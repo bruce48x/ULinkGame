@@ -15,18 +15,19 @@
 
 ## new
 
-命令参数与 `ulinkrpc-starter new` 对齐：
+命令参数面向 ULinkGame 项目创建，并会把可兼容的参数转发给 `ulinkrpc-starter`：
 
 ```bash
 ulinkgame-tool new --name MyGame --output ./out --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter new` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充：
+该命令会先调用 `ulinkrpc-starter` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充：
 
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
 - 基于 `ULinkGame.Server` 的 gateway 启动代码
 - Orleans 配置文件
+- 当 `--client-engine godot` 时，生成 Godot .NET `Client/`
 - `ulinkgame.tool.json`
 
 最终会在输出目录下生成：
@@ -47,7 +48,7 @@ ulinkgame-tool new
 
 ## codegen
 
-根据 `ulinkgame.tool.json` 所在项目根目录，委托 `ulinkrpc-starter codegen` 重新生成 RPC 代码：
+根据 `ulinkgame.tool.json` 所在项目根目录，恢复本地 .NET 工具并调用 `ulinkrpc-codegen` 重新生成 RPC 代码：
 
 ```bash
 ulinkgame-tool codegen

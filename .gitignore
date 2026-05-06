@@ -11,6 +11,7 @@ Thumbs.db
 # .NET build outputs
 **/bin/
 **/obj/
+src/**/*.meta
 /_artifacts/
 /.dotnet/
 /.dotnetcli/
@@ -68,6 +69,7 @@ Thumbs.db
 /samples/*/Client/*.mdb
 /samples/*/Client/*.opendb
 /samples/*/Client/*.VC.db
+!/samples/*.Godot/Client/*.csproj
 
 # NuGetForUnity restored packages in samples
 /samples/*/Client/Assets/Packages/
@@ -75,7 +77,10 @@ Thumbs.db
 # Godot generated folders and imported assets
 /samples/*/.godot/
 /samples/*/.import/
+/samples/*/Client/.godot/
+/samples/*/Client/.import/
 /samples/*/export_presets.cfg
+/samples/*/Client/export_presets.cfg
 *.import
 
 # Logs

@@ -64,6 +64,11 @@ internal static class ULinkGameToolCli
             return 1;
         }
 
+        if (IsGodot(options.ClientEngine))
+        {
+            await ReplaceGeneratedClientWithGodotClientAsync(projectRoot, projectName, options).ConfigureAwait(false);
+        }
+
         await AugmentProjectWithULinkGameServerAsync(projectRoot, options).ConfigureAwait(false);
 
         var configPath = Path.Combine(projectRoot, "ulinkgame.tool.json");
@@ -97,7 +102,7 @@ internal static class ULinkGameToolCli
         var rootPath = Path.GetDirectoryName(Path.GetFullPath(configPath))
             ?? Directory.GetCurrentDirectory();
 
-        var starterExitCode = await RunULinkRpcStarterCodegenAsync(rootPath, options.NoRestore).ConfigureAwait(false);
+        var starterExitCode = await RunULinkRpcCodegenAsync(rootPath, config, options.NoRestore).ConfigureAwait(false);
         if (starterExitCode != 0)
         {
             return starterExitCode;
@@ -207,13 +212,10 @@ internal static class ULinkGameToolCli
     {
         var arguments = new[]
         {
-            "new",
             "--name", projectName,
             "--output", outputDirectory,
-            "--client-engine", options.ClientEngine,
             "--transport", options.Transport,
-            "--serializer", options.Serializer,
-            "--nugetforunity-source", options.NuGetForUnitySource
+            "--serializer", options.Serializer
         };
 
         foreach (var invocation in EnumerateULinkRpcStarterInvocations(arguments))
@@ -235,36 +237,53 @@ internal static class ULinkGameToolCli
         return 1;
     }
 
-    private static async Task<int> RunULinkRpcStarterCodegenAsync(string projectRoot, bool noRestore)
+    private static async Task<int> RunULinkRpcCodegenAsync(string projectRoot, ToolConfig config, bool noRestore)
     {
-        var arguments = new List<string>
+        if (!noRestore)
         {
-            "codegen",
-            "--project-root", projectRoot
-        };
-
-        if (noRestore)
-        {
-            arguments.Add("--no-restore");
-        }
-
-        foreach (var invocation in EnumerateULinkRpcStarterInvocations(arguments))
-        {
-            try
+            var restoreExitCode = await RunProcessAsync("dotnet", ["tool", "restore"], projectRoot).ConfigureAwait(false);
+            if (restoreExitCode != 0)
             {
-                return await RunProcessAsync(invocation.FileName, invocation.Arguments, Directory.GetCurrentDirectory()).ConfigureAwait(false);
-            }
-            catch (Win32Exception) when (invocation.CanFallback)
-            {
-            }
-            catch (InvalidOperationException) when (invocation.CanFallback)
-            {
+                return restoreExitCode;
             }
         }
 
-        Console.Error.WriteLine("Unable to locate `ulinkrpc-starter`.");
-        Console.Error.WriteLine("Install it globally or expose it on PATH before running `ulinkgame-tool codegen`.");
-        return 1;
+        foreach (var arguments in BuildCodegenInvocations(projectRoot, config))
+        {
+            var exitCode = await RunProcessAsync("dotnet", ["tool", "run", "ulinkrpc-codegen", "--", .. arguments], projectRoot).ConfigureAwait(false);
+            if (exitCode != 0)
+            {
+                return exitCode;
+            }
+        }
+
+        return 0;
+    }
+
+    private static IEnumerable<string[]> BuildCodegenInvocations(string projectRoot, ToolConfig config)
+    {
+        var codegen = config.Codegen;
+        var contractsPath = Path.Combine(projectRoot, codegen.ContractsPath);
+
+        if (codegen.Server is not null)
+        {
+            yield return [
+                "--mode", "server",
+                "--contracts", contractsPath,
+                "--server-output", Path.Combine(projectRoot, codegen.Server.ProjectPath, codegen.Server.OutputPath),
+                "--server-namespace", codegen.Server.Namespace
+            ];
+        }
+
+        if (codegen.UnityClient is not null)
+        {
+            yield return [
+                "--mode", "unity",
+                "--contracts", contractsPath,
+                "--output", Path.Combine(projectRoot, codegen.UnityClient.ProjectPath, codegen.UnityClient.OutputPath),
+                "--namespace", codegen.UnityClient.Namespace
+            ];
+        }
     }
 
     private static IEnumerable<ProcessInvocation> EnumerateULinkRpcStarterInvocations(IReadOnlyList<string> commandArguments)
@@ -293,6 +312,111 @@ internal static class ULinkGameToolCli
         var destinationPath = Path.Combine(projectRoot, "src", "ULinkGame.Server");
 
         CopyDirectory(sourcePath, destinationPath);
+    }
+
+    private static async Task ReplaceGeneratedClientWithGodotClientAsync(string projectRoot, string projectName, NewCommandOptions options)
+    {
+        var clientDirectory = Path.Combine(projectRoot, "Client");
+        if (Directory.Exists(clientDirectory))
+        {
+            Directory.Delete(clientDirectory, recursive: true);
+        }
+
+        Directory.CreateDirectory(Path.Combine(clientDirectory, "Scenes"));
+        Directory.CreateDirectory(Path.Combine(clientDirectory, "Scripts"));
+        Directory.CreateDirectory(Path.Combine(clientDirectory, "Scripts", "Rpc", "Generated"));
+
+        await Task.WhenAll(
+            File.WriteAllTextAsync(Path.Combine(clientDirectory, $"{projectName}.csproj"), RenderGodotProject(projectName, options) + Environment.NewLine),
+            File.WriteAllTextAsync(Path.Combine(clientDirectory, "project.godot"), RenderGodotProjectSettings(projectName) + Environment.NewLine),
+            File.WriteAllTextAsync(Path.Combine(clientDirectory, "Scenes", "Main.tscn"), RenderGodotMainScene() + Environment.NewLine),
+            File.WriteAllTextAsync(Path.Combine(clientDirectory, "Scripts", "Main.cs"), RenderGodotMainScript(projectName) + Environment.NewLine)).ConfigureAwait(false);
+    }
+
+    private static string RenderGodotProject(string projectName, NewCommandOptions options)
+    {
+        var (serializerPackage, _) = GetSerializerArtifacts(options.Serializer);
+        var (transportPackage, _) = GetTransportArtifacts(options.Transport);
+        var rootNamespace = SanitizeCSharpIdentifier(projectName.Replace('.', '_'));
+
+        return $"""
+        <Project Sdk="Godot.NET.Sdk/4.3.0">
+          <PropertyGroup>
+            <TargetFramework>net8.0</TargetFramework>
+            <RootNamespace>{rootNamespace}</RootNamespace>
+            <Nullable>enable</Nullable>
+            <EnableDynamicLoading>true</EnableDynamicLoading>
+          </PropertyGroup>
+
+          <ItemGroup>
+            <ProjectReference Include="..\Shared\Shared.csproj" />
+          </ItemGroup>
+
+          <ItemGroup>
+            <PackageReference Include="ULinkRPC.Core" Version="0.11.2" />
+            <PackageReference Include="ULinkRPC.Client" Version="0.11.0" />
+            <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
+            <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
+          </ItemGroup>
+        </Project>
+        """;
+    }
+
+    private static string RenderGodotProjectSettings(string projectName)
+    {
+        return $$"""
+        ; Engine configuration file.
+
+        config_version=5
+
+        [application]
+
+        config/name="{{SanitizeGodotString(projectName)}}"
+        run/main_scene="res://Scenes/Main.tscn"
+        config/features=PackedStringArray("4.3", "C#", "Forward Plus")
+
+        [dotnet]
+
+        project/assembly_name="{{SanitizeGodotString(projectName)}}"
+        """;
+    }
+
+    private static string RenderGodotMainScene()
+    {
+        return """
+        [gd_scene load_steps=2 format=3 uid="uid://ulinkgame_starter_main"]
+
+        [ext_resource type="Script" path="res://Scripts/Main.cs" id="1_main"]
+
+        [node name="Main" type="Node2D"]
+        script = ExtResource("1_main")
+        """;
+    }
+
+    private static string RenderGodotMainScript(string projectName)
+    {
+        var namespaceName = SanitizeCSharpIdentifier(projectName.Replace('.', '_'));
+
+        return $$"""
+        using Godot;
+        using Shared.Interfaces;
+
+        namespace {{namespaceName}}.Scripts;
+
+        public partial class Main : Node2D
+        {
+            public override void _Draw()
+            {
+                var request = new PingRequest { Message = "Hello from Godot" };
+                DrawString(ThemeDB.FallbackFont, new Vector2(24, 40), $"ULinkGame Godot client ready: {request.Message}");
+            }
+        }
+        """;
+    }
+
+    private static bool IsGodot(string clientEngine)
+    {
+        return string.Equals(clientEngine, "godot", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveTemplateRoot()
@@ -788,6 +912,22 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
+    private static string SanitizeGodotString(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    private static string SanitizeCSharpIdentifier(string value)
+    {
+        var sanitized = new string(value.Select(static c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray());
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            return "Game";
+        }
+
+        return char.IsDigit(sanitized[0]) ? "_" + sanitized : sanitized;
+    }
+
     private static string IndentBlock(string block, int level)
     {
         var indent = new string(' ', level * 4);
@@ -857,7 +997,7 @@ internal sealed class ToolConfig
                 UnityClient = new CodegenTargetConfig
                 {
                     ProjectPath = "Client",
-                    OutputPath = "Assets/Scripts/Rpc/Generated",
+                    OutputPath = string.Equals(options.ClientEngine, "godot", StringComparison.OrdinalIgnoreCase) ? "Scripts/Rpc/Generated" : "Assets/Scripts/Rpc/Generated",
                     Namespace = "Rpc.Generated"
                 }
             }
