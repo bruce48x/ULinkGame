@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="../Shared/Shared.csproj" />
+  <Project Path="../../../src/ULinkGame.Client/ULinkGame.Client.csproj" />
+  <Project Path="../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
+  <Project Path="../../../src/ULinkGame.Tool/ULinkGame.Tool.csproj" />
+  <Project Path="Server/Server.csproj" />
+  <Project Path="Orleans.Contracts/Orleans.Contracts.csproj" />
+  <Project Path="Silo/Silo.csproj" />
+  <Project Path="../tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj" />
+</Solution>

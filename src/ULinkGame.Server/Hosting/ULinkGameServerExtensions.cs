@@ -1,0 +1,102 @@
+using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+
+namespace ULinkGame.Server.Hosting;
+
+public static class ULinkGameServerExtensions
+{
+    public static IHostApplicationBuilder AddULinkGameServerOrleansClient(this IHostApplicationBuilder builder)
+    {
+        builder.UseOrleansClient(client =>
+        {
+            var configuration = builder.Configuration;
+            var clusterId = configuration["Orleans:ClusterId"] ?? "dev";
+            var serviceId = configuration["Orleans:ServiceId"] ?? "ULinkGame-Server";
+            var invariant = configuration["Orleans:Invariant"] ?? "Npgsql";
+            var connectionString = configuration["Orleans:ConnectionString"]
+                ?? throw new InvalidOperationException("Missing configuration: Orleans:ConnectionString");
+
+            client.Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = clusterId;
+                options.ServiceId = serviceId;
+            });
+
+            client.UseAdoNetClustering(options =>
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+        });
+
+        return builder;
+    }
+
+    public static IHostBuilder UseULinkGameServerOrleansSilo(this IHostBuilder hostBuilder)
+    {
+        return hostBuilder.UseULinkGameServerOrleansSilo(configureSilo: null);
+    }
+
+    public static IHostBuilder UseULinkGameServerOrleansSilo(
+        this IHostBuilder hostBuilder,
+        Action<HostBuilderContext, ISiloBuilder>? configureSilo)
+    {
+        return hostBuilder.UseOrleans((context, silo) =>
+        {
+            var configuration = context.Configuration;
+            var clusterId = configuration["Orleans:ClusterId"] ?? "dev";
+            var serviceId = configuration["Orleans:ServiceId"] ?? "ULinkGame-Server";
+            var invariant = configuration["Orleans:Invariant"] ?? "Npgsql";
+            var connectionString = configuration["Orleans:ConnectionString"]
+                ?? throw new InvalidOperationException("Missing configuration: Orleans:ConnectionString");
+            var siloPort = ParsePort(configuration["Orleans:SiloPort"], 11111);
+            var gatewayPort = ParsePort(configuration["Orleans:GatewayPort"], 30000);
+            var advertisedIPAddress = ParseIPAddress(configuration["Orleans:AdvertisedIPAddress"]);
+
+            silo.Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = clusterId;
+                options.ServiceId = serviceId;
+            });
+
+            if (advertisedIPAddress is null)
+            {
+                silo.ConfigureEndpoints(siloPort: siloPort, gatewayPort: gatewayPort);
+            }
+            else
+            {
+                silo.ConfigureEndpoints(advertisedIP: advertisedIPAddress, siloPort: siloPort, gatewayPort: gatewayPort);
+            }
+
+            silo.UseAdoNetClustering(options =>
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+
+            configureSilo?.Invoke(context, silo);
+        });
+    }
+
+    private static int ParsePort(string? rawValue, int fallback)
+    {
+        return int.TryParse(rawValue, out var port) && port > 0
+            ? port
+            : fallback;
+    }
+
+    private static IPAddress? ParseIPAddress(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        return IPAddress.TryParse(rawValue, out var address)
+            ? address
+            : throw new InvalidOperationException($"Invalid configuration: Orleans:AdvertisedIPAddress '{rawValue}'");
+    }
+}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ULinkGame.Server</RootNamespace>
+    <Authors>ULinkGame</Authors>
+    <Company>ULinkGame</Company>
+    <Product>ULinkGame</Product>
+    <PackageId>ULinkGame.Server</PackageId>
+    <Description>Server-side hosting helpers, Orleans integration, and reliable push infrastructure for ULinkGame applications.</Description>
+    <PackageTags>ulinkgame;ulinkrpc;game;server;orleans;rpc;reliable-push</PackageTags>
+    <PackageProjectUrl>https://github.com/bruce48x/ULinkRPC-Sample</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/bruce48x/ULinkRPC-Sample</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
+    <PackageReference Include="ULinkRPC.Server" Version="0.11.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

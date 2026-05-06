@@ -1,0 +1,82 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vs/
+*.suo
+*.user
+*.userprefs
+*.DotSettings.user
+
+# .NET build outputs
+**/bin/
+**/obj/
+/_artifacts/
+/.dotnet/
+/.dotnetcli/
+/.nuget/
+/_verify/
+/.buildtmp/
+
+# Unity generated folders
+/Client/[Ll]ibrary/
+/Client/[Tt]emp/
+/Client/[Ll]ogs/
+/Client/[Uu]ser[Ss]ettings/
+/Client/[Oo]bj/
+/Client/[Bb]uild/
+/Client/[Bb]uilds/
+/Client/[Mm]emoryCaptures/
+/Client/[Rr]ecordings/
+
+# Unity generated project/IDE files
+/Client/*.csproj
+/Client/*.sln
+/Client/*.slnx
+/Client/*.unityproj
+/Client/*.pidb
+/Client/*.booproj
+/Client/*.svd
+/Client/*.pdb
+/Client/*.mdb
+/Client/*.opendb
+/Client/*.VC.db
+
+# NuGetForUnity restored packages
+/Client/Assets/Packages/
+
+# Unity sample generated folders
+/samples/*/Client/[Ll]ibrary/
+/samples/*/Client/[Tt]emp/
+/samples/*/Client/[Ll]ogs/
+/samples/*/Client/[Uu]ser[Ss]ettings/
+/samples/*/Client/[Oo]bj/
+/samples/*/Client/[Bb]uild/
+/samples/*/Client/[Bb]uilds/
+/samples/*/Client/[Mm]emoryCaptures/
+/samples/*/Client/[Rr]ecordings/
+
+# Unity sample generated project/IDE files
+/samples/*/Client/*.csproj
+/samples/*/Client/*.sln
+/samples/*/Client/*.slnx
+/samples/*/Client/*.unityproj
+/samples/*/Client/*.pidb
+/samples/*/Client/*.booproj
+/samples/*/Client/*.svd
+/samples/*/Client/*.pdb
+/samples/*/Client/*.mdb
+/samples/*/Client/*.opendb
+/samples/*/Client/*.VC.db
+
+# NuGetForUnity restored packages in samples
+/samples/*/Client/Assets/Packages/
+
+# Godot generated folders and imported assets
+/samples/*/.godot/
+/samples/*/.import/
+/samples/*/export_presets.cfg
+*.import
+
+# Logs
+*.log

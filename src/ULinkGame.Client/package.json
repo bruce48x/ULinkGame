@@ -1,0 +1,10 @@
+{
+  "name": "com.ulinkgame.client",
+  "version": "1.0.0",
+  "displayName": "ULinkGame Client",
+  "description": "Engine-neutral ULinkGame client helpers.",
+  "unity": "2022.3",
+  "author": {
+    "name": "ULinkGame"
+  }
+}

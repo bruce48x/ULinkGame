@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ULinkGame.Client.Tests/ULinkGame.Client.Tests.csproj" />
+  <Project Path="ULinkGame.Server.Tests/ULinkGame.Server.Tests.csproj" />
+</Solution>
