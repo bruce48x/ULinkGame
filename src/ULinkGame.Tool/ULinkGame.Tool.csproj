@@ -11,6 +11,7 @@
     <Company>ULinkGame</Company>
     <Product>ULinkGame</Product>
     <PackageId>ULinkGame.Tool</PackageId>
+    <Version>0.1.1</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and code generation workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;codegen</PackageTags>
     <PackageProjectUrl>https://github.com/bruce48x/ULinkRPC-Sample</PackageProjectUrl>

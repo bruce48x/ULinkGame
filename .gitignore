@@ -11,6 +11,7 @@ Thumbs.db
 # .NET build outputs
 **/bin/
 **/obj/
+**/artifacts/
 src/**/*.meta
 /_artifacts/
 /.dotnet/
@@ -18,30 +19,6 @@ src/**/*.meta
 /.nuget/
 /_verify/
 /.buildtmp/
-
-# Unity generated folders
-/Client/[Ll]ibrary/
-/Client/[Tt]emp/
-/Client/[Ll]ogs/
-/Client/[Uu]ser[Ss]ettings/
-/Client/[Oo]bj/
-/Client/[Bb]uild/
-/Client/[Bb]uilds/
-/Client/[Mm]emoryCaptures/
-/Client/[Rr]ecordings/
-
-# Unity generated project/IDE files
-/Client/*.csproj
-/Client/*.sln
-/Client/*.slnx
-/Client/*.unityproj
-/Client/*.pidb
-/Client/*.booproj
-/Client/*.svd
-/Client/*.pdb
-/Client/*.mdb
-/Client/*.opendb
-/Client/*.VC.db
 
 # NuGetForUnity restored packages
 /Client/Assets/Packages/

@@ -8,6 +8,7 @@
     <Company>ULinkGame</Company>
     <Product>ULinkGame</Product>
     <PackageId>ULinkGame.Server</PackageId>
+    <Version>0.1.1</Version>
     <Description>Server-side hosting helpers, Orleans integration, and reliable push infrastructure for ULinkGame applications.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;server;orleans;rpc;reliable-push</PackageTags>
     <PackageProjectUrl>https://github.com/bruce48x/ULinkRPC-Sample</PackageProjectUrl>

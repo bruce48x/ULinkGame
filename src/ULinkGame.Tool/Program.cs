@@ -11,6 +11,14 @@ internal static class ULinkGameToolCli
     private static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
     private static readonly string[] SupportedSerializers = ["json", "memorypack"];
     private static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];
+    private const string ULinkGameClientVersion = "0.1.1";
+    private const string ULinkGameServerVersion = "0.1.1";
+    private const string ULinkRpcStarterVersion = "0.2.52";
+    private const string ULinkRpcCoreVersion = "0.11.2";
+    private const string ULinkRpcClientVersion = "0.11.1";
+    private const string ULinkRpcServerVersion = "0.11.7";
+    private const string OrleansVersion = "10.0.0";
+    private const string NpgsqlVersion = "9.0.4";
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -294,7 +302,7 @@ internal static class ULinkGameToolCli
 
     private static async Task AugmentProjectWithULinkGameServerAsync(string projectRoot, NewCommandOptions options)
     {
-        CopyULinkGameServerSource(projectRoot);
+        await WriteDotNetToolManifestAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteGatewayProgramAsync(projectRoot).ConfigureAwait(false);
         await WriteGatewayProjectAsync(projectRoot, options).ConfigureAwait(false);
@@ -303,15 +311,6 @@ internal static class ULinkGameToolCli
         await WriteSiloProjectAsync(projectRoot).ConfigureAwait(false);
         await WriteSiloProgramAsync(projectRoot).ConfigureAwait(false);
         await WriteSiloAppSettingsAsync(projectRoot).ConfigureAwait(false);
-    }
-
-    private static void CopyULinkGameServerSource(string projectRoot)
-    {
-        var templateRoot = ResolveTemplateRoot();
-        var sourcePath = Path.Combine(templateRoot, "src", "ULinkGame.Server");
-        var destinationPath = Path.Combine(projectRoot, "src", "ULinkGame.Server");
-
-        CopyDirectory(sourcePath, destinationPath);
     }
 
     private static async Task ReplaceGeneratedClientWithGodotClientAsync(string projectRoot, string projectName, NewCommandOptions options)
@@ -353,8 +352,9 @@ internal static class ULinkGameToolCli
           </ItemGroup>
 
           <ItemGroup>
-            <PackageReference Include="ULinkRPC.Core" Version="0.11.2" />
-            <PackageReference Include="ULinkRPC.Client" Version="0.11.0" />
+            <PackageReference Include="ULinkGame.Client" Version="{ULinkGameClientVersion}" />
+            <PackageReference Include="ULinkRPC.Core" Version="{ULinkRpcCoreVersion}" />
+            <PackageReference Include="ULinkRPC.Client" Version="{ULinkRpcClientVersion}" />
             <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
             <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
           </ItemGroup>
@@ -419,66 +419,30 @@ internal static class ULinkGameToolCli
         return string.Equals(clientEngine, "godot", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string ResolveTemplateRoot()
+    private static Task WriteDotNetToolManifestAsync(string projectRoot)
     {
-        var candidates = new[]
-        {
-            Directory.GetCurrentDirectory(),
-            AppContext.BaseDirectory
-        };
+        var toolManifestDirectory = Path.Combine(projectRoot, ".config");
+        Directory.CreateDirectory(toolManifestDirectory);
 
-        foreach (var candidate in candidates)
-        {
-            var current = new DirectoryInfo(candidate);
-            while (current is not null)
+        var content =
+            $$"""
             {
-                if (File.Exists(Path.Combine(current.FullName, "src", "ULinkGame.Server", "ULinkGame.Server.csproj")))
-                {
-                    return current.FullName;
+              "version": 1,
+              "isRoot": true,
+              "tools": {
+                "ulinkrpc.starter": {
+                  "version": "{{ULinkRpcStarterVersion}}",
+                  "commands": [
+                    "ulinkrpc-starter",
+                    "ulinkrpc-codegen"
+                  ],
+                  "rollForward": false
                 }
-
-                current = current.Parent;
+              }
             }
-        }
+            """;
 
-        throw new InvalidOperationException("Unable to locate local ULinkGame.Server source templates.");
-    }
-
-    private static void CopyDirectory(string sourcePath, string destinationPath)
-    {
-        Directory.CreateDirectory(destinationPath);
-
-        foreach (var directory in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(sourcePath, directory);
-            if (IsBuildArtifactPath(relative))
-            {
-                continue;
-            }
-
-            Directory.CreateDirectory(Path.Combine(destinationPath, relative));
-        }
-
-        foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(sourcePath, file);
-            if (IsBuildArtifactPath(relative))
-            {
-                continue;
-            }
-
-            var destinationFile = Path.Combine(destinationPath, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationFile)!);
-            File.Copy(file, destinationFile, overwrite: true);
-        }
-    }
-
-    private static bool IsBuildArtifactPath(string relativePath)
-    {
-        var segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return segments.Any(static segment =>
-            string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
+        return File.WriteAllTextAsync(Path.Combine(toolManifestDirectory, "dotnet-tools.json"), content + Environment.NewLine);
     }
 
     private static Task WriteServerSolutionAsync(string projectRoot)
@@ -487,7 +451,6 @@ internal static class ULinkGameToolCli
             """
             <Solution>
               <Project Path="../Shared/Shared.csproj" />
-              <Project Path="../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
               <Project Path="Server/Server.csproj" />
               <Project Path="Silo/Silo.csproj" />
             </Solution>
@@ -550,14 +513,14 @@ internal static class ULinkGameToolCli
 
               <ItemGroup>
                 <ProjectReference Include="..\..\Shared\Shared.csproj" />
-                <ProjectReference Include="..\..\..\..\src\ULinkGame.Server\ULinkGame.Server.csproj" />
               </ItemGroup>
 
               <ItemGroup>
-                <PackageReference Include="ULinkRPC.Server" Version="0.11.7" />
+                <PackageReference Include="ULinkGame.Server" Version="{ULinkGameServerVersion}" />
+                <PackageReference Include="ULinkRPC.Server" Version="{ULinkRpcServerVersion}" />
                 <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
                 <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
-                <PackageReference Include="Npgsql" Version="9.0.4" />
+                <PackageReference Include="Npgsql" Version="{NpgsqlVersion}" />
               </ItemGroup>
 
               <ItemGroup>
@@ -679,8 +642,8 @@ internal sealed class {typeName}
 
     private static Task WriteSiloProjectAsync(string projectRoot)
     {
-        const string content =
-            """
+        var content =
+            $$"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <OutputType>Exe</OutputType>
@@ -690,11 +653,11 @@ internal sealed class {typeName}
               </PropertyGroup>
 
               <ItemGroup>
-                <ProjectReference Include="..\..\..\..\src\ULinkGame.Server\ULinkGame.Server.csproj" />
-                <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.0.0" />
-                <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.0.0" />
-                <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
-                <PackageReference Include="Npgsql" Version="9.0.4" />
+                <PackageReference Include="ULinkGame.Server" Version="{{ULinkGameServerVersion}}" />
+                <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="{{OrleansVersion}}" />
+                <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="{{OrleansVersion}}" />
+                <PackageReference Include="Microsoft.Orleans.Server" Version="{{OrleansVersion}}" />
+                <PackageReference Include="Npgsql" Version="{{NpgsqlVersion}}" />
               </ItemGroup>
 
               <ItemGroup>
