@@ -17,12 +17,6 @@
       "dependencies": {},
       "url": "https://package.openupm.com"
     },
-    "com.ulinkgame.client": {
-      "version": "file:../../../../src/ULinkGame.Client",
-      "depth": 0,
-      "source": "local",
-      "dependencies": {}
-    },
     "com.ulinkgame.agar.unity.shared": {
       "version": "file:../../Shared",
       "depth": 0,

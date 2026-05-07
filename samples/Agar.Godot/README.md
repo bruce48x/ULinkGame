@@ -21,7 +21,7 @@ samples/Agar.Godot/
 
 ## Dependencies
 
-- `src/ULinkGame.Client`
+- `ULinkGame.Client` NuGet package
 - `src/ULinkGame.Server`
 - local `Shared`
 

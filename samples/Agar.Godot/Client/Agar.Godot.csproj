@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../src/ULinkGame.Client/ULinkGame.Client.csproj" />
+    <PackageReference Include="ULinkGame.Client" Version="0.1.2" />
     <ProjectReference Include="../Shared/Shared.csproj" />
   </ItemGroup>
 </Project>
