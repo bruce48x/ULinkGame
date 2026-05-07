@@ -3,7 +3,7 @@ languageCode = "zh-cn"
 title = "ULinkGame Blog"
 
 [params]
-description = "Game-session infrastructure notes for ULinkGame."
+description = "Game-session infrastructure notes for ULinkRPC and Microsoft Orleans integration."
 repo = "https://github.com/bruce48x/ULinkGame"
 
 [markup]

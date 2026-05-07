@@ -6,7 +6,7 @@ This document is for people working on the ULinkGame repository itself. User-fac
 
 ```txt
 src/
-  ULinkGame.Server/       Server-side hosting, Orleans integration, reliable push outbox
+  ULinkGame.Server/       Server-side hosting, Microsoft Orleans integration, reliable push outbox
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Tool/         Project management tool entry point
 
@@ -60,7 +60,7 @@ It is separate from runtime packages. Runtime code belongs in `ULinkGame.Server`
 
 ### Background
 
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Orleans, dependency injection, and process lifetime. Reliable business push changes that boundary. The framework now owns mechanics that must be understood by both sides of a game session:
+The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Reliable business push changes that boundary. The framework now owns mechanics that must be understood by both sides of a game session:
 
 - reconnect versus new-session decisions
 - business push sequencing
@@ -85,10 +85,11 @@ Do not introduce `ULinkGame.Unity` yet.
 
 ### Why ULinkGame
 
-`ULinkGame` clearly communicates that this layer is above raw RPC and is intended for game networking workflows. The relationship should be:
+`ULinkGame` clearly communicates that this layer is above raw RPC and standalone actor hosting, and is intended for game networking workflows. The relationship should be:
 
 - `ULinkRPC`: transport, serialization, RPC calls, and generated bindings
-- `ULinkGame`: game-session infrastructure built on top of ULinkRPC
+- `Microsoft Orleans`: distributed actors, clustering, placement, and grain state
+- `ULinkGame`: game-session infrastructure that integrates ULinkRPC and Microsoft Orleans
 - user game code: matchmaking, room rules, gameplay state, rewards, inventory, and other domain features
 
 This keeps the product line understandable without forcing a thick game framework.

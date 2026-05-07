@@ -21,12 +21,12 @@
 ulinkgame-tool new --name MyGame --output ./out --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充：
+该命令会先调用 `ulinkrpc-starter` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施：
 
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
 - 基于 `ULinkGame.Server` 的 gateway 启动代码
-- Orleans 配置文件
+- Microsoft Orleans 配置文件
 - 当 `--client-engine godot` 时，生成 Godot .NET `Client/`
 - `ulinkgame.tool.json`
 
