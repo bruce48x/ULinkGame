@@ -1,4 +1,5 @@
 using Orleans.Contracts.Users;
+using Orleans.Contracts.Leaderboard;
 using Orleans.Contracts;
 using Orleans.Contracts.Sessions;
 using Server.Realtime;
@@ -147,8 +148,38 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             Token = loginResult.SessionToken,
             PlayerId = loginResult.UserId,
             WinCount = loginResult.WinCount,
+            VictoryPoints = loginResult.VictoryPoints,
             Account = account,
             Password = req.GuestLogin ? password : string.Empty
+        };
+    }
+
+    public async ValueTask<LeaderboardReply> GetLeaderboardAsync(LeaderboardRequest req)
+    {
+        ThrowIfDisposed();
+
+        var topN = req.TopN <= 0 ? 10 : req.TopN;
+        var snapshot = await _clusterClient.GetGrain<ILeaderboardGrain>(0)
+            .GetLeaderboardAsync(topN)
+            .ConfigureAwait(false);
+
+        _logger.LogInformation("Leaderboard queried. TopN={TopN} Returned={Returned} Period={PeriodStartUtc}.",
+            topN,
+            snapshot.Entries.Count,
+            snapshot.PeriodStartUtc);
+
+        return new LeaderboardReply
+        {
+            Code = 0,
+            PeriodStartUtc = snapshot.PeriodStartUtc,
+            SecondsUntilReset = snapshot.SecondsUntilReset,
+            Entries = snapshot.Entries.Select(static entry => new Shared.Interfaces.LeaderboardEntry
+            {
+                PlayerId = entry.PlayerId,
+                VictoryPoints = entry.VictoryPoints,
+                WinCount = entry.WinCount,
+                Rank = entry.Rank
+            }).ToList()
         };
     }
 

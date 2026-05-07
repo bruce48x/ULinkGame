@@ -123,9 +123,6 @@ namespace SampleClient.Gameplay
                 renderState.Mass = player.Mass;
                 renderState.Radius = player.Radius;
                 renderState.MoveSpeed = player.MoveSpeed;
-                renderState.SpeedBoostRemainingSeconds = player.SpeedBoostRemainingSeconds;
-                renderState.KnockbackBoostRemainingSeconds = player.KnockbackBoostRemainingSeconds;
-                renderState.ShieldRemainingSeconds = player.ShieldRemainingSeconds;
 
                 view.SetIdentity(player.PlayerId, player.Score);
                 if (_playerOverlayViews.TryGetValue(player.PlayerId, out var overlay))

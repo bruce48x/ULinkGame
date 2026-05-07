@@ -4,10 +4,10 @@
 
 ## 文档入口
 
-- [玩法与架构设计](docs/GAMEPLAY_DESIGN.md)
+- [玩法与架构设计](docs/GAMEPLAY_DESIGN.md)（总索引，各功能子文档在 `docs/features/` 下）
 - [开发计划](docs/DEVELOPMENT_PLAN.md)
 
-`README.md` 只保留项目入口、运行方式和代码索引；玩法规则、客户端服务端边界、联机流程和后续架构判断都放在玩法设计文档里，避免重复维护。
+`README.md` 只保留项目入口、运行方式和代码索引；玩法规则、胜利积分系统、客户端服务端边界、联机流程和分布式架构判断都放在 `docs/features/` 下的功能子文档里，避免重复维护。
 
 ## 样例内容
 
@@ -29,16 +29,20 @@ samples/Agar.Unity
  ├─ Shared
  │  ├─ Gameplay
  │  │  ├─ ArenaConfig.cs
- │  │  └─ ArenaSimulation.cs
+ │  │  ├─ ArenaSimulation.cs
+ │  │  └─ VictoryPointAwards.cs
  │  └─ Interfaces
  │     └─ IPlayerService.cs
  ├─ Server
+ │  ├─ Orleans.Contracts
+ │  │  └─ Leaderboard
  │  ├─ Server
  │  │  ├─ Realtime
  │  │  │  └─ RoomRuntime.cs
  │  │  └─ Services
  │  │     └─ PlayerService.cs
  │  └─ Silo
+ │     └─ Leaderboard
  ├─ Client
  │  └─ Assets
  │     └─ Scripts
@@ -54,6 +58,7 @@ samples/Agar.Unity
 - `Shared/Gameplay/ArenaSimulation.cs`：玩法规则内核，单机和联机共用。
 - `Shared/Interfaces/IPlayerService.cs`：客户端和服务端共用的 RPC 协议。
 - `Server/Server/Realtime/RoomRuntime.cs`：服务端房间模拟和世界状态广播。
+- `Server/Silo/Leaderboard/LeaderboardGrain.cs`：胜利积分排行榜周期、排序和归档。
 - `Client/Assets/Scripts/Gameplay/DotArenaGame.cs`：客户端主流程、输入、渲染、模式切换和网络会话编排。
 
 相关单元测试位于 `samples/Agar.Unity/tests/BusinessLogic.Tests`。仓库根目录 `Tests` 目录只包含 ULinkGame 框架测试。
@@ -103,8 +108,13 @@ DELETE FROM OrleansMembershipVersionTable WHERE DeploymentId = 'dev';
 - 成长、吞噬、复活、AI 补位和胜负判定。
 - 控制连接和实时连接的联机样例。
 - 登录重连参数、可靠业务推送和玩家碰撞表现。
+- 旧 dash / buff 协议清理，输入只保留移动方向和 tick。
+- 服务端胜利积分、周榜查询、最近两周归档和客户端真实排行榜展示。
+- `samples/Agar.Unity/CLAUDE.md` 开发入口与工作流说明。
+- 自动化测试 20 个，覆盖模拟规则、匹配队列和胜利积分基础规则。
 
 仍需继续验证：
 
 - Unity 编辑器内完整单机流程回归。
-- 联机模式下 UI 交互和视觉细节的最终打磨。
+- 联机模式下 UI 交互、积分发放、排行榜刷新和视觉细节的最终打磨。
+- 跨网关实时路由设计与实现。

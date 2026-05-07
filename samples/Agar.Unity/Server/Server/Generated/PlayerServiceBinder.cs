@@ -14,9 +14,9 @@ namespace Server.Generated
     {
         private const int ServiceId = 1;
 
-        public static void Bind(RpcServiceRegistry registry, Func<LoginRequest, ValueTask<LoginReply>> loginAsyncHandler, Func<MatchmakingRequest, ValueTask> startMatchmakingAsyncHandler, Func<CancelMatchmakingRequest, ValueTask> cancelMatchmakingAsyncHandler, Func<RealtimeAttachRequest, ValueTask<RealtimeAttachReply>> attachRealtimeAsyncHandler, Func<ReliablePushAckRequest, ValueTask<ReliablePushAckReply>> ackReliablePushAsyncHandler, Func<InputMessage, ValueTask> submitInputHandler, Func<LogoutRequest, ValueTask> logoutAsyncHandler)
+        public static void Bind(RpcServiceRegistry registry, Func<LoginRequest, ValueTask<LoginReply>> loginAsyncHandler, Func<MatchmakingRequest, ValueTask> startMatchmakingAsyncHandler, Func<CancelMatchmakingRequest, ValueTask> cancelMatchmakingAsyncHandler, Func<RealtimeAttachRequest, ValueTask<RealtimeAttachReply>> attachRealtimeAsyncHandler, Func<ReliablePushAckRequest, ValueTask<ReliablePushAckReply>> ackReliablePushAsyncHandler, Func<LeaderboardRequest, ValueTask<LeaderboardReply>> getLeaderboardAsyncHandler, Func<InputMessage, ValueTask> submitInputHandler, Func<LogoutRequest, ValueTask> logoutAsyncHandler)
         {
-            BindFactory(registry, _ => new DelegateImpl(loginAsyncHandler, startMatchmakingAsyncHandler, cancelMatchmakingAsyncHandler, attachRealtimeAsyncHandler, ackReliablePushAsyncHandler, submitInputHandler, logoutAsyncHandler));
+            BindFactory(registry, _ => new DelegateImpl(loginAsyncHandler, startMatchmakingAsyncHandler, cancelMatchmakingAsyncHandler, attachRealtimeAsyncHandler, ackReliablePushAsyncHandler, getLeaderboardAsyncHandler, submitInputHandler, logoutAsyncHandler));
         }
 
         private sealed class DelegateImpl : IPlayerService
@@ -26,16 +26,18 @@ namespace Server.Generated
             private readonly Func<CancelMatchmakingRequest, ValueTask> _cancelMatchmakingAsyncHandler;
             private readonly Func<RealtimeAttachRequest, ValueTask<RealtimeAttachReply>> _attachRealtimeAsyncHandler;
             private readonly Func<ReliablePushAckRequest, ValueTask<ReliablePushAckReply>> _ackReliablePushAsyncHandler;
+            private readonly Func<LeaderboardRequest, ValueTask<LeaderboardReply>> _getLeaderboardAsyncHandler;
             private readonly Func<InputMessage, ValueTask> _submitInputHandler;
             private readonly Func<LogoutRequest, ValueTask> _logoutAsyncHandler;
 
-            public DelegateImpl(Func<LoginRequest, ValueTask<LoginReply>> loginAsyncHandler, Func<MatchmakingRequest, ValueTask> startMatchmakingAsyncHandler, Func<CancelMatchmakingRequest, ValueTask> cancelMatchmakingAsyncHandler, Func<RealtimeAttachRequest, ValueTask<RealtimeAttachReply>> attachRealtimeAsyncHandler, Func<ReliablePushAckRequest, ValueTask<ReliablePushAckReply>> ackReliablePushAsyncHandler, Func<InputMessage, ValueTask> submitInputHandler, Func<LogoutRequest, ValueTask> logoutAsyncHandler)
+            public DelegateImpl(Func<LoginRequest, ValueTask<LoginReply>> loginAsyncHandler, Func<MatchmakingRequest, ValueTask> startMatchmakingAsyncHandler, Func<CancelMatchmakingRequest, ValueTask> cancelMatchmakingAsyncHandler, Func<RealtimeAttachRequest, ValueTask<RealtimeAttachReply>> attachRealtimeAsyncHandler, Func<ReliablePushAckRequest, ValueTask<ReliablePushAckReply>> ackReliablePushAsyncHandler, Func<LeaderboardRequest, ValueTask<LeaderboardReply>> getLeaderboardAsyncHandler, Func<InputMessage, ValueTask> submitInputHandler, Func<LogoutRequest, ValueTask> logoutAsyncHandler)
             {
                 _loginAsyncHandler = loginAsyncHandler ?? throw new ArgumentNullException(nameof(loginAsyncHandler));
                 _startMatchmakingAsyncHandler = startMatchmakingAsyncHandler ?? throw new ArgumentNullException(nameof(startMatchmakingAsyncHandler));
                 _cancelMatchmakingAsyncHandler = cancelMatchmakingAsyncHandler ?? throw new ArgumentNullException(nameof(cancelMatchmakingAsyncHandler));
                 _attachRealtimeAsyncHandler = attachRealtimeAsyncHandler ?? throw new ArgumentNullException(nameof(attachRealtimeAsyncHandler));
                 _ackReliablePushAsyncHandler = ackReliablePushAsyncHandler ?? throw new ArgumentNullException(nameof(ackReliablePushAsyncHandler));
+                _getLeaderboardAsyncHandler = getLeaderboardAsyncHandler ?? throw new ArgumentNullException(nameof(getLeaderboardAsyncHandler));
                 _submitInputHandler = submitInputHandler ?? throw new ArgumentNullException(nameof(submitInputHandler));
                 _logoutAsyncHandler = logoutAsyncHandler ?? throw new ArgumentNullException(nameof(logoutAsyncHandler));
             }
@@ -63,6 +65,11 @@ namespace Server.Generated
             public ValueTask<ReliablePushAckReply> AckReliablePushAsync(ReliablePushAckRequest req)
             {
                 return _ackReliablePushAsyncHandler(req);
+            }
+
+            public ValueTask<LeaderboardReply> GetLeaderboardAsync(LeaderboardRequest req)
+            {
+                return _getLeaderboardAsyncHandler(req);
             }
 
             public ValueTask SubmitInput(InputMessage req)
@@ -134,6 +141,15 @@ namespace Server.Generated
                 var impl = server.GetOrAddScopedService(ServiceId, implFactory);
                 var arg = server.Serializer.Deserialize<ReliablePushAckRequest>(req.Payload.Memory)!;
                 var resp = await impl.AckReliablePushAsync(arg);
+                using var payloadFrame = server.Serializer.SerializeFrame(resp);
+                return RpcEnvelopeCodec.EncodeResponse(req.RequestId, RpcStatus.Ok, payloadFrame.Memory);
+            });
+
+            registry.Register(ServiceId, 8, async (server, req, ct) =>
+            {
+                var impl = server.GetOrAddScopedService(ServiceId, implFactory);
+                var arg = server.Serializer.Deserialize<LeaderboardRequest>(req.Payload.Memory)!;
+                var resp = await impl.GetLeaderboardAsync(arg);
                 using var payloadFrame = server.Serializer.SerializeFrame(resp);
                 return RpcEnvelopeCodec.EncodeResponse(req.RequestId, RpcStatus.Ok, payloadFrame.Memory);
             });

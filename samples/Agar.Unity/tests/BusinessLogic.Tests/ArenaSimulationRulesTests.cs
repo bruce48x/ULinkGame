@@ -99,6 +99,53 @@ public sealed class ArenaSimulationRulesTests
         Assert.Equal(normal.MoveSpeed * 2f, boosted.MoveSpeed, precision: 4);
     }
 
+    [Fact]
+    public void DefaultPickupTypesOnlyContainScorePoint()
+    {
+        var options = new ArenaSimulationOptions();
+
+        var pickupType = Assert.Single(options.EnabledPickupTypes);
+        Assert.Equal(PickupType.ScorePoint, pickupType);
+    }
+
+    [Fact]
+    public void GeneratedFoodUsesOnlyScorePoint()
+    {
+        var simulation = new ArenaSimulation(new ArenaSimulationOptions
+        {
+            EnableBots = false,
+            FoodTargetCount = 16,
+            MinPlayersToStart = 1,
+            TargetParticipantCount = 1,
+            MaxRoundSeconds = 0f
+        });
+
+        var world = simulation.CreateWorldState();
+
+        Assert.All(world.Pickups, pickup => Assert.Equal(PickupType.ScorePoint, pickup.Type));
+    }
+
+    [Theory]
+    [InlineData(1, 10)]
+    [InlineData(2, 7)]
+    [InlineData(3, 5)]
+    [InlineData(4, 3)]
+    [InlineData(5, 1)]
+    [InlineData(6, 0)]
+    public void VictoryPointsMatchRankTable(int rank, int expectedPoints)
+    {
+        Assert.Equal(expectedPoints, VictoryPointAwards.GetPointsForRank(rank));
+    }
+
+    [Theory]
+    [InlineData("AI01", true)]
+    [InlineData("AI-bot", true)]
+    [InlineData("Player", false)]
+    public void VictoryPointBotFilterUsesAiPrefix(string playerId, bool expected)
+    {
+        Assert.Equal(expected, VictoryPointAwards.IsBotPlayer(playerId));
+    }
+
     private static PlayerState CreateSinglePlayerState(int score, bool invertedSpeed)
     {
         var simulation = new ArenaSimulation(new ArenaSimulationOptions

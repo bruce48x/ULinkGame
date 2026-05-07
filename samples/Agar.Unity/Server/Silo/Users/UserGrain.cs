@@ -35,6 +35,9 @@ public sealed class UserState
 
     [Id(8)]
     public int WinCount { get; set; }
+
+    [Id(9)]
+    public int VictoryPoints { get; set; }
 }
 
 public sealed class UserGrain : Grain, IUserGrain
@@ -90,7 +93,8 @@ public sealed class UserGrain : Grain, IUserGrain
             LoginCount = _state.State.LoginCount,
             LastLoginAtUtc = _state.State.LastLoginAtUtc,
             Score = NormalizeScore(_state.State.Score),
-            WinCount = Math.Max(0, _state.State.WinCount)
+            WinCount = Math.Max(0, _state.State.WinCount),
+            VictoryPoints = Math.Max(0, _state.State.VictoryPoints)
         };
     }
 
@@ -104,7 +108,8 @@ public sealed class UserGrain : Grain, IUserGrain
             LastLoginAtUtc = _state.State.LastLoginAtUtc,
             IsOnline = _state.State.IsOnline,
             Score = NormalizeScore(_state.State.Score),
-            WinCount = Math.Max(0, _state.State.WinCount)
+            WinCount = Math.Max(0, _state.State.WinCount),
+            VictoryPoints = Math.Max(0, _state.State.VictoryPoints)
         };
         return Task.FromResult(snapshot);
     }
@@ -150,6 +155,28 @@ public sealed class UserGrain : Grain, IUserGrain
         }
 
         _state.State.WinCount = Math.Max(0, _state.State.WinCount + 1);
+        await _state.WriteStateAsync();
+    }
+
+    public async Task AddVictoryPointsAsync(int points)
+    {
+        if (!_state.RecordExists || points <= 0)
+        {
+            return;
+        }
+
+        _state.State.VictoryPoints = Math.Max(0, _state.State.VictoryPoints + points);
+        await _state.WriteStateAsync();
+    }
+
+    public async Task ResetVictoryPointsAsync()
+    {
+        if (!_state.RecordExists)
+        {
+            return;
+        }
+
+        _state.State.VictoryPoints = 0;
         await _state.WriteStateAsync();
     }
 

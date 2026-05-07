@@ -43,11 +43,7 @@ namespace Shared.Gameplay
         public Vector2 FinalArenaHalfExtents { get; set; } = new(18f, 18f);
         public PickupType[] EnabledPickupTypes { get; set; } =
         {
-            PickupType.ScorePoint,
-            PickupType.SpeedBoost,
-            PickupType.KnockbackBoost,
-            PickupType.Shield,
-            PickupType.BonusScore
+            PickupType.ScorePoint
         };
     }
 
@@ -271,9 +267,6 @@ namespace Shared.Gameplay
                     Alive = player.Alive,
                     RespawnRemainingSeconds = player.Alive ? 0 : (int)MathF.Ceiling(player.RespawnRemaining),
                     Score = player.Score,
-                    SpeedBoostRemainingSeconds = 0,
-                    KnockbackBoostRemainingSeconds = 0,
-                    ShieldRemainingSeconds = 0,
                     Mass = player.Mass,
                     Radius = player.Radius,
                     MoveSpeed = moveSpeed

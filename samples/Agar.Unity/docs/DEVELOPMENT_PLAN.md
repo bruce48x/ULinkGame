@@ -6,7 +6,7 @@
 
 这个样例的功能开发按以下顺序推进：
 
-1. 更新 `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`。
+1. 更新 `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md` 以及 `docs/features/` 下对应的功能子文档。
 2. 更新本开发计划。
 3. 实现代码改动。
 4. 验证被影响的运行路径。
@@ -32,7 +32,14 @@
 - 包含 PostgreSQL 和 Redis 的本地 compose 基线。
 - `DisconnectedSessionCleanupHostedService` 用于后台清理过期会话。
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
-- 客户端已有本地排行榜 UI（`GetLeaderboardSummary`），但数据为本地 mock 假条目，未连接服务端。
+- 客户端排行榜 UI 已通过 `IPlayerService.GetLeaderboardAsync` 连接服务端真实排行榜数据。
+- `InputMessage` 只包含玩家、移动方向和 tick，不再包含 dash。
+- `PickupType` 当前只保留 `ScorePoint`，食物行为统一为加分和质量成长。
+- `PlayerState` 只发布位置、速度、生死、分数、质量、半径和移动速度，不再发布旧强化剩余时间。
+- `IUserGrain` 已持久化 `VictoryPoints`，`ILeaderboardGrain` 已提供周榜查询、周期重置和最近两周归档。
+- `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，AI 玩家不获得积分。
+- 自动化测试当前为 20 个（`ArenaSimulationRulesTests` 16 个，`MatchmakingQueuePolicyTests` 4 个）。
+- `samples/Agar.Unity/CLAUDE.md` 已记录入口文件、生成命令和开发工作流。
 
 已经从当前计划中移除的方向：
 
@@ -46,12 +53,10 @@
 
 以下问题存在于当前代码库中，需要在对应阶段处理：
 
-### 协议残留
+### 协议与玩法变体
 
-- `InputMessage.Dash` 字段在协议中定义、客户端填充、服务端传输，但 `ArenaSimulation.SubmitInput` 从不读取它。客户端 `_dashQueued` 始终为 `false`（无按键绑定），`PlayerLifeState.Dash = 2` 枚举值从未被 `GetLifeState()` 返回。`FocusGameViewOnPlay.cs` 中有仅编辑器使用的 dash 桥接代码。
-- `PickupType.SpeedBoost`、`KnockbackBoost`、`Shield`、`BonusScore` 在 `ArenaSimulationOptions.EnabledPickupTypes` 默认值中全部启用，食物会生成这些类型，但 `ConsumeFood` 对所有类型执行相同逻辑（统一加 1 分）。`PlayerState` 中的 `SpeedBoostRemainingSeconds`、`KnockbackBoostRemainingSeconds`、`ShieldRemainingSeconds` 字段始终发布为 `0`。客户端 `DotArenaPresentation.GetPickupDisplayName` 对所有类型返回 "Mass"。
-- `PlayerLifeState.Stunned = 3` 枚举值定义但从未被使用。
-- `ArenaMapVariant` 和 `ArenaRuleVariant` 枚举各有多个值，但实际只实现了 `ClassicSquare` / `ClassicElimination` 一条路径。
+- `ArenaMapVariant` 和 `ArenaRuleVariant` 枚举各有多个值；当前代码已有多个单机预设，但联机仍只走默认共享规则。后续如果不会继续扩展联机规则变体，可以把联机侧字段收敛为简单常量。
+- RPC 生成代码需要在共享协议变更后重新生成，Unity 客户端命名空间必须保持为 `Rpc`，否则会遮蔽手写的 `WebSocketRpcClientFactory` / `KcpRpcClientFactory`。
 
 ### 客户端结构
 
@@ -61,24 +66,24 @@
 
 ### 测试缺口
 
-当前仅有 9 个自动化测试（`ArenaSimulationRulesTests` 5 个，`MatchmakingQueuePolicyTests` 4 个）。缺少覆盖：网络会话生命周期、房间运行时行为、网关清理语义、客户端流程状态。
+当前已有 20 个自动化测试。仍缺少覆盖：网络会话生命周期、房间运行时行为、网关清理语义、客户端流程状态，以及 `LeaderboardGrain` 的持久化周期重置路径。
 
 ## 活跃待办
 
-### 阶段 1：玩法回归与协议清理
+### 阶段 1：玩法回归与协议清理（基本完成，剩余手动回归）
 
 任务：
 
-- 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
-- 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
-- 检查 HUD 文案中是否还残留冲刺、强化、眩晕等旧玩法语义。发现则替换为质量、排名、成长、存活等当前语义。
-- 从 `InputMessage` 中移除 `Dash` 字段（序号重排为 0-3），同步更新 `IPlayerService.cs`、`DotArenaGame.Input.cs`、`DotArenaGame.Views.cs`、`DotArenaGame.SinglePlayer.cs`、`RpcConnectionTester.cs` 和 `FocusGameViewOnPlay.cs` 中所有引用。
-- 从 `PlayerLifeState` 枚举中移除 `Dash = 2` 和 `Stunned = 3`，重新编号 `Dead = 2`。
-- 从 `ArenaSimulationOptions.EnabledPickupTypes` 默认值中移除 `SpeedBoost`、`KnockbackBoost`、`Shield`、`BonusScore`，只保留 `ScorePoint`。同步清理 `PickupType` 枚举中的未使用值。
-- 从 `PlayerState` 中移除 `SpeedBoostRemainingSeconds`、`KnockbackBoostRemainingSeconds`、`ShieldRemainingSeconds` 字段，同步更新 `CreateWorldState()`、`DotArenaCallbackInbox.cs`、`DotArenaWorldSynchronizer.cs`、`DotArenaGame.Types.cs`、`DotArenaTuning.cs`、`DotArenaPresentation.cs` 和 `DotArenaSinglePlayerCatalog.cs` 中所有引用。
-- 考虑是否移除 `ArenaMapVariant` / `ArenaRuleVariant` 枚举（如果短期内不会有第二个实现），或将对应 `_currentArenaMapVariant` / `_currentArenaRuleVariant` 字段替换为简单的字符串常量。
-- 检查 Unity 刷新项目后生成的 `.csproj` 和包引用是否能正确带上 KCP。
-- 创建 `samples/Agar.Unity/CLAUDE.md`，记录项目入口、关键文件路径和开发工作流规则。
+- 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。（待手动完整回归）
+- 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。（待手动完整回归）
+- 检查 HUD 文案中是否还残留冲刺、强化、眩晕等旧玩法语义。发现则替换为质量、排名、成长、存活等当前语义。（已完成代码扫描和 Unity 编译检查）
+- 从 `InputMessage` 中移除 `Dash` 字段（序号重排为 0-3），同步更新 `IPlayerService.cs`、`DotArenaGame.Input.cs`、`DotArenaGame.Views.cs`、`DotArenaGame.SinglePlayer.cs`、`RpcConnectionTester.cs` 和 `FocusGameViewOnPlay.cs` 中所有引用。（已完成）
+- 从 `PlayerLifeState` 枚举中移除 `Dash = 2` 和 `Stunned = 3`，重新编号 `Dead = 2`。（已完成）
+- 从 `ArenaSimulationOptions.EnabledPickupTypes` 默认值中移除 `SpeedBoost`、`KnockbackBoost`、`Shield`、`BonusScore`，只保留 `ScorePoint`。同步清理 `PickupType` 枚举中的未使用值。（已完成）
+- 从 `PlayerState` 中移除 `SpeedBoostRemainingSeconds`、`KnockbackBoostRemainingSeconds`、`ShieldRemainingSeconds` 字段，同步更新 `CreateWorldState()`、`DotArenaCallbackInbox.cs`、`DotArenaWorldSynchronizer.cs`、`DotArenaGame.Types.cs`、`DotArenaTuning.cs`、`DotArenaPresentation.cs` 和 `DotArenaSinglePlayerCatalog.cs` 中所有引用。（已完成）
+- 考虑是否移除 `ArenaMapVariant` / `ArenaRuleVariant` 枚举（如果短期内不会有第二个实现），或将对应 `_currentArenaMapVariant` / `_currentArenaRuleVariant` 字段替换为简单的字符串常量。（保留：单机预设仍使用这些枚举）
+- 检查 Unity 刷新项目后生成的 `.csproj` 和包引用是否能正确带上 KCP。（Unity 脚本刷新通过；KCP factory 引用已保持）
+- 创建 `samples/Agar.Unity/CLAUDE.md`，记录项目入口、关键文件路径和开发工作流规则。（已完成）
 
 验收标准：
 
@@ -125,31 +130,31 @@
 - 重复登录、登出、匹配和取消匹配不会留下重复的本地注册。
 - `DisconnectedSessionCleanupHostedService` 的后台清理周期性运行且日志可追踪。
 
-### 阶段 4：胜利积分与排行榜
+### 阶段 4：胜利积分与排行榜（代码完成，剩余联机实机回归）
 
 任务：
 
 服务端：
 
-- 在 `Orleans.Contracts/Users/IUserGrain.cs` 中增加 `AddVictoryPointsAsync(int points)` 方法，在 `UserLoginResult` 和 `UserProfileSnapshot` 中增加 `VictoryPoints` 字段。
-- 在 `Silo/Users/UserGrain.cs` 的 `UserState` 中增加 `VictoryPoints` 持久化字段（Orleans `[Id(9)]`），实现 `AddVictoryPointsAsync`。
-- 新建 `Server/Orleans.Contracts/Leaderboard/ILeaderboardGrain.cs`：定义 `GetLeaderboardAsync(int topN)` 返回排行榜列表、`ResetWeeklyIfNeededAsync()` 触发周期重置。排行榜条目包含 `PlayerId`、`VictoryPoints`、`WinCount`、`Rank`。
+- 在 `Orleans.Contracts/Users/IUserGrain.cs` 中增加 `AddVictoryPointsAsync(int points)` 方法，在 `UserLoginResult` 和 `UserProfileSnapshot` 中增加 `VictoryPoints` 字段。（已完成）
+- 在 `Silo/Users/UserGrain.cs` 的 `UserState` 中增加 `VictoryPoints` 持久化字段（Orleans `[Id(9)]`），实现 `AddVictoryPointsAsync`。（已完成）
+- 新建 `Server/Orleans.Contracts/Leaderboard/ILeaderboardGrain.cs`：定义 `GetLeaderboardAsync(int topN)` 返回排行榜列表、`ResetWeeklyIfNeededAsync()` 触发周期重置。排行榜条目包含 `PlayerId`、`VictoryPoints`、`WinCount`、`Rank`。（已完成）
 - 新建 `Server/Silo/Leaderboard/LeaderboardGrain.cs`：实现 `ILeaderboardGrain`（`IGrainWithIntegerKey`，固定 key=0，单实例），负责：
-  - 聚合全部用户 grain 的胜利积分（分页读取避免一次性加载过多用户）。
-  - 按积分降序、胜场降序、玩家标识升序排序，返回 top N。
-  - 记录当前周期标识（`yyyy-MM-dd` 格式的周一日期），每次查询时检查是否已过周一 UTC 00:00，若是则先执行重置再返回新周期空排行榜。
-  - 重置时：归档上周 top 100 到 `WeeklySnapshot`（只保留最近两周），将所有用户的 `VictoryPoints` 归零。
-- 在 `RoomRuntime.PersistMatchEndAsync` 中，对局结算时根据 `RoomSettlementEntry.Rank` 发放胜利积分：
-  - 排名 1→10 分、2→7 分、3→5 分、4→3 分、5→1 分，其余 0 分。
-  - 过滤 AI 玩家（以 `BotPrefix` 开头），不发放积分。
-- 在 `Shared/Interfaces/IPlayerService.cs` 中新增 `GetLeaderboardAsync` RPC 方法和请求/回复类型。
-- 在 `Server/Services/PlayerService.cs` 中实现排行榜查询，转发到 `ILeaderboardGrain`。
+  - 维护由对局结算写入的排行榜积分索引，避免当前缺少全量用户目录时做不可控全库扫描。（已完成）
+  - 按积分降序、胜场降序、玩家标识升序排序，返回 top N。（已完成）
+  - 记录当前周期标识（`yyyy-MM-dd` 格式的周一日期），每次查询或写入时检查是否已过周一 UTC 00:00，若是则先执行重置。（已完成）
+  - 重置时：归档上周 top 100 到 `WeeklySnapshot`（只保留最近两周），将索引内用户的 `VictoryPoints` 归零。（已完成；未来如新增全量用户目录需扩展为全用户重置）
+- 在 `RoomRuntime.PersistMatchEndAsync` 中，对局结算时根据排名发放胜利积分：
+  - 排名 1→10 分、2→7 分、3→5 分、4→3 分、5→1 分，其余 0 分。（已完成）
+  - 过滤 AI 玩家（以 `AI` 前缀开头），不发放积分。（已完成）
+- 在 `Shared/Interfaces/IPlayerService.cs` 中新增 `GetLeaderboardAsync` RPC 方法和请求/回复类型。（已完成）
+- 在 `Server/Services/PlayerService.cs` 中实现排行榜查询，转发到 `ILeaderboardGrain`。（已完成）
 
 客户端：
 
-- 在 `DotArenaMetaProgression.Queries.cs` 中将 `GetLeaderboardSummary` 从本地 mock 替换为 RPC 调用。
-- 淘汰 `DotArenaLeaderboardSummary` 中的本地假条目（`Queue Rival`、`Arena Veteran`），替换为服务端返回的真实排行榜数据。
-- 排行榜 UI（`DotArenaSceneUiPresenter.Lobby.cs` 中的排行榜面板）展示当前周期剩余时间。
+- 在 `DotArenaMetaProgression.Queries.cs` 中将 `GetLeaderboardSummary` 从本地 mock 替换为服务端数据缓存展示；RPC 拉取由 `DotArenaNetworkSession.GetLeaderboardAsync` 和 `DotArenaGame.RefreshLeaderboardAsync` 负责。（已完成）
+- 淘汰 `DotArenaLeaderboardSummary` 中的本地假条目（`Queue Rival`、`Arena Veteran`），替换为服务端返回的真实排行榜数据。（已完成）
+- 排行榜 UI（`DotArenaSceneUiPresenter.Lobby.cs` 中的排行榜面板）展示当前周期剩余时间。（已完成）
 
 验收标准：
 
@@ -190,7 +195,7 @@
 - 世界状态广播可以到达连接在不同网关节点上的玩家。
 - 断线、登出和离房清理在跨网关所有权下仍然正确。
 
-### 阶段 7：测试扩展
+### 阶段 7：测试扩展（部分完成）
 
 任务：
 
@@ -203,19 +208,19 @@
 
 验收标准：
 
-- 自动化测试数量从 9 个增加到至少 30 个。
+- 自动化测试数量从 9 个增加到至少 30 个。（当前 20 个）
 - 核心业务逻辑路径（模拟、匹配、房间、会话）有可运行的测试覆盖。
 
-### 阶段 8：验证与打包
+### 阶段 8：验证与打包（本轮已验证）
 
 任务：
 
-- 构建 `Shared/Shared.csproj`。
-- 构建 `Server/Silo/Silo.csproj`。
-- 构建 `Server/Server/Server.csproj`。
-- 运行已有自动化测试和新增测试。
-- Unity 可用时，手动冒烟测试单机和联机流程。
-- 当命令、端口或架构事实变化时，同步 README 和 `CLAUDE.md`。
+- 构建 `Shared/Shared.csproj`。（已通过）
+- 构建 `Server/Silo/Silo.csproj`。（已通过）
+- 构建 `Server/Server/Server.csproj`。（已通过）
+- 运行已有自动化测试和新增测试。（已通过，20/20）
+- Unity 可用时，手动冒烟测试单机和联机流程。（Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍待回归）
+- 当命令、端口或架构事实变化时，同步 README 和 `CLAUDE.md`。（已同步）
 
 验收标准：
 

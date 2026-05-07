@@ -1,6 +1,7 @@
 using Orleans.Contracts.Rooms;
 using Orleans.Contracts.Sessions;
 using Orleans.Contracts.Users;
+using Orleans.Contracts.Leaderboard;
 using Server.Services;
 using Shared.Gameplay;
 using Shared.Interfaces;
@@ -216,7 +217,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
             .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
             .ToArray();
 
-        foreach (var player in result.WorldState.Players)
+        foreach (var player in result.WorldState.Players.Where(static player => !VictoryPointAwards.IsBotPlayer(player.PlayerId)))
         {
             await _clusterClient.GetGrain<IUserGrain>(player.PlayerId)
                 .AddScoreAsync(player.Score)
@@ -257,9 +258,31 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 .ConfigureAwait(false);
         }
 
-        if (!string.IsNullOrWhiteSpace(winnerPlayerId))
+        if (!string.IsNullOrWhiteSpace(winnerPlayerId) && !VictoryPointAwards.IsBotPlayer(winnerPlayerId))
         {
             await _clusterClient.GetGrain<IUserGrain>(winnerPlayerId).AddWinAsync().ConfigureAwait(false);
+        }
+
+        foreach (var player in rankedPlayers.Where(static player => !VictoryPointAwards.IsBotPlayer(player.PlayerId)))
+        {
+            var rank = Array.IndexOf(rankedPlayers, player) + 1;
+            var victoryPoints = VictoryPointAwards.GetPointsForRank(rank);
+            if (victoryPoints <= 0)
+            {
+                continue;
+            }
+
+            var userGrain = _clusterClient.GetGrain<IUserGrain>(player.PlayerId);
+            await userGrain.AddVictoryPointsAsync(victoryPoints).ConfigureAwait(false);
+            var profile = await userGrain.GetProfileAsync().ConfigureAwait(false);
+            await _clusterClient.GetGrain<ILeaderboardGrain>(0)
+                .RecordVictoryPointsAsync(player.PlayerId, profile.VictoryPoints, profile.WinCount)
+                .ConfigureAwait(false);
+            _logger.LogInformation("Awarded {VictoryPoints} victory points to {PlayerId} for rank {Rank} in room {RoomId}.",
+                victoryPoints,
+                player.PlayerId,
+                rank,
+                _roomId);
         }
     }
 

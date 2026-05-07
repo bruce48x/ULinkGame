@@ -40,7 +40,6 @@ namespace SampleClient.Gameplay
         private SessionMode _sessionMode = SessionMode.None;
         private FrontendFlowState _flowState = FrontendFlowState.Entry;
         private int _inputTick;
-        private bool _dashQueued;
         private float _nextInputAt;
         private float _singlePlayerTickAccumulator;
         private float _matchmakingStartedAt = -1f;
@@ -83,7 +82,6 @@ namespace SampleClient.Gameplay
         private RealtimeConnectionInfo? _lastRealtimeConnection;
 #if UNITY_EDITOR
         private Vector2 _editorMoveOverride;
-        private bool _editorDashOverride;
         private bool _hasEditorInputOverride;
 #endif
 

@@ -10,7 +10,7 @@ using Shared.Interfaces;
 using ULinkRPC.Client;
 using ULinkRPC.Core;
 
-namespace Rpc.Generated
+namespace Rpc
 {
     public sealed class RpcApi
     {
@@ -42,7 +42,7 @@ namespace ULinkRPC.Client
     {
         private readonly RpcClientRuntime _runtime;
         private readonly RpcCallbackBindings? _callbacks;
-        private global::Rpc.Generated.RpcApi? _api;
+        private global::Rpc.RpcApi? _api;
 
         public RpcClient(RpcClientOptions options)
         {
@@ -73,7 +73,7 @@ namespace ULinkRPC.Client
                 if (client is null) throw new ArgumentNullException(nameof(client));
                 if (_playerCallback is not null)
                 {
-                    global::Rpc.Generated.PlayerCallbackBinder.Bind(client, _playerCallback);
+                    global::Rpc.PlayerCallbackBinder.Bind(client, _playerCallback);
                 }
             }
         }
@@ -105,7 +105,7 @@ namespace ULinkRPC.Client
         }
 
         public RpcClientOptions Options { get; }
-        public global::Rpc.Generated.RpcApi Api => _api ??= new global::Rpc.Generated.RpcApi(_runtime);
+        public global::Rpc.RpcApi Api => _api ??= new global::Rpc.RpcApi(_runtime);
 
         public ValueTask ConnectAsync(CancellationToken ct = default)
         {

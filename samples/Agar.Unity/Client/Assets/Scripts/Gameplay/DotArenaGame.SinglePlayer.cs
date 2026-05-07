@@ -115,18 +115,5 @@ namespace SampleClient.Gameplay
             var move = new Vector2(x, y);
             return move.sqrMagnitude > 1f ? move.normalized : move;
         }
-
-#if UNITY_EDITOR
-        private bool ConsumeEditorDashOverride()
-        {
-            if (!_editorDashOverride)
-            {
-                return false;
-            }
-
-            _editorDashOverride = false;
-            return true;
-        }
-#endif
     }
 }

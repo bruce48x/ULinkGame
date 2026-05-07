@@ -281,7 +281,7 @@ namespace SampleClient.Gameplay
             foreach (var entry in summary.Entries)
             {
                 var marker = entry.IsLocalPlayer ? " [You]" : string.Empty;
-                lines.Add($"{entry.Position}. {entry.Name} - {entry.Wins} wins / {entry.Matches} matches{marker}");
+                lines.Add($"{entry.Position}. {entry.Name} - {entry.VictoryPoints} VP / {entry.Wins} wins{marker}");
             }
 
             return string.Join("\n", lines);

@@ -25,6 +25,9 @@ namespace SampleClient.Gameplay
         public List<DotArenaTaskProgress> DailyTasks = new();
         public List<DotArenaTaskProgress> NewPlayerTasks = new();
         public List<DotArenaMatchRecord> MatchHistory = new();
+        public string LeaderboardPeriodStartUtc = string.Empty;
+        public int LeaderboardSecondsUntilReset;
+        public List<DotArenaLeaderboardEntrySummary> LeaderboardEntries = new();
         public DotArenaSettings Settings = new();
     }
 
@@ -113,6 +116,7 @@ namespace SampleClient.Gameplay
     {
         public int Position { get; set; }
         public string Name { get; set; } = string.Empty;
+        public int VictoryPoints { get; set; }
         public int Wins { get; set; }
         public int Matches { get; set; }
         public string Note { get; set; } = string.Empty;

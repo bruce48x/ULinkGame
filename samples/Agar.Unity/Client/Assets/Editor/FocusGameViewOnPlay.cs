@@ -142,10 +142,8 @@ internal static class FocusGameViewOnPlay
         }
 
         var move = ReadEditorMove(keyboard);
-        var dash = keyboard.spaceKey.wasPressedThisFrame;
         SetField(game, "_editorMoveOverride", move);
-        SetField(game, "_editorDashOverride", dash || GetField<bool>(game, "_editorDashOverride"));
-        SetField(game, "_hasEditorInputOverride", move != Vector2.zero || dash);
+        SetField(game, "_hasEditorInputOverride", move != Vector2.zero);
     }
 
     private static bool IsModeSelect(DotArenaGame game)
@@ -215,7 +213,6 @@ internal static class FocusGameViewOnPlay
         }
 
         SetField(game, "_editorMoveOverride", Vector2.zero);
-        SetField(game, "_editorDashOverride", false);
         SetField(game, "_hasEditorInputOverride", false);
     }
 #endif
@@ -264,7 +261,6 @@ internal static class FocusGameViewOnPlay
             PlayerId = playerId,
             MoveX = 0f,
             MoveY = 1f,
-            Dash = false,
             Tick = nextTick
         });
     }

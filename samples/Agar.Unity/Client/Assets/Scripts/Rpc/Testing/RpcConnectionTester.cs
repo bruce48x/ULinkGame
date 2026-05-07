@@ -145,7 +145,6 @@ namespace Rpc.Testing
                         PlayerId = _playerId,
                         MoveX = 1f,
                         MoveY = 0f,
-                        Dash = false,
                         Tick = ++_tick
                     });
                     if (_cts.IsCancellationRequested || _stopped)

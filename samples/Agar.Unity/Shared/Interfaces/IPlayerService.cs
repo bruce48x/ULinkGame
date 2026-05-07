@@ -25,6 +25,9 @@ namespace Shared.Interfaces
 
         [RpcMethod(7)]
         ValueTask<ReliablePushAckReply> AckReliablePushAsync(ReliablePushAckRequest req);
+
+        [RpcMethod(8)]
+        ValueTask<LeaderboardReply> GetLeaderboardAsync(LeaderboardRequest req);
         
         [RpcMethod(2)]
         ValueTask SubmitInput(InputMessage req);
@@ -79,6 +82,8 @@ namespace Shared.Interfaces
         public string Password { get; set; } = "";
         [MemoryPackOrder(6)]
         public string Message { get; set; } = "";
+        [MemoryPackOrder(7)]
+        public int VictoryPoints { get; set; }
     }
 
     public static class LoginResultCodes
@@ -99,8 +104,6 @@ namespace Shared.Interfaces
         [MemoryPackOrder(2)]
         public float MoveY { get; set; }
         [MemoryPackOrder(3)]
-        public bool Dash { get; set; }
-        [MemoryPackOrder(4)]
         public int Tick { get; set; }
     }
 
@@ -268,17 +271,46 @@ namespace Shared.Interfaces
         [MemoryPackOrder(8)]
         public int Score { get; set; }
         [MemoryPackOrder(9)]
-        public int SpeedBoostRemainingSeconds { get; set; }
-        [MemoryPackOrder(10)]
-        public int KnockbackBoostRemainingSeconds { get; set; }
-        [MemoryPackOrder(11)]
-        public int ShieldRemainingSeconds { get; set; }
-        [MemoryPackOrder(12)]
         public float Mass { get; set; }
-        [MemoryPackOrder(13)]
+        [MemoryPackOrder(10)]
         public float Radius { get; set; }
-        [MemoryPackOrder(14)]
+        [MemoryPackOrder(11)]
         public float MoveSpeed { get; set; }
+    }
+
+    [MemoryPackable(GenerateType.VersionTolerant)]
+    public partial class LeaderboardRequest
+    {
+        [MemoryPackOrder(0)]
+        public int TopN { get; set; } = 10;
+    }
+
+    [MemoryPackable(GenerateType.VersionTolerant)]
+    public partial class LeaderboardReply
+    {
+        [MemoryPackOrder(0)]
+        public int Code { get; set; }
+        [MemoryPackOrder(1)]
+        public string Message { get; set; } = "";
+        [MemoryPackOrder(2)]
+        public string PeriodStartUtc { get; set; } = "";
+        [MemoryPackOrder(3)]
+        public int SecondsUntilReset { get; set; }
+        [MemoryPackOrder(4)]
+        public List<LeaderboardEntry> Entries { get; set; } = new();
+    }
+
+    [MemoryPackable(GenerateType.VersionTolerant)]
+    public partial class LeaderboardEntry
+    {
+        [MemoryPackOrder(0)]
+        public string PlayerId { get; set; } = "";
+        [MemoryPackOrder(1)]
+        public int VictoryPoints { get; set; }
+        [MemoryPackOrder(2)]
+        public int WinCount { get; set; }
+        [MemoryPackOrder(3)]
+        public int Rank { get; set; }
     }
 
     [MemoryPackable(GenerateType.VersionTolerant)]
@@ -314,18 +346,12 @@ namespace Shared.Interfaces
     {
         Idle = 0,
         Move = 1,
-        Dash = 2,
-        Stunned = 3,
-        Dead = 4
+        Dead = 2
     }
 
     public enum PickupType
     {
-        SpeedBoost = 0,
-        KnockbackBoost = 1,
-        ScorePoint = 2,
-        Shield = 3,
-        BonusScore = 4
+        ScorePoint = 0
     }
 
     public enum MatchmakingState

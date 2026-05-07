@@ -20,9 +20,7 @@ namespace SampleClient.Gameplay
             _nextInputAt = Time.time + InputSendIntervalSeconds;
 
             var move = ReadMoveVector();
-            var dash = _dashQueued;
-            _dashQueued = false;
-            var inputSummary = $"{move.x:0.00},{move.y:0.00}|dash={dash}";
+            var inputSummary = $"{move.x:0.00},{move.y:0.00}";
             if (!string.Equals(_lastLoggedInputVector, inputSummary, StringComparison.Ordinal))
             {
                 _lastLoggedInputVector = inputSummary;
@@ -36,7 +34,6 @@ namespace SampleClient.Gameplay
                     PlayerId = _localPlayerId,
                     MoveX = move.x,
                     MoveY = move.y,
-                    Dash = dash,
                     Tick = ++_inputTick
                 });
                 return;
@@ -47,10 +44,10 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            _ = SendInputAsync(move, dash);
+            _ = SendInputAsync(move);
         }
 
-        private async Task SendInputAsync(Vector2 move, bool dash)
+        private async Task SendInputAsync(Vector2 move)
         {
             try
             {
@@ -59,7 +56,6 @@ namespace SampleClient.Gameplay
                     PlayerId = _localPlayerId,
                     MoveX = move.x,
                     MoveY = move.y,
-                    Dash = dash,
                     Tick = ++_inputTick
                 });
             }

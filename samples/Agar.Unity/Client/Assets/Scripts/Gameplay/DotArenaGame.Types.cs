@@ -17,9 +17,6 @@ namespace SampleClient.Gameplay
         public float Mass { get; set; }
         public float Radius { get; set; }
         public float MoveSpeed { get; set; }
-        public int SpeedBoostRemainingSeconds { get; set; }
-        public int KnockbackBoostRemainingSeconds { get; set; }
-        public int ShieldRemainingSeconds { get; set; }
     }
 
     internal sealed class PlayerOverlayView

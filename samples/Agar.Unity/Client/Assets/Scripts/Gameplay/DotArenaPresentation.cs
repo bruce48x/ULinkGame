@@ -34,10 +34,6 @@ namespace SampleClient.Gameplay
             return pickupType switch
             {
                 PickupType.ScorePoint => ScorePickupColor,
-                PickupType.SpeedBoost => SpeedPickupColor,
-                PickupType.KnockbackBoost => KnockbackPickupColor,
-                PickupType.Shield => ShieldPickupColor,
-                PickupType.BonusScore => BonusScorePickupColor,
                 _ => Color.white
             };
         }
@@ -47,10 +43,6 @@ namespace SampleClient.Gameplay
             return pickupType switch
             {
                 PickupType.ScorePoint => "Mass",
-                PickupType.SpeedBoost => "Mass",
-                PickupType.KnockbackBoost => "Mass",
-                PickupType.Shield => "Mass",
-                PickupType.BonusScore => "Mass",
                 _ => "Food"
             };
         }

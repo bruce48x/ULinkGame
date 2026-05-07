@@ -11,6 +11,8 @@ public interface IUserGrain : IGrainWithStringKey
     Task SetScoreAsync(int score);
     Task AddScoreAsync(int delta);
     Task AddWinAsync();
+    Task AddVictoryPointsAsync(int points);
+    Task ResetVictoryPointsAsync();
 }
 
 [GenerateSerializer]
@@ -32,6 +34,8 @@ public sealed class UserLoginResult
     public int Score { get; set; }
     [Id(5)]
     public int WinCount { get; set; }
+    [Id(6)]
+    public int VictoryPoints { get; set; }
 }
 
 [GenerateSerializer]
@@ -56,5 +60,7 @@ public sealed class UserProfileSnapshot
     public int Score { get; set; }
     [Id(6)]
     public int WinCount { get; set; }
+    [Id(7)]
+    public int VictoryPoints { get; set; }
 }
 

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Shared.Interfaces;
 using UnityEngine;
 
 namespace SampleClient.Gameplay
@@ -182,57 +183,73 @@ namespace SampleClient.Gameplay
             var trend = GetRecentMatchTrendSummary(state, 5);
             var totalMatches = Math.Max(0, state.TotalMatches);
             var winRate = totalMatches == 0 ? 0f : state.TotalWins / (float)totalMatches;
-            var projectedRank = Math.Max(1, 4 - Math.Min(3, state.TotalWins / 2));
-
-            var entries = new List<DotArenaLeaderboardEntrySummary>
-            {
-                new()
-                {
-                    Position = 1,
-                    Name = state.PlayerId,
-                    Wins = state.TotalWins,
-                    Matches = state.TotalMatches,
-                    Note = "Local player",
-                    IsLocalPlayer = true
-                },
-                new()
-                {
-                    Position = 2,
-                    Name = "Queue Rival",
-                    Wins = Math.Max(0, state.TotalWins - 1),
-                    Matches = Math.Max(1, state.TotalMatches - 1),
-                    Note = "Matchmaking benchmark"
-                },
-                new()
-                {
-                    Position = 3,
-                    Name = "Arena Veteran",
-                    Wins = Math.Max(0, state.TotalWins / 2),
-                    Matches = Math.Max(1, state.TotalMatches - 2),
-                    Note = "Baseline leaderboard"
-                }
-            };
-
-            entries.Sort((left, right) => right.Wins.CompareTo(left.Wins));
-            for (var i = 0; i < entries.Count; i++)
-            {
-                entries[i].Position = i + 1;
-            }
+            var entries = new List<DotArenaLeaderboardEntrySummary>(state.LeaderboardEntries);
+            var localEntry = entries.Find(entry => entry.IsLocalPlayer);
+            var rankLine = localEntry != null
+                ? $"Global rank: #{localEntry.Position} | VP: {localEntry.VictoryPoints} | Trend: {trend.TrendLabel}"
+                : $"Global rank: Unranked | Win rate: {winRate:P0} | Trend: {trend.TrendLabel}";
+            var resetLine = state.LeaderboardSecondsUntilReset > 0
+                ? $"Weekly reset in {FormatLeaderboardReset(state.LeaderboardSecondsUntilReset)}"
+                : "Weekly reset pending next server query";
 
             return new DotArenaLeaderboardSummary
             {
                 HasProfile = true,
-                Title = "Local Leaderboard",
+                Title = string.IsNullOrWhiteSpace(state.LeaderboardPeriodStartUtc)
+                    ? "Global Leaderboard"
+                    : $"Global Leaderboard ({state.LeaderboardPeriodStartUtc})",
                 PlayerLine = $"Player: {state.PlayerId} | Wins: {state.TotalWins} | Matches: {state.TotalMatches} | Win rate: {winRate:P0}",
-                RankLine = $"Projected rank: #{projectedRank} of {entries.Count} | Trend: {trend.TrendLabel}",
+                RankLine = rankLine,
                 TrendLine = trend.HasHistory
                     ? $"Recent form: {trend.FormStrip} | {trend.CurrentStreakType} streak: {trend.CurrentStreak} | Avg score: {trend.AverageScore}"
                     : "Recent form: No history",
-                FormLine = trend.HasHistory
+                FormLine = resetLine + " | " + (trend.HasHistory
                     ? $"Last {trend.SampleCount}: {trend.WinCount}W / {trend.LossCount}L | Best score: {trend.BestScore}"
-                    : "Last 0: no matches yet",
+                    : "Last 0: no matches yet"),
                 Entries = entries
             };
+        }
+
+        public static void ApplyLeaderboard(DotArenaMetaState? state, LeaderboardReply reply)
+        {
+            if (state == null || reply.Code != 0)
+            {
+                return;
+            }
+
+            NormalizeState(state, state.PlayerId);
+            state.LeaderboardPeriodStartUtc = reply.PeriodStartUtc;
+            state.LeaderboardSecondsUntilReset = Math.Max(0, reply.SecondsUntilReset);
+            state.LeaderboardEntries.Clear();
+            foreach (var entry in reply.Entries)
+            {
+                state.LeaderboardEntries.Add(new DotArenaLeaderboardEntrySummary
+                {
+                    Position = entry.Rank,
+                    Name = entry.PlayerId,
+                    VictoryPoints = entry.VictoryPoints,
+                    Wins = entry.WinCount,
+                    Matches = 0,
+                    Note = "Server",
+                    IsLocalPlayer = string.Equals(entry.PlayerId, state.PlayerId, StringComparison.Ordinal)
+                });
+            }
+        }
+
+        private static string FormatLeaderboardReset(int seconds)
+        {
+            var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
+            if (span.TotalDays >= 1d)
+            {
+                return $"{(int)span.TotalDays}d {span.Hours}h";
+            }
+
+            if (span.TotalHours >= 1d)
+            {
+                return $"{(int)span.TotalHours}h {span.Minutes}m";
+            }
+
+            return $"{span.Minutes}m";
         }
 
         public static DotArenaShopAvailabilitySummary GetShopAvailabilitySummary(DotArenaMetaState? state)

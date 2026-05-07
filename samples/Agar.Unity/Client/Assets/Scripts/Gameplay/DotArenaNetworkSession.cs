@@ -157,6 +157,23 @@ namespace SampleClient.Gameplay
             }).ConfigureAwait(false);
         }
 
+        public async Task<LeaderboardReply> GetLeaderboardAsync(int topN, CancellationToken cancellationToken = default)
+        {
+            if (_controlPlayerService == null)
+            {
+                return new LeaderboardReply
+                {
+                    Code = 1,
+                    Message = "Not connected."
+                };
+            }
+
+            return await _controlPlayerService.GetLeaderboardAsync(new LeaderboardRequest
+            {
+                TopN = topN
+            }).ConfigureAwait(false);
+        }
+
         public async Task<bool> EnsureRealtimeConnectedAsync(
             RealtimeConnectionInfo realtimeConnection,
             IPlayerCallback callback,

@@ -38,6 +38,11 @@ var host = Host.CreateDefaultBuilder(args)
             options.Invariant = invariant;
             options.ConnectionString = connectionString;
         });
+        silo.AddAdoNetGrainStorage("leaderboards", options =>
+        {
+            options.Invariant = invariant;
+            options.ConnectionString = connectionString;
+        });
     })
     .Build();
 

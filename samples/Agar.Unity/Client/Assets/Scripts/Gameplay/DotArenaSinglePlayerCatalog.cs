@@ -74,14 +74,7 @@ namespace SampleClient.Gameplay
                 FoodTargetCount = 96,
                 InitialMass = 24f,
                 RespawnMass = 24f,
-                EnabledPickupTypes = new[]
-                {
-                    PickupType.SpeedBoost,
-                    PickupType.KnockbackBoost,
-                    PickupType.ScorePoint,
-                    PickupType.Shield,
-                    PickupType.BonusScore
-                }
+                EnabledPickupTypes = new[] { PickupType.ScorePoint }
             };
 
             switch (preset.RuleVariant)

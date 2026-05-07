@@ -44,6 +44,7 @@ namespace SampleClient.Gameplay
                 _localMatch = null;
                 _reliablePushTracker.Reset();
                 EnsureMetaState(_localPlayerId);
+                _ = RefreshLeaderboardAsync();
                 _localWinCount = Math.Max(0, reply.WinCount);
                 _hasAuthenticatedProfile = true;
                 _authenticatedPlayerId = _localPlayerId;
@@ -118,6 +119,7 @@ namespace SampleClient.Gameplay
                 _localMatch = null;
                 _reliablePushTracker.Reset();
                 EnsureMetaState(_localPlayerId);
+                _ = RefreshLeaderboardAsync();
                 _localWinCount = Math.Max(0, reply.WinCount);
                 _hasAuthenticatedProfile = true;
                 _authenticatedPlayerId = _localPlayerId;
@@ -212,6 +214,8 @@ namespace SampleClient.Gameplay
                             _authenticatedPlayerId = _localPlayerId;
                             _hasAuthenticatedProfile = true;
                             _localWinCount = Math.Max(0, reply.WinCount);
+                            EnsureMetaState(_localPlayerId);
+                            _ = RefreshLeaderboardAsync();
                             _sessionMode = SessionMode.Multiplayer;
                             _status = _flowState == FrontendFlowState.InMatch
                                 ? $"In Match: {_localPlayerId}"
@@ -346,6 +350,11 @@ namespace SampleClient.Gameplay
                 LocalPlayerWon = localPlayerWon,
                 SessionMode = sessionMode
             };
+
+            if (preserveLoginState)
+            {
+                _ = RefreshLeaderboardAsync();
+            }
 
             if (_metaState != null)
             {

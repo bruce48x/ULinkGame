@@ -31,7 +31,6 @@ namespace SampleClient.Gameplay
             _localWinCount = _sessionMode == SessionMode.Multiplayer ? _localWinCount : 0;
             _lastWorldTick = -1;
             _lastLoggedPlayerCount = -1;
-            _dashQueued = false;
             _nextInputAt = 0f;
             _singlePlayerTickAccumulator = 0f;
             _currentArenaHalfExtents = GameplayConfig.ArenaHalfExtents;

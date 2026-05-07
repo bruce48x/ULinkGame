@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Shared.Interfaces;
 using ULinkRPC.Core;
 
-namespace Rpc.Generated
+namespace Rpc
 {
     public sealed class PlayerServiceClient : IPlayerService
     {
@@ -18,6 +18,7 @@ namespace Rpc.Generated
         private static readonly RpcMethod<CancelMatchmakingRequest, RpcVoid> cancelMatchmakingAsyncRpcMethod = new(ServiceId, 5);
         private static readonly RpcMethod<RealtimeAttachRequest, RealtimeAttachReply> attachRealtimeAsyncRpcMethod = new(ServiceId, 6);
         private static readonly RpcMethod<ReliablePushAckRequest, ReliablePushAckReply> ackReliablePushAsyncRpcMethod = new(ServiceId, 7);
+        private static readonly RpcMethod<LeaderboardRequest, LeaderboardReply> getLeaderboardAsyncRpcMethod = new(ServiceId, 8);
         private static readonly RpcMethod<InputMessage, RpcVoid> submitInputRpcMethod = new(ServiceId, 2);
         private static readonly RpcMethod<LogoutRequest, RpcVoid> logoutAsyncRpcMethod = new(ServiceId, 3);
 
@@ -73,6 +74,16 @@ namespace Rpc.Generated
         public ValueTask<ReliablePushAckReply> AckReliablePushAsync(ReliablePushAckRequest req, CancellationToken ct)
         {
             return _client.CallAsync(ackReliablePushAsyncRpcMethod, req, ct);
+        }
+
+        public ValueTask<LeaderboardReply> GetLeaderboardAsync(LeaderboardRequest req)
+        {
+            return GetLeaderboardAsync(req, CancellationToken.None);
+        }
+
+        public ValueTask<LeaderboardReply> GetLeaderboardAsync(LeaderboardRequest req, CancellationToken ct)
+        {
+            return _client.CallAsync(getLeaderboardAsyncRpcMethod, req, ct);
         }
 
         public async ValueTask SubmitInput(InputMessage req)

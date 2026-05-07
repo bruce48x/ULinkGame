@@ -60,5 +60,8 @@ src/**/*.meta
 /samples/*/Client/export_presets.cfg
 *.import
 
+# Claude Code local settings
+**/.claude/settings.local.json
+
 # Logs
 *.log

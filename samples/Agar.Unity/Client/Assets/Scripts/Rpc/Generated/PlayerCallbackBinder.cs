@@ -6,7 +6,7 @@ using System;
 using Shared.Interfaces;
 using ULinkRPC.Core;
 
-namespace Rpc.Generated
+namespace Rpc
 {
     public static class PlayerCallbackBinder
     {
