@@ -6,6 +6,7 @@
 
 - `ULinkGame.Client` `0.1.3`
 - `ULinkGame.Tool` `0.1.7`
+- `ULinkGame.Tool` `0.1.8`
 
 ### Changed
 
@@ -13,3 +14,4 @@
 - Updated Unity and Godot samples to consume `ULinkGame.Client` through NuGet.
 - Updated Godot sample projects and generated tool templates to avoid MSBuild multi-target project races during default restore/build.
 - Limited Godot server logging to console output to avoid Windows EventLog permission failures in non-elevated runs.
+- Updated Godot client generation in `ULinkGame.Tool` to preserve generated RPC clients and create a real networked Ping example.

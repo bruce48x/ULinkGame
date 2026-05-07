@@ -16,6 +16,10 @@ internal sealed class ProjectScaffolder
     public async Task ReplaceGeneratedClientWithGodotClientAsync(string projectRoot, string projectName, NewCommandOptions options)
     {
         var clientDirectory = Path.Combine(projectRoot, "Client");
+        var generatedRpcFiles = await ReadDirectoryFilesAsync(
+            Path.Combine(clientDirectory, "Scripts", "Rpc", "Generated")).ConfigureAwait(false);
+        var nugetConfig = await ReadOptionalFileAsync(Path.Combine(clientDirectory, "NuGet.config")).ConfigureAwait(false);
+
         if (Directory.Exists(clientDirectory))
         {
             Directory.Delete(clientDirectory, recursive: true);
@@ -29,7 +33,17 @@ internal sealed class ProjectScaffolder
             WriteAsync(Path.Combine(clientDirectory, $"{projectName}.csproj"), ToolTemplates.RenderGodotProject(projectName, options)),
             WriteAsync(Path.Combine(clientDirectory, "project.godot"), ToolTemplates.RenderGodotProjectSettings(projectName)),
             WriteAsync(Path.Combine(clientDirectory, "Scenes", "Main.tscn"), ToolTemplates.RenderGodotMainScene()),
-            WriteAsync(Path.Combine(clientDirectory, "Scripts", "Main.cs"), ToolTemplates.RenderGodotMainScript(projectName))).ConfigureAwait(false);
+            WriteAsync(Path.Combine(clientDirectory, "Scripts", "Main.cs"), ToolTemplates.RenderGodotMainScript(projectName, options)),
+            WriteAsync(Path.Combine(clientDirectory, "Scripts", "Rpc", "RpcClientFactory.cs"), ToolTemplates.RenderGodotRpcClientFactory(options))).ConfigureAwait(false);
+
+        if (nugetConfig is not null)
+        {
+            await File.WriteAllTextAsync(Path.Combine(clientDirectory, "NuGet.config"), nugetConfig).ConfigureAwait(false);
+        }
+
+        await WriteDirectoryFilesAsync(
+            Path.Combine(clientDirectory, "Scripts", "Rpc", "Generated"),
+            generatedRpcFiles).ConfigureAwait(false);
     }
 
     private static Task WriteDotNetToolManifestAsync(string projectRoot)
@@ -92,5 +106,50 @@ internal sealed class ProjectScaffolder
     private static Task WriteAsync(string path, string content)
     {
         return File.WriteAllTextAsync(path, content + Environment.NewLine);
+    }
+
+    private static async Task<string?> ReadOptionalFileAsync(string path)
+    {
+        return File.Exists(path) ? await File.ReadAllTextAsync(path).ConfigureAwait(false) : null;
+    }
+
+    private static async Task<IReadOnlyList<(string RelativePath, string Content)>> ReadDirectoryFilesAsync(string directory)
+    {
+        if (!Directory.Exists(directory))
+        {
+            return [];
+        }
+
+        var files = Directory
+            .EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        var result = new List<(string RelativePath, string Content)>(files.Length);
+        foreach (var file in files)
+        {
+            var relativePath = Path.GetRelativePath(directory, file);
+            var content = await File.ReadAllTextAsync(file).ConfigureAwait(false);
+            result.Add((relativePath, content));
+        }
+
+        return result;
+    }
+
+    private static Task WriteDirectoryFilesAsync(
+        string directory,
+        IReadOnlyList<(string RelativePath, string Content)> files)
+    {
+        return Task.WhenAll(files.Select(file =>
+        {
+            var path = Path.Combine(directory, file.RelativePath);
+            var parentDirectory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(parentDirectory))
+            {
+                Directory.CreateDirectory(parentDirectory);
+            }
+
+            return File.WriteAllTextAsync(path, file.Content);
+        }));
     }
 }
