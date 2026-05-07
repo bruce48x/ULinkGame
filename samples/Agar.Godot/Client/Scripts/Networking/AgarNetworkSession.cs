@@ -1,0 +1,292 @@
+#nullable enable
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Rpc;
+using Shared.Interfaces;
+using ULinkRPC.Client;
+
+namespace Agar.Godot.Scripts.Networking;
+
+internal sealed class AgarNetworkSession
+{
+    private readonly Action<Exception?> _onDisconnected;
+    private RpcClient? _controlConnection;
+    private IPlayerService? _controlPlayerService;
+    private RpcClient? _realtimeConnection;
+    private IPlayerService? _realtimePlayerService;
+    private string _playerId = string.Empty;
+    private string _token = string.Empty;
+    private string _realtimeRoomId = string.Empty;
+    private string _realtimeMatchId = string.Empty;
+    private bool _ignoreControlDisconnect;
+    private bool _ignoreRealtimeDisconnect;
+
+    public AgarNetworkSession(Action<Exception?> onDisconnected)
+    {
+        _onDisconnected = onDisconnected;
+    }
+
+    public bool IsConnected { get; private set; }
+
+    public bool IsRealtimeConnected { get; private set; }
+
+    public string PlayerId => _playerId;
+
+    public bool CanSubmitGameplayInput => IsConnected || IsRealtimeConnected;
+
+    public async Task<LoginReply> ConnectAndLoginAsync(
+        string host,
+        int port,
+        string path,
+        string account,
+        string password,
+        IPlayerCallback callback,
+        CancellationToken cancellationToken)
+    {
+        var callbacks = new RpcClient.RpcCallbackBindings();
+        callbacks.Add(callback);
+
+        _controlConnection = WebSocketRpcClientFactory.Create(host, port, path, callbacks);
+        _controlConnection.Disconnected += HandleControlDisconnected;
+
+        try
+        {
+            await _controlConnection.ConnectAsync(cancellationToken).ConfigureAwait(false);
+
+            _controlPlayerService = _controlConnection.Api.Shared.Player;
+            var reply = await _controlPlayerService.LoginAsync(new LoginRequest
+            {
+                Account = account,
+                Password = password,
+                GuestLogin = true
+            }).ConfigureAwait(false);
+
+            if (reply.Code != LoginResultCodes.Ok)
+            {
+                await DisposeControlAsync(logout: false).ConfigureAwait(false);
+                return reply;
+            }
+
+            _playerId = reply.PlayerId;
+            _token = reply.Token;
+            IsConnected = true;
+            return reply;
+        }
+        catch
+        {
+            await DisposeControlAsync(logout: false).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task StartMatchmakingAsync(CancellationToken cancellationToken)
+    {
+        if (_controlPlayerService == null || string.IsNullOrWhiteSpace(_playerId))
+        {
+            return;
+        }
+
+        await _controlPlayerService.StartMatchmakingAsync(new MatchmakingRequest
+        {
+            PlayerId = _playerId,
+            Token = _token
+        }).ConfigureAwait(false);
+    }
+
+    public async Task SubmitInputAsync(InputMessage input)
+    {
+        var playerService = _realtimePlayerService ?? _controlPlayerService;
+        if (playerService == null)
+        {
+            return;
+        }
+
+        await playerService.SubmitInput(input).ConfigureAwait(false);
+    }
+
+    public async Task<ReliablePushAckReply> AckReliablePushAsync(long sequence, CancellationToken cancellationToken)
+    {
+        if (_controlPlayerService == null || sequence <= 0)
+        {
+            return new ReliablePushAckReply
+            {
+                Code = ReliablePushAckResultCodes.InvalidRequest,
+                Message = "Reliable push ack request is incomplete."
+            };
+        }
+
+        return await _controlPlayerService.AckReliablePushAsync(new ReliablePushAckRequest
+        {
+            PlayerId = _playerId,
+            Token = _token,
+            Sequence = sequence
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<bool> EnsureRealtimeConnectedAsync(
+        RealtimeConnectionInfo realtimeConnection,
+        IPlayerCallback callback,
+        CancellationToken cancellationToken)
+    {
+        if (realtimeConnection.Transport != RealtimeTransportKind.Kcp)
+        {
+            return false;
+        }
+
+        if (IsRealtimeConnected &&
+            string.Equals(_realtimeRoomId, realtimeConnection.RoomId, StringComparison.Ordinal) &&
+            string.Equals(_realtimeMatchId, realtimeConnection.MatchId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        await DisposeRealtimeAsync().ConfigureAwait(false);
+
+        var callbacks = new RpcClient.RpcCallbackBindings();
+        callbacks.Add(callback);
+
+        _realtimeRoomId = realtimeConnection.RoomId ?? string.Empty;
+        _realtimeMatchId = realtimeConnection.MatchId ?? string.Empty;
+        _realtimeConnection = KcpRpcClientFactory.Create(realtimeConnection.Host, realtimeConnection.Port, callbacks);
+        _realtimeConnection.Disconnected += HandleRealtimeDisconnected;
+
+        await _realtimeConnection.ConnectAsync(cancellationToken).ConfigureAwait(false);
+
+        _realtimePlayerService = _realtimeConnection.Api.Shared.Player;
+        var reply = await _realtimePlayerService.AttachRealtimeAsync(new RealtimeAttachRequest
+        {
+            PlayerId = _playerId,
+            Token = string.IsNullOrWhiteSpace(realtimeConnection.SessionToken) ? _token : realtimeConnection.SessionToken,
+            RoomId = realtimeConnection.RoomId ?? string.Empty,
+            MatchId = realtimeConnection.MatchId ?? string.Empty
+        }).ConfigureAwait(false);
+
+        if (reply.Code != 0)
+        {
+            await DisposeRealtimeAsync().ConfigureAwait(false);
+            return false;
+        }
+
+        IsRealtimeConnected = true;
+        return true;
+    }
+
+    public async Task DisposeAsync(bool logout = true)
+    {
+        await DisposeRealtimeAsync().ConfigureAwait(false);
+        await DisposeControlAsync(logout).ConfigureAwait(false);
+    }
+
+    private async Task DisposeControlAsync(bool logout)
+    {
+        if (_controlConnection == null)
+        {
+            _controlPlayerService = null;
+            IsConnected = false;
+            return;
+        }
+
+        var connection = _controlConnection;
+        var playerService = _controlPlayerService;
+        _controlConnection = null;
+        _ignoreControlDisconnect = true;
+        connection.Disconnected -= HandleControlDisconnected;
+
+        try
+        {
+            if (logout && IsConnected && playerService != null)
+            {
+                await playerService.LogoutAsync(new LogoutRequest()).ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _ignoreControlDisconnect = false;
+            _controlPlayerService = null;
+            IsConnected = false;
+
+            if (logout)
+            {
+                _playerId = string.Empty;
+                _token = string.Empty;
+            }
+        }
+    }
+
+    private async Task DisposeRealtimeAsync()
+    {
+        if (_realtimeConnection == null)
+        {
+            _realtimePlayerService = null;
+            IsRealtimeConnected = false;
+            _realtimeRoomId = string.Empty;
+            _realtimeMatchId = string.Empty;
+            return;
+        }
+
+        var connection = _realtimeConnection;
+        _realtimeConnection = null;
+        _ignoreRealtimeDisconnect = true;
+        connection.Disconnected -= HandleRealtimeDisconnected;
+
+        try
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _ignoreRealtimeDisconnect = false;
+            _realtimePlayerService = null;
+            IsRealtimeConnected = false;
+            _realtimeRoomId = string.Empty;
+            _realtimeMatchId = string.Empty;
+        }
+    }
+
+    private void HandleControlDisconnected(Exception? ex)
+    {
+        if (_ignoreControlDisconnect)
+        {
+            return;
+        }
+
+        IsConnected = false;
+        _controlConnection = null;
+        _controlPlayerService = null;
+        _onDisconnected(ex);
+    }
+
+    private void HandleRealtimeDisconnected(Exception? ex)
+    {
+        if (_ignoreRealtimeDisconnect)
+        {
+            return;
+        }
+
+        IsRealtimeConnected = false;
+        _realtimePlayerService = null;
+        _realtimeRoomId = string.Empty;
+        _realtimeMatchId = string.Empty;
+
+        if (!IsConnected)
+        {
+            _onDisconnected(ex);
+        }
+    }
+}
