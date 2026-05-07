@@ -52,28 +52,24 @@ ULinkGame is not a full game business framework. It does not decide your:
 
 Those belong in your game. ULinkGame stays focused on the infrastructure that many online games have to rebuild.
 
-## Install
+## Create A Project
 
-Install the runtime packages you need:
-
-```powershell
-dotnet add package ULinkGame.Server
-dotnet add package ULinkGame.Client
-```
-
-Install the project tool as a .NET tool:
+Use `ULinkGame.Tool` to create a starter project instead of wiring the runtime packages by hand:
 
 ```powershell
 dotnet tool install --global ULinkGame.Tool
-```
-
-Create a starter project:
-
-```powershell
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack
 ```
 
-The generated project uses ULinkRPC for typed RPC and Microsoft Orleans for distributed actor hosting, then augments the server with ULinkGame hosting and reliable push infrastructure.
+The tool creates a ULinkRPC-based project, prepares Microsoft Orleans hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation.
+
+Run code generation later from the generated project:
+
+```powershell
+ulinkgame-tool codegen
+```
+
+For the full walkthrough, see [ULinkGame getting started](https://bruce48x.github.io/ULinkGame/posts/ulinkgame-getting-started/).
 
 ## Package Guide
 
