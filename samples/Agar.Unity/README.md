@@ -1,16 +1,17 @@
 # ULinkGame Game Sample
 
-这个样例用于验证 [ULinkRPC](https://github.com/bruce48x/ulinkrpc) 和 ULinkGame 在一个轻量多人对战游戏里的接入方式，同时支持：
+这个样例用于验证 ULinkGame 在一个轻量多人对战游戏里的接入方式，同时支持：
 
 - 真正离线的本地单机
 - 基于 RPC 的联机同步
 - WS 控制连接 + KCP 实时连接
 - 断线重连与业务层可靠推送
+- 分布式部署
 
 ## 产品规划
 
-- [Agar 风格玩法设计](docs/GAMEPLAY_DESIGN.md)
-- [Agar 风格开发计划](docs/DEVELOPMENT_PLAN.md)
+- [玩法设计](docs/GAMEPLAY_DESIGN.md)
+- [开发计划](docs/DEVELOPMENT_PLAN.md)
 
 ## 1. 玩法
 

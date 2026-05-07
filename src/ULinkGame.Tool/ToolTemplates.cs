@@ -162,6 +162,7 @@ internal static class ToolTemplates
 
                     _status = "Ping ok";
                     _reply = $"Reply: {reply.Message} | Server UTC: {reply.ServerTimeUtc}";
+                    GD.Print($"Ping ok: message={reply.Message}, serverTimeUtc={reply.ServerTimeUtc}");
                 }
                 catch (OperationCanceledException)
                 {
@@ -556,7 +557,8 @@ internal sealed class {typeName}
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using ULinkGame.Server.Hosting;
+        return $@"using Server.Generated;
+using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
@@ -578,6 +580,7 @@ internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServer
         var builder = context.Builder;
         builder.UseSerializer(new {serializerType}());
 {TemplateText.IndentBlock(RenderControlPlaneAcceptor(options.Transport), 2)}
+        AllServicesBinder.BindAll(builder.ServiceRegistry);
     }}
 }}";
     }
@@ -587,7 +590,8 @@ internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServer
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using ULinkGame.Server.Hosting;
+        return $@"using Server.Generated;
+using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
@@ -609,6 +613,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         var builder = context.Builder;
         builder.UseSerializer(new {serializerType}());
 {TemplateText.IndentBlock(RenderRealtimeAcceptor(options.Transport), 2)}
+        AllServicesBinder.BindAll(builder.ServiceRegistry);
     }}
 }}";
     }

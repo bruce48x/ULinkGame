@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+WORK_DIR="$ROOT_DIR/.tmp/ulinkgame-tool-godot-daily"
+GENERATED_ROOT="$WORK_DIR/generated"
+TOOLS_DIR="$WORK_DIR/tools"
+LOG_DIR="$WORK_DIR/logs"
+LOCAL_FEED="$ROOT_DIR/artifacts/ci-nuget"
+CI_NUGET_CONFIG="$WORK_DIR/NuGet.config"
+
+TRANSPORT="${ULINKGAME_TOOL_TRANSPORT:-kcp}"
+SERIALIZER="${ULINKGAME_TOOL_SERIALIZER:-memorypack}"
+TRANSPORT_LABEL="$(tr '[:lower:]' '[:upper:]' <<< "${TRANSPORT:0:1}")${TRANSPORT:1}"
+SERIALIZER_LABEL="$(tr '[:lower:]' '[:upper:]' <<< "${SERIALIZER:0:1}")${SERIALIZER:1}"
+PROJECT_NAME="ULinkGameGodot${TRANSPORT_LABEL}${SERIALIZER_LABEL}"
+PROJECT_DIR="$GENERATED_ROOT/$PROJECT_NAME"
+CLIENT_DIR="$PROJECT_DIR/Client"
+CLIENT_PROJECT="$CLIENT_DIR/$PROJECT_NAME.csproj"
+SILO_PROJECT="$PROJECT_DIR/Server/Silo/Silo.csproj"
+SERVER_PROJECT="$PROJECT_DIR/Server/Server/Server.csproj"
+SILO_LOG="$LOG_DIR/silo.log"
+SERVER_LOG="$LOG_DIR/server.log"
+CLIENT_LOG="$LOG_DIR/client.log"
+GODOT_STDOUT_LOG="$LOG_DIR/godot.stdout.log"
+
+if [[ -z "${GODOT_BIN:-}" || -z "${GODOT_NUPKGS:-}" ]]; then
+  echo "GODOT_BIN and GODOT_NUPKGS must be set." >&2
+  exit 1
+fi
+
+case "$TRANSPORT" in
+  tcp|websocket|kcp) ;;
+  *)
+    echo "Unsupported ULINKGAME_TOOL_TRANSPORT: $TRANSPORT" >&2
+    exit 1
+    ;;
+esac
+
+case "$SERIALIZER" in
+  json|memorypack) ;;
+  *)
+    echo "Unsupported ULINKGAME_TOOL_SERIALIZER: $SERIALIZER" >&2
+    exit 1
+    ;;
+esac
+
+terminate_process() {
+  local pid="${1:-}"
+  local name="${2:-process}"
+
+  if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+
+  kill "$pid" 2>/dev/null || true
+  for ((i = 0; i < 10; i++)); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" 2>/dev/null || true
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Force killing lingering $name process $pid." >&2
+  kill -9 "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+}
+
+cleanup() {
+  terminate_process "${GODOT_PID:-}" "godot"
+  terminate_process "${SERVER_PID:-}" "server"
+  terminate_process "${SILO_PID:-}" "silo"
+}
+
+trap cleanup EXIT
+
+print_logs() {
+  for log in "$SILO_LOG" "$SERVER_LOG" "$CLIENT_LOG" "$GODOT_STDOUT_LOG"; do
+    if [[ -f "$log" ]]; then
+      echo "===== $log =====" >&2
+      cat "$log" >&2
+    fi
+  done
+}
+
+wait_for_port() {
+  local host="$1"
+  local port="$2"
+  local attempts="${3:-60}"
+
+  for ((i = 0; i < attempts; i++)); do
+    if bash -c "</dev/tcp/$host/$port" >/dev/null 2>&1; then
+      return 0
+    fi
+
+    if [[ -n "${SERVER_PID:-}" ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      echo "Server process exited before $host:$port became ready." >&2
+      return 1
+    fi
+
+    sleep 1
+  done
+
+  echo "Timed out waiting for $host:$port." >&2
+  return 1
+}
+
+wait_for_log() {
+  local pattern="$1"
+  local file_path="$2"
+  local attempts="${3:-60}"
+
+  for ((i = 0; i < attempts; i++)); do
+    if grep -Fq "$pattern" "$file_path" 2>/dev/null; then
+      return 0
+    fi
+
+    sleep 1
+  done
+
+  return 1
+}
+
+wait_for_server_ready() {
+  case "$TRANSPORT" in
+    websocket)
+      wait_for_port 127.0.0.1 20000 60
+      ;;
+    tcp)
+      wait_for_port 127.0.0.1 20000 60
+      ;;
+    kcp)
+      wait_for_log "listening on udp://" "$SERVER_LOG" 60
+      ;;
+  esac
+}
+
+pack_local_package() {
+  local project_path="$1"
+  dotnet pack "$project_path" -c Release -o "$LOCAL_FEED" --nologo
+}
+
+rm -rf "$WORK_DIR" "$LOCAL_FEED"
+mkdir -p "$GENERATED_ROOT" "$TOOLS_DIR" "$LOG_DIR" "$LOCAL_FEED"
+
+cat > "$CI_NUGET_CONFIG" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$LOCAL_FEED" />
+    <add key="godot-local" value="$GODOT_NUPKGS" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+</configuration>
+EOF
+
+echo "Packing local ULinkGame packages into $LOCAL_FEED"
+pack_local_package "$ROOT_DIR/src/ULinkGame.Client/ULinkGame.Client.csproj"
+pack_local_package "$ROOT_DIR/src/ULinkGame.Server/ULinkGame.Server.csproj"
+pack_local_package "$ROOT_DIR/src/ULinkGame.Tool/ULinkGame.Tool.csproj"
+
+echo "Installing ulinkrpc-starter into $TOOLS_DIR"
+dotnet tool install ulinkrpc.starter --version 0.2.52 --tool-path "$TOOLS_DIR"
+export PATH="$TOOLS_DIR:$PATH"
+export ULINKRPC_GODOT_NUPKGS="$GODOT_NUPKGS"
+
+echo "Generating ULinkGame Godot project at $PROJECT_DIR ($TRANSPORT + $SERIALIZER)"
+dotnet run --project "$ROOT_DIR/src/ULinkGame.Tool/ULinkGame.Tool.csproj" -- \
+  new \
+  --name "$PROJECT_NAME" \
+  --output "$GENERATED_ROOT" \
+  --client-engine godot \
+  --transport "$TRANSPORT" \
+  --serializer "$SERIALIZER"
+
+echo "Restoring and building generated server projects"
+dotnet restore "$SILO_PROJECT" --configfile "$CI_NUGET_CONFIG"
+dotnet restore "$SERVER_PROJECT" --configfile "$CI_NUGET_CONFIG"
+dotnet build "$SILO_PROJECT" -c Release --no-restore
+dotnet build "$SERVER_PROJECT" -c Release --no-restore
+
+echo "Restoring and building generated Godot client"
+dotnet restore "$CLIENT_PROJECT" --configfile "$CI_NUGET_CONFIG"
+dotnet build "$CLIENT_PROJECT" -c Debug --no-restore
+
+echo "Starting generated Orleans silo"
+dotnet run --project "$SILO_PROJECT" -c Release --no-build >"$SILO_LOG" 2>&1 &
+SILO_PID=$!
+
+if ! wait_for_port 127.0.0.1 30000 60; then
+  print_logs
+  exit 1
+fi
+
+echo "Starting generated gateway server"
+dotnet run --project "$SERVER_PROJECT" -c Release --no-build >"$SERVER_LOG" 2>&1 &
+SERVER_PID=$!
+
+if ! wait_for_server_ready; then
+  print_logs
+  exit 1
+fi
+
+echo "Running generated Godot client headless"
+"$GODOT_BIN" \
+  --headless \
+  --path "$CLIENT_DIR" \
+  --scene "res://Scenes/Main.tscn" \
+  --log-file "$CLIENT_LOG" \
+  --verbose \
+  --no-header >"$GODOT_STDOUT_LOG" 2>&1 &
+GODOT_PID=$!
+
+for ((i = 0; i < 90; i++)); do
+  if grep -Fq "Request failed:" "$GODOT_STDOUT_LOG" "$CLIENT_LOG" 2>/dev/null || \
+     grep -Fq "Connect failed:" "$GODOT_STDOUT_LOG" "$CLIENT_LOG" 2>/dev/null; then
+    echo "Godot client reported a network failure." >&2
+    print_logs
+    exit 1
+  fi
+
+  if grep -Fq "Ping ok:" "$GODOT_STDOUT_LOG" "$CLIENT_LOG" 2>/dev/null; then
+    echo "ULinkGame Tool Godot $TRANSPORT + $SERIALIZER verification passed."
+    exit 0
+  fi
+
+  if ! kill -0 "$GODOT_PID" 2>/dev/null; then
+    if wait "$GODOT_PID"; then
+      godot_exit_code=0
+    else
+      godot_exit_code=$?
+    fi
+    echo "Godot exited before producing a successful ping log. Exit code: $godot_exit_code" >&2
+    print_logs
+    exit 1
+  fi
+
+  sleep 1
+done
+
+echo "Timed out waiting for successful ping from generated Godot client." >&2
+print_logs
+exit 1
