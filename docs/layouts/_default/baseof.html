@@ -23,11 +23,11 @@
   <body>
     <header class="site-header">
       <div class="wrap">
-        <a class="brand" href="{{ "/" | relURL }}">{{ .Site.Title }}</a>
+        <a class="brand" href="{{ .Site.Home.RelPermalink }}">{{ .Site.Title }}</a>
         <nav class="nav">
-          <a href="{{ "/" | relURL }}">Home</a>
-          <a href="{{ "/posts/" | relURL }}">Posts</a>
-          <a href="{{ "/about/" | relURL }}">About</a>
+          <a href="{{ .Site.Home.RelPermalink }}">Home</a>
+          <a href="{{ "posts/" | relURL }}">Posts</a>
+          <a href="{{ "about/" | relURL }}">About</a>
           <a href="{{ .Site.Params.repo }}">GitHub</a>
         </nav>
       </div>
