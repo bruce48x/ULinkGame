@@ -2,12 +2,13 @@ internal sealed class ProjectScaffolder
 {
     public async Task AugmentProjectWithULinkGameServerAsync(string projectRoot, NewCommandOptions options)
     {
+        await MoveStarterServerProjectToEdgeAsync(projectRoot).ConfigureAwait(false);
         await WriteDotNetToolManifestAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
-        await WriteGatewayProgramAsync(projectRoot).ConfigureAwait(false);
-        await WriteGatewayProjectAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteGatewayAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteGatewayConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteEdgeProgramAsync(projectRoot).ConfigureAwait(false);
+        await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteSiloProjectAsync(projectRoot).ConfigureAwait(false);
         await WriteSiloProgramAsync(projectRoot).ConfigureAwait(false);
         await WriteSiloAppSettingsAsync(projectRoot).ConfigureAwait(false);
@@ -58,28 +59,75 @@ internal sealed class ProjectScaffolder
         return WriteAsync(Path.Combine(projectRoot, "Server", "Server.slnx"), ToolTemplates.RenderServerSolution());
     }
 
-    private static Task WriteGatewayProgramAsync(string projectRoot)
+    private static async Task MoveStarterServerProjectToEdgeAsync(string projectRoot)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "Program.cs"), ToolTemplates.RenderGatewayProgram());
+        var starterServerDirectory = Path.Combine(projectRoot, ToNativePath(ProjectConventions.StarterServerProjectPath));
+        var edgeDirectory = Path.Combine(projectRoot, ToNativePath(ProjectConventions.EdgeProjectPath));
+
+        if (Directory.Exists(starterServerDirectory))
+        {
+            if (Directory.Exists(edgeDirectory))
+            {
+                throw new InvalidOperationException($"Both generated server directories exist: {starterServerDirectory} and {edgeDirectory}");
+            }
+
+            Directory.Move(starterServerDirectory, edgeDirectory);
+        }
+        else
+        {
+            Directory.CreateDirectory(edgeDirectory);
+        }
+
+        await RenameStarterServerNamespacesAsync(edgeDirectory).ConfigureAwait(false);
+        DeleteIfExists(Path.Combine(edgeDirectory, "Server.csproj"));
     }
 
-    private static Task WriteGatewayProjectAsync(string projectRoot, NewCommandOptions options)
+    private static async Task RenameStarterServerNamespacesAsync(string edgeDirectory)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "Server.csproj"), ToolTemplates.RenderGatewayProject(options));
+        if (!Directory.Exists(edgeDirectory))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(edgeDirectory, "*.cs", SearchOption.AllDirectories))
+        {
+            var content = await File.ReadAllTextAsync(file).ConfigureAwait(false);
+            var updated = content.Replace(
+                ProjectConventions.StarterServerGeneratedNamespace,
+                ProjectConventions.EdgeGeneratedNamespace,
+                StringComparison.Ordinal)
+                .Replace("namespace Server.", "namespace Edge.", StringComparison.Ordinal)
+                .Replace("using Server.", "using Edge.", StringComparison.Ordinal);
+
+            if (!string.Equals(content, updated, StringComparison.Ordinal))
+            {
+                await File.WriteAllTextAsync(file, updated).ConfigureAwait(false);
+            }
+        }
     }
 
-    private static Task WriteGatewayAppSettingsAsync(string projectRoot, NewCommandOptions options)
+    private static Task WriteEdgeProgramAsync(string projectRoot)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "appsettings.json"), ToolTemplates.RenderGatewayAppSettings(options));
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "Program.cs"), ToolTemplates.RenderEdgeProgram());
     }
 
-    private static Task WriteGatewayConfiguratorsAsync(string projectRoot, NewCommandOptions options)
+    private static Task WriteEdgeProjectAsync(string projectRoot, NewCommandOptions options)
     {
-        var hostingDirectory = Path.Combine(projectRoot, "Server", "Server", "Hosting");
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "Edge.csproj"), ToolTemplates.RenderEdgeProject(options));
+    }
+
+    private static Task WriteEdgeAppSettingsAsync(string projectRoot, NewCommandOptions options)
+    {
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "appsettings.json"), ToolTemplates.RenderEdgeAppSettings(options));
+    }
+
+    private static Task WriteEdgeConfiguratorsAsync(string projectRoot, NewCommandOptions options)
+    {
+        var hostingDirectory = Path.Combine(projectRoot, "Server", "Edge", "Hosting");
         Directory.CreateDirectory(hostingDirectory);
 
         return Task.WhenAll(
-            WriteAsync(Path.Combine(hostingDirectory, "GatewayRpcServerOptions.cs"), ToolTemplates.RenderGatewayRpcServerOptions()),
+            WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
             WriteAsync(Path.Combine(hostingDirectory, "ControlPlaneRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
             WriteAsync(Path.Combine(hostingDirectory, "RealtimeRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
             WriteAsync(Path.Combine(hostingDirectory, "DefaultControlPlaneRpcServerConfigurator.cs"), ToolTemplates.RenderControlPlaneConfigurator(options)),
@@ -106,6 +154,19 @@ internal sealed class ProjectScaffolder
     private static Task WriteAsync(string path, string content)
     {
         return File.WriteAllTextAsync(path, content + Environment.NewLine);
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static string ToNativePath(string path)
+    {
+        return path.Replace('/', Path.DirectorySeparatorChar);
     }
 
     private static async Task<string?> ReadOptionalFileAsync(string path)

@@ -25,7 +25,8 @@ ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --seriali
 
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
-- 基于 `ULinkGame.Server` 的 gateway 启动代码
+- `Server/Edge/` in generated sample projects
+- 基于 `ULinkGame.Server` 的 edge 启动代码
 - Microsoft Orleans 本地开发配置
 - 当 `--client-engine godot` 时，生成 Godot .NET `Client/`
 - `ulinkgame.tool.json`
@@ -77,9 +78,9 @@ ulinkgame-tool codegen --no-restore
   "codegen": {
     "contractsPath": "Shared",
     "server": {
-      "projectPath": "Server/Server",
+      "projectPath": "Server/Edge",
       "outputPath": "Generated",
-      "namespace": "Server.Generated"
+      "namespace": "Edge.Generated"
     },
     "unityClient": {
       "projectPath": "Client",

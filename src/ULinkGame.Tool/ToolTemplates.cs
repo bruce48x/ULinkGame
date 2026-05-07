@@ -306,20 +306,20 @@ internal static class ToolTemplates
         return """
         <Solution>
           <Project Path="../Shared/Shared.csproj" />
-          <Project Path="Server/Server.csproj" />
+          <Project Path="Edge/Edge.csproj" />
           <Project Path="Silo/Silo.csproj" />
         </Solution>
         """;
     }
 
-    public static string RenderGatewayProgram()
+    public static string RenderEdgeProgram()
     {
         return """
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
         using Microsoft.Extensions.Hosting;
         using Microsoft.Extensions.Logging;
-        using Server.Hosting;
+        using Edge.Hosting;
         using ULinkGame.Server.Hosting;
 
         var builder = Host.CreateApplicationBuilder(args);
@@ -332,15 +332,15 @@ internal static class ToolTemplates
 
         builder.AddULinkGameServerOrleansClient();
         builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-            GatewayRpcServerOptions.FromConfiguration(
+            EdgeRpcServerOptions.FromConfiguration(
                 builder.Configuration,
                 "ControlPlane",
-                new GatewayRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
+                new EdgeRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
         builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-            GatewayRpcServerOptions.FromConfiguration(
+            EdgeRpcServerOptions.FromConfiguration(
                 builder.Configuration,
                 "Realtime",
-                new GatewayRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
+                new EdgeRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
         builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
         builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
         builder.Services.AddULinkGameServerGateway();
@@ -350,7 +350,7 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderGatewayProject(NewCommandOptions options)
+    public static string RenderEdgeProject(NewCommandOptions options)
     {
         var (serializerPackage, _) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
@@ -362,7 +362,7 @@ internal static class ToolTemplates
             <TargetFramework>net10.0</TargetFramework>
             <ImplicitUsings>enable</ImplicitUsings>
             <Nullable>enable</Nullable>
-            <RootNamespace>Server</RootNamespace>
+            <RootNamespace>Edge</RootNamespace>
             <BuildInParallel>false</BuildInParallel>
             <RestoreBuildInParallel>false</RestoreBuildInParallel>
           </PropertyGroup>
@@ -388,7 +388,7 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderGatewayAppSettings(NewCommandOptions options)
+    public static string RenderEdgeAppSettings(NewCommandOptions options)
     {
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
@@ -413,30 +413,30 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderGatewayRpcServerOptions()
+    public static string RenderEdgeRpcServerOptions()
     {
         return @"using Microsoft.Extensions.Configuration;
 
-namespace Server.Hosting;
+namespace Edge.Hosting;
 
-internal sealed class GatewayRpcServerOptions
+internal sealed class EdgeRpcServerOptions
 {
     public string Transport { get; init; } = ""websocket"";
     public string Host { get; init; } = ""127.0.0.1"";
     public int Port { get; init; } = 20000;
     public string Path { get; init; } = """";
 
-    public static GatewayRpcServerOptions FromConfiguration(
+    public static EdgeRpcServerOptions FromConfiguration(
         IConfiguration configuration,
         string sectionName,
-        GatewayRpcServerOptions defaults)
+        EdgeRpcServerOptions defaults)
     {
         var section = configuration.GetSection(sectionName);
         var transport = NormalizeTransport(section[""Transport""], defaults.Transport);
         var host = section[""Host""];
         var path = section[""Path""];
 
-        return new GatewayRpcServerOptions
+        return new EdgeRpcServerOptions
         {
             Transport = transport,
             Host = string.IsNullOrWhiteSpace(host) ? defaults.Host : host,
@@ -463,16 +463,16 @@ internal sealed class GatewayRpcServerOptions
 
     public static string RenderNamedRpcServerOptions(string typeName)
     {
-        return $@"namespace Server.Hosting;
+        return $@"namespace Edge.Hosting;
 
 internal sealed class {typeName}
 {{
-    public {typeName}(GatewayRpcServerOptions endpoint)
+    public {typeName}(EdgeRpcServerOptions endpoint)
     {{
         Endpoint = endpoint;
     }}
 
-    public GatewayRpcServerOptions Endpoint {{ get; }}
+    public EdgeRpcServerOptions Endpoint {{ get; }}
 }}";
     }
 
@@ -557,16 +557,16 @@ internal sealed class {typeName}
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using Server.Generated;
+        return $@"using Edge.Generated;
 using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
-namespace Server.Hosting;
+namespace Edge.Hosting;
 
 internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServerConfigurator
 {{
-    private readonly GatewayRpcServerOptions _options;
+    private readonly EdgeRpcServerOptions _options;
 
     public DefaultControlPlaneRpcServerConfigurator(ControlPlaneRpcServerOptions options)
     {{
@@ -590,16 +590,16 @@ internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServer
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using Server.Generated;
+        return $@"using Edge.Generated;
 using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
-namespace Server.Hosting;
+namespace Edge.Hosting;
 
 internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConfigurator
 {{
-    private readonly GatewayRpcServerOptions _options;
+    private readonly EdgeRpcServerOptions _options;
 
     public DefaultRealtimeRpcServerConfigurator(RealtimeRpcServerOptions options)
     {{

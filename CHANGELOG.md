@@ -7,6 +7,7 @@
 - `ULinkGame.Client` `0.1.3`
 - `ULinkGame.Tool` `0.1.7`
 - `ULinkGame.Tool` `0.1.8`
+- `ULinkGame.Tool` `0.1.9`
 
 ### Changed
 
@@ -15,3 +16,4 @@
 - Updated Godot sample projects and generated tool templates to avoid MSBuild multi-target project races during default restore/build.
 - Limited Godot server logging to console output to avoid Windows EventLog permission failures in non-elevated runs.
 - Updated Godot client generation in `ULinkGame.Tool` to preserve generated RPC clients and create a real networked Ping example.
+- Updated `ULinkGame.Tool` project scaffolding to expose the generated client-facing server as `Server/Edge/Edge.csproj` instead of `Server/Server/Server.csproj`, while keeping `Server/Silo/Silo.csproj` for Orleans grains.

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(cmd.exe *)",
+      "Bash(dir \"C:\\\\Users\\\\Administrator\\\\Documents\\\\GitHub\\\\ULinkGame\\\\samples\\\\Agar.Unity\")",
+      "Bash(dir *)"
+    ]
+  }
+}

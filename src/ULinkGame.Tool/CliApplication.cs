@@ -82,6 +82,7 @@ internal sealed class CliApplication(
 
         await configStore.SaveAsync(configPath, ToolConfig.CreateDefault(projectName, options)).ConfigureAwait(false);
         Console.WriteLine($"Created tool config: {configPath}");
+        PrintNewProjectNextSteps(projectRoot);
         return 0;
     }
 
@@ -124,6 +125,15 @@ internal sealed class CliApplication(
               codegen [--config <path>] [--no-restore]
                   Delegate code generation to ulinkrpc-starter codegen.
             """);
+    }
+
+    private static void PrintNewProjectNextSteps(string projectRoot)
+    {
+        Console.WriteLine("ULinkGame project ready. Next steps:");
+        Console.WriteLine($"  1) cd \"{projectRoot}\"");
+        Console.WriteLine("  2) dotnet run --project \"Server/Silo/Silo.csproj\"");
+        Console.WriteLine("  3) dotnet run --project \"Server/Edge/Edge.csproj\"");
+        Console.WriteLine("  4) After changing Shared contracts, run `ulinkgame-tool codegen` from the project root.");
     }
 }
 

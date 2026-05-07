@@ -6,6 +6,10 @@ internal static class ProjectConventions
     public const string DefaultTransport = "kcp";
     public const string DefaultSerializer = "memorypack";
     public const string DefaultNuGetForUnitySource = "embedded";
+    public const string StarterServerProjectPath = "Server/Server";
+    public const string EdgeProjectPath = "Server/Edge";
+    public const string StarterServerGeneratedNamespace = "Server.Generated";
+    public const string EdgeGeneratedNamespace = "Edge.Generated";
 
     public static readonly string[] SupportedClientEngines = ["unity", "unity-cn", "tuanjie", "godot"];
     public static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
@@ -48,9 +52,9 @@ internal sealed class ToolConfig
                 ContractsPath = "Shared",
                 Server = new CodegenTargetConfig
                 {
-                    ProjectPath = "Server/Server",
+                    ProjectPath = ProjectConventions.EdgeProjectPath,
                     OutputPath = "Generated",
-                    Namespace = "Server.Generated"
+                    Namespace = ProjectConventions.EdgeGeneratedNamespace
                 },
                 UnityClient = new CodegenTargetConfig
                 {

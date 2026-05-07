@@ -18,7 +18,7 @@ PROJECT_DIR="$GENERATED_ROOT/$PROJECT_NAME"
 CLIENT_DIR="$PROJECT_DIR/Client"
 CLIENT_PROJECT="$CLIENT_DIR/$PROJECT_NAME.csproj"
 SILO_PROJECT="$PROJECT_DIR/Server/Silo/Silo.csproj"
-SERVER_PROJECT="$PROJECT_DIR/Server/Server/Server.csproj"
+SERVER_PROJECT="$PROJECT_DIR/Server/Edge/Edge.csproj"
 SILO_LOG="$LOG_DIR/silo.log"
 SERVER_LOG="$LOG_DIR/server.log"
 CLIENT_LOG="$LOG_DIR/client.log"
@@ -194,7 +194,7 @@ if ! wait_for_port 127.0.0.1 30000 60; then
   exit 1
 fi
 
-echo "Starting generated gateway server"
+echo "Starting generated edge server"
 dotnet run --project "$SERVER_PROJECT" -c Release --no-build >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
