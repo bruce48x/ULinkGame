@@ -4,18 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ULinkGame.Server</RootNamespace>
-    <Authors>ULinkGame</Authors>
-    <Company>ULinkGame</Company>
-    <Product>ULinkGame</Product>
     <PackageId>ULinkGame.Server</PackageId>
     <Version>0.1.2</Version>
     <Description>Server-side hosting helpers, Orleans integration, and reliable push infrastructure for ULinkGame applications.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;server;orleans;rpc;reliable-push</PackageTags>
-    <PackageProjectUrl>https://github.com/bruce48x/ULinkGame</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/bruce48x/ULinkGame</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>

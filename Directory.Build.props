@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ULinkGame.Client' Or '$(MSBuildProjectName)' == 'ULinkGame.Server' Or '$(MSBuildProjectName)' == 'ULinkGame.Tool'">
+    <Authors>ULinkGame</Authors>
+    <Company>ULinkGame</Company>
+    <Product>ULinkGame</Product>
+    <PackageProjectUrl>https://github.com/bruce48x/ULinkGame</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/bruce48x/ULinkGame</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+</Project>

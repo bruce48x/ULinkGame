@@ -5,18 +5,10 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <RootNamespace>ULinkGame.Client</RootNamespace>
-    <Authors>ULinkGame</Authors>
-    <Company>ULinkGame</Company>
-    <Product>ULinkGame</Product>
     <PackageId>ULinkGame.Client</PackageId>
     <Version>0.1.2</Version>
     <Description>Engine-neutral client helpers for ULinkGame applications, including reliable push sequence tracking.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;client;unity;godot;rpc;reliable-push</PackageTags>
-    <PackageProjectUrl>https://github.com/bruce48x/ULinkGame</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/bruce48x/ULinkGame</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>

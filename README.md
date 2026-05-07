@@ -89,7 +89,9 @@ The repository includes Unity and Godot samples under `samples/`.
 
 For internals and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-For design details, see:
+For user-facing articles, see the Hugo site source under [docs](docs/).
 
-- [Reliable push design](docs/RELIABLE_PUSH_DESIGN.md)
-- [Package decision notes](docs/ULINKGAME_PACKAGE_DECISION.md)
+For implementation design notes, see:
+
+- [Reliable push design](CONTRIBUTING.md#reliable-business-push-design)
+- [Package decision notes](CONTRIBUTING.md#package-decision)

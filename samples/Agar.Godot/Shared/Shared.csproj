@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.1;net10.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.1;net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MemoryPack" Version="1.21.4"/>
     <PackageReference Include="MemoryPack.UnityShims" Version="1.21.4"/>
     <PackageReference Include="ULinkRPC.Core" Version="0.11.2" />
     <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.0" />
