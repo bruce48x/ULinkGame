@@ -14,9 +14,6 @@ internal static class ULinkGameToolCli
     private const string ULinkGameClientVersion = "0.1.1";
     private const string ULinkGameServerVersion = "0.1.1";
     private const string ULinkRpcStarterVersion = "0.2.52";
-    private const string ULinkRpcCoreVersion = "0.11.2";
-    private const string ULinkRpcClientVersion = "0.11.1";
-    private const string ULinkRpcServerVersion = "0.11.7";
     private const string OrleansVersion = "10.0.0";
     private const string NpgsqlVersion = "9.0.4";
 
@@ -353,8 +350,7 @@ internal static class ULinkGameToolCli
 
           <ItemGroup>
             <PackageReference Include="ULinkGame.Client" Version="{ULinkGameClientVersion}" />
-            <PackageReference Include="ULinkRPC.Core" Version="{ULinkRpcCoreVersion}" />
-            <PackageReference Include="ULinkRPC.Client" Version="{ULinkRpcClientVersion}" />
+            <PackageReference Include="ULinkRPC.Client" Version="0.11.1" />
             <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
             <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
           </ItemGroup>
@@ -517,7 +513,6 @@ internal static class ULinkGameToolCli
 
               <ItemGroup>
                 <PackageReference Include="ULinkGame.Server" Version="{ULinkGameServerVersion}" />
-                <PackageReference Include="ULinkRPC.Server" Version="{ULinkRpcServerVersion}" />
                 <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
                 <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
                 <PackageReference Include="Npgsql" Version="{NpgsqlVersion}" />
