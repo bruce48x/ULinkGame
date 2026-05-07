@@ -29,4 +29,11 @@ samples/Agar.Godot/
 
 Open `samples/Agar.Godot/Client` in Godot 4 .NET and run the main scene.
 
-The sample is an offline client-side playground. It does not start the Agar Unity sample server or implement RPC transport wiring yet.
+To run the server side, start the Orleans silo first, then start the gateway server:
+
+```powershell
+dotnet run --project samples/Agar.Godot/Server/Silo/Silo.csproj
+dotnet run --project samples/Agar.Godot/Server/Server/Server.csproj
+```
+
+Both server projects read their Orleans connection string from `appsettings.json`.

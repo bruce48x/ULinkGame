@@ -13,10 +13,14 @@ internal static class ToolTemplates
             <RootNamespace>{rootNamespace}</RootNamespace>
             <Nullable>enable</Nullable>
             <EnableDynamicLoading>true</EnableDynamicLoading>
+            <BuildInParallel>false</BuildInParallel>
+            <RestoreBuildInParallel>false</RestoreBuildInParallel>
           </PropertyGroup>
 
           <ItemGroup>
-            <ProjectReference Include="..\Shared\Shared.csproj" />
+            <ProjectReference Include="..\Shared\Shared.csproj" TargetFramework="net8.0">
+              <SetTargetFramework>TargetFramework=net8.0</SetTargetFramework>
+            </ProjectReference>
           </ItemGroup>
 
           <ItemGroup>
@@ -118,10 +122,13 @@ internal static class ToolTemplates
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
         using Microsoft.Extensions.Hosting;
+        using Microsoft.Extensions.Logging;
         using Server.Hosting;
         using ULinkGame.Server.Hosting;
 
         var builder = Host.CreateApplicationBuilder(args);
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
         builder.Configuration
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
@@ -160,10 +167,14 @@ internal static class ToolTemplates
             <ImplicitUsings>enable</ImplicitUsings>
             <Nullable>enable</Nullable>
             <RootNamespace>Server</RootNamespace>
+            <BuildInParallel>false</BuildInParallel>
+            <RestoreBuildInParallel>false</RestoreBuildInParallel>
           </PropertyGroup>
 
           <ItemGroup>
-            <ProjectReference Include="..\..\Shared\Shared.csproj" />
+            <ProjectReference Include="..\..\Shared\Shared.csproj" TargetFramework="net10.0">
+              <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
+            </ProjectReference>
           </ItemGroup>
 
           <ItemGroup>
@@ -278,6 +289,8 @@ internal sealed class {typeName}
             <TargetFramework>net10.0</TargetFramework>
             <ImplicitUsings>enable</ImplicitUsings>
             <Nullable>enable</Nullable>
+            <BuildInParallel>false</BuildInParallel>
+            <RestoreBuildInParallel>false</RestoreBuildInParallel>
           </PropertyGroup>
 
           <ItemGroup>
@@ -299,10 +312,16 @@ internal sealed class {typeName}
         return """
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.Hosting;
+        using Microsoft.Extensions.Logging;
         using Orleans.Hosting;
         using ULinkGame.Server.Hosting;
 
         var host = Host.CreateDefaultBuilder(args)
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddConsole();
+            })
             .ConfigureAppConfiguration(configuration =>
             {
                 configuration

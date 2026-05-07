@@ -175,7 +175,7 @@ samples/Agar.Unity/
   Client/  Unity client
 
 samples/Agar.Godot/
-  Godot .NET client playground that references src/ULinkGame.Client and Agar.Unity/Shared
+  Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
 ```
 
 `samples/Agar.Unity` demonstrates:
