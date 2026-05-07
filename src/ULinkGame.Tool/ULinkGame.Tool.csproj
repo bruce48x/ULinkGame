@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ulinkgame-tool</ToolCommandName>
     <PackageId>ULinkGame.Tool</PackageId>
-    <Version>0.1.4</Version>
+    <Version>0.1.5</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and code generation workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;codegen</PackageTags>
   </PropertyGroup>

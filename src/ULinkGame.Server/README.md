@@ -59,6 +59,8 @@
 - 配置读取
 - 基础运维接缝
 
+默认 Orleans 装配只面向本地开发：使用 localhost clustering，不绑定任何具体数据库或缓存产品。生产环境需要按项目实际基础设施显式接入 Orleans clustering / storage provider，例如 MySQL、PostgreSQL、Redis、SQL Server、Oracle 或其它方案。
+
 不允许直接进入 Core 的能力类型：
 
 - `Room`

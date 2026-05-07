@@ -26,9 +26,11 @@ ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --seriali
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
 - 基于 `ULinkGame.Server` 的 gateway 启动代码
-- Microsoft Orleans 配置文件
+- Microsoft Orleans 本地开发配置
 - 当 `--client-engine godot` 时，生成 Godot .NET `Client/`
 - `ulinkgame.tool.json`
+
+默认生成项目使用 Orleans localhost clustering 和 memory grain storage，不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。生产环境应按项目实际基础设施显式接入 Orleans clustering / storage provider。
 
 最终会在输出目录下生成：
 

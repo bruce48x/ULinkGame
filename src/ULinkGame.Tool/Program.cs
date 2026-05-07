@@ -28,10 +28,9 @@ internal static class ULinkGameToolCli
     private static readonly string[] SupportedSerializers = ["json", "memorypack"];
     private static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];
     private const string ULinkGameClientVersion = "0.1.1";
-    private const string ULinkGameServerVersion = "0.1.1";
+    private const string ULinkGameServerVersion = "0.1.3";
     private const string ULinkRpcStarterVersion = "0.2.52";
     private const string OrleansVersion = "10.0.0";
-    private const string NpgsqlVersion = "9.0.4";
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -623,7 +622,6 @@ internal static class ULinkGameToolCli
                 <PackageReference Include="ULinkGame.Server" Version="{ULinkGameServerVersion}" />
                 <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
                 <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
-                <PackageReference Include="Npgsql" Version="{NpgsqlVersion}" />
               </ItemGroup>
 
               <ItemGroup>
@@ -647,9 +645,7 @@ internal static class ULinkGameToolCli
             {
               "Orleans": {
                 "ClusterId": "dev",
-                "ServiceId": "{{SanitizeJson(options.Name ?? "MyGame")}}-Server",
-                "Invariant": "Npgsql",
-                "ConnectionString": "Host=127.0.0.1;Port=5432;Database={{SanitizeJson((options.Name ?? "mygame").ToLowerInvariant())}};Username=postgres;Password=postgres"
+                "ServiceId": "{{SanitizeJson(options.Name ?? "MyGame")}}-Server"
               },
               "ControlPlane": {
                 "Port": 20000,
@@ -757,10 +753,7 @@ internal sealed class {typeName}
 
               <ItemGroup>
                 <PackageReference Include="ULinkGame.Server" Version="{{ULinkGameServerVersion}}" />
-                <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="{{OrleansVersion}}" />
-                <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="{{OrleansVersion}}" />
                 <PackageReference Include="Microsoft.Orleans.Server" Version="{{OrleansVersion}}" />
-                <PackageReference Include="Npgsql" Version="{{NpgsqlVersion}}" />
               </ItemGroup>
 
               <ItemGroup>
@@ -795,31 +788,10 @@ internal sealed class {typeName}
                 })
                 .UseULinkGameServerOrleansSilo((context, silo) =>
                 {
-                    var configuration = context.Configuration;
-                    var invariant = configuration["Orleans:Invariant"] ?? "Npgsql";
-                    var connectionString = configuration["Orleans:ConnectionString"]
-                        ?? throw new InvalidOperationException("Missing configuration: Orleans:ConnectionString");
-
-                    silo.AddAdoNetGrainStorage("users", options =>
-                    {
-                        options.Invariant = invariant;
-                        options.ConnectionString = connectionString;
-                    });
-                    silo.AddAdoNetGrainStorage("sessions", options =>
-                    {
-                        options.Invariant = invariant;
-                        options.ConnectionString = connectionString;
-                    });
-                    silo.AddAdoNetGrainStorage("matchmaking", options =>
-                    {
-                        options.Invariant = invariant;
-                        options.ConnectionString = connectionString;
-                    });
-                    silo.AddAdoNetGrainStorage("rooms", options =>
-                    {
-                        options.Invariant = invariant;
-                        options.ConnectionString = connectionString;
-                    });
+                    silo.AddMemoryGrainStorage("users");
+                    silo.AddMemoryGrainStorage("sessions");
+                    silo.AddMemoryGrainStorage("matchmaking");
+                    silo.AddMemoryGrainStorage("rooms");
                 })
                 .Build();
 
@@ -836,8 +808,6 @@ internal sealed class {typeName}
               "Orleans": {
                 "ClusterId": "dev",
                 "ServiceId": "ULinkGame-Server",
-                "Invariant": "Npgsql",
-                "ConnectionString": "Host=127.0.0.1;Port=5432;Database=ulinkgame;Username=postgres;Password=postgres",
                 "SiloPort": 11111,
                 "GatewayPort": 30000
               }
