@@ -12,15 +12,17 @@ namespace SampleClient.Gameplay
         private readonly SpriteRenderer _outlineRenderer;
         private readonly TextMesh _nameText;
         private readonly TextMesh _scoreText;
+        private readonly bool _usesAuthoredSkin;
         private float _impactUntil;
 
-        public DotView(GameObject root, SpriteRenderer renderer, SpriteRenderer outlineRenderer, TextMesh nameText, TextMesh scoreText)
+        public DotView(GameObject root, SpriteRenderer renderer, SpriteRenderer outlineRenderer, TextMesh nameText, TextMesh scoreText, bool usesAuthoredSkin)
         {
             Root = root;
             _renderer = renderer;
             _outlineRenderer = outlineRenderer;
             _nameText = nameText;
             _scoreText = scoreText;
+            _usesAuthoredSkin = usesAuthoredSkin;
         }
 
         public GameObject Root { get; }
@@ -46,7 +48,6 @@ namespace SampleClient.Gameplay
             var remaining = Mathf.Clamp01((_impactUntil - time) / 0.28f);
             var pulse = remaining * remaining;
             UpdateMaterial(_renderer, time, pulse, 1f);
-            UpdateMaterial(_outlineRenderer, time, pulse, 1.2f);
         }
 
         public void SetIdentity(string playerId, int score)
@@ -67,10 +68,11 @@ namespace SampleClient.Gameplay
                 color = Color.Lerp(baseColor, Color.white, 0.12f);
             }
 
-            _renderer.color = color;
-            _outlineRenderer.color = alive
-                ? PlayerOutlineColor
-                : new Color(PlayerOutlineColor.r, PlayerOutlineColor.g, PlayerOutlineColor.b, 0.45f);
+            _renderer.color = _usesAuthoredSkin
+                ? ResolveAuthoredSkinColor(alive)
+                : color;
+            _outlineRenderer.enabled = false;
+            _outlineRenderer.color = new Color(PlayerOutlineColor.r, PlayerOutlineColor.g, PlayerOutlineColor.b, 0f);
             var serverRadius = !float.IsNaN(radius) && !float.IsInfinity(radius) && radius > 0f
                 ? radius
                 : GameplayConfig.PlayerVisualRadius;
@@ -78,6 +80,16 @@ namespace SampleClient.Gameplay
             Root.transform.localScale = new Vector3(diameter, diameter, 1f);
             var outlineScale = 1.14f;
             _outlineRenderer.transform.localScale = new Vector3(outlineScale, outlineScale, 1f);
+        }
+
+        private static Color ResolveAuthoredSkinColor(bool alive)
+        {
+            if (!alive)
+            {
+                return new Color(0.55f, 0.55f, 0.55f, 0.55f);
+            }
+
+            return Color.white;
         }
 
         private static void UpdateMaterial(SpriteRenderer renderer, float time, float impactPulse, float wobbleScale)

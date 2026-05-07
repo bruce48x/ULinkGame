@@ -52,6 +52,10 @@ namespace SampleClient.Gameplay
         private Sprite _pixelSprite = null!;
         private Sprite _playerSprite = null!;
         private Sprite _playerOutlineSprite = null!;
+        private Sprite? _scorePickupSprite;
+        private Sprite? _arenaBackgroundSprite;
+        private readonly Dictionary<string, Sprite> _playerSkinSprites = new(StringComparer.Ordinal);
+        private readonly List<Sprite> _remotePlayerSkinSprites = new();
         private Shader? _jellyShader;
         private Shader? _pickupAbsorbShader;
         private string _status = "连接中...";

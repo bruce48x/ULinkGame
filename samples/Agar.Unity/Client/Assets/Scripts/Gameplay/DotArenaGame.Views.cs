@@ -113,9 +113,11 @@ namespace SampleClient.Gameplay
             Debug.Log($"[DotArena] CreateView root={viewRoot.name} parent={viewRoot.transform.parent?.name}");
 
             var renderer = viewRoot.AddComponent<SpriteRenderer>();
-            renderer.sprite = _playerSprite;
             var cosmeticId = playerId == _localPlayerId ? _metaState?.EquippedCosmeticId : null;
-            renderer.color = DotArenaPresentation.ResolvePlayerColor(playerId, cosmeticId);
+            var baseColor = DotArenaPresentation.ResolvePlayerColor(playerId, cosmeticId);
+            var skinSprite = ResolvePlayerSkinSprite(playerId, cosmeticId, out var usesAuthoredSkin);
+            renderer.sprite = skinSprite;
+            renderer.color = usesAuthoredSkin ? Color.white : baseColor;
             renderer.sortingOrder = PlayerSortingOrder;
             renderer.material = CreateJellyMaterial(UnityEngine.Random.Range(0f, Mathf.PI * 2f), 3.6f, 0.06f);
 
@@ -124,8 +126,9 @@ namespace SampleClient.Gameplay
             outlineObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
             var outlineRenderer = outlineObject.AddComponent<SpriteRenderer>();
             outlineRenderer.sprite = _playerOutlineSprite;
-            outlineRenderer.color = PlayerOutlineColor;
+            outlineRenderer.color = Color.clear;
             outlineRenderer.sortingOrder = PlayerSortingOrder - 1;
+            outlineRenderer.enabled = false;
             outlineRenderer.material = CreateJellyMaterial(UnityEngine.Random.Range(0f, Mathf.PI * 2f), 4.2f, 0.08f);
 
             var nameBackdrop = new GameObject("NameBackdrop");
@@ -176,9 +179,9 @@ namespace SampleClient.Gameplay
             scoreText.color = new Color(1f, 0.97f, 0.72f, 1f);
             DotArenaSpriteFactory.ConfigureTextRenderer(scoreText.GetComponent<MeshRenderer>(), PlayerTextSortingOrder);
 
-            var view = new DotView(viewRoot, renderer, outlineRenderer, nameText, scoreText);
+            var view = new DotView(viewRoot, renderer, outlineRenderer, nameText, scoreText, usesAuthoredSkin);
             view.SetIdentity(playerId, 0);
-            view.ApplyPresentation(DotArenaPresentation.ResolvePlayerColor(playerId, cosmeticId), PlayerLifeState.Idle, true, GameplayConfig.PlayerVisualRadius);
+            view.ApplyPresentation(baseColor, PlayerLifeState.Idle, true, GameplayConfig.PlayerVisualRadius);
             return view;
         }
 
@@ -188,9 +191,10 @@ namespace SampleClient.Gameplay
             pickupRoot.transform.SetParent(transform, false);
 
             var pickupColor = DotArenaPresentation.GetPickupColor(pickupType);
+            var usesAuthoredPickupSprite = pickupType == PickupType.ScorePoint && _scorePickupSprite != null;
             var renderer = pickupRoot.AddComponent<SpriteRenderer>();
-            renderer.sprite = _playerSprite;
-            renderer.color = pickupColor;
+            renderer.sprite = usesAuthoredPickupSprite ? _scorePickupSprite : _playerSprite;
+            renderer.color = usesAuthoredPickupSprite ? Color.white : pickupColor;
             renderer.sortingOrder = PickupSortingOrder;
             renderer.material = CreatePickupAbsorbMaterial(pickupColor);
 
@@ -201,8 +205,9 @@ namespace SampleClient.Gameplay
 
             var glowRenderer = glow.AddComponent<SpriteRenderer>();
             glowRenderer.sprite = _playerOutlineSprite;
-            glowRenderer.color = Color.Lerp(pickupColor, Color.white, 0.35f);
+            glowRenderer.color = Color.clear;
             glowRenderer.sortingOrder = PickupSortingOrder - 1;
+            glowRenderer.enabled = false;
 
             var label = new GameObject("Label");
             label.transform.SetParent(pickupRoot.transform, false);
