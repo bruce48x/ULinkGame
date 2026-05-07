@@ -9,11 +9,11 @@
     <Company>ULinkGame</Company>
     <Product>ULinkGame</Product>
     <PackageId>ULinkGame.Client</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Description>Engine-neutral client helpers for ULinkGame applications, including reliable push sequence tracking.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;client;unity;godot;rpc;reliable-push</PackageTags>
-    <PackageProjectUrl>https://github.com/bruce48x/ULinkRPC-Sample</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/bruce48x/ULinkRPC-Sample</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/bruce48x/ULinkGame</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/bruce48x/ULinkGame</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
