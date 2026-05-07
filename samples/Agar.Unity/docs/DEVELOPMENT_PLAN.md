@@ -1,124 +1,136 @@
-# Development Plan
+# 开发计划
 
-## Workflow Rule
+这份文档只记录阶段计划、验收点和执行顺序。玩法规则和架构判断放在 `GAMEPLAY_DESIGN.md`，避免两个文档重复解释同一件事。
 
-For this repository, feature work follows this order:
+## 工作流规则
 
-1. update `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`
-2. update this development plan
-3. implement the change
-4. validate the touched runtime path
+这个样例的功能开发按以下顺序推进：
 
-Small changes can keep the design and plan notes short, but they should still update the two canonical docs when behavior or architecture changes.
+1. 更新 `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`。
+2. 更新本开发计划。
+3. 实现代码改动。
+4. 验证被影响的运行路径。
 
-## Current Baseline
+小改动可以让设计说明和计划说明保持简短，但只要行为或架构发生变化，就应该同步更新这两个核心文档。
 
-The repository has moved beyond the original single-process arena sample.
+## 当前基线
 
-Completed:
+仓库已经不再是最早的单进程场地样例，当前基线包括：
 
-- shared agar-style simulation in `samples/Agar.Unity/Shared/Gameplay/ArenaSimulation.cs`
-- single-player and multiplayer using the shared simulation
-- mass/radius/speed growth loop
-- food spawning, player consumption, respawn, match timer, and ranking
-- Unity scene/script workflow without editor-side gameplay scene baking
-- WebSocket control-plane RPC
-- KCP realtime-plane RPC
-- `AttachRealtimeAsync` for realtime session attachment
-- PostgreSQL-backed Orleans clustering and grain persistence
-- Orleans-backed matchmaking queue
-- durable room/session assignment with runtime gateway endpoint metadata
-- realtime-only local session registration for runtime gateway attach
-- local compose baseline with PostgreSQL and Redis
+- `samples/Agar.Unity/Shared/Gameplay/ArenaSimulation.cs` 中的共享小球吞噬玩法模拟。
+- 单机和联机共用同一套模拟逻辑。
+- 质量、半径、速度之间的成长循环。
+- 食物刷新、玩家吞噬、死亡、复活、单局计时和排名。
+- Unity 场景和脚本作为工作流来源，不再恢复编辑器侧自动烘焙玩法场景的做法。
+- 控制面的 WebSocket RPC。
+- 实时面的 KCP RPC。
+- 用于实时会话绑定的 `AttachRealtimeAsync`。
+- 基于 PostgreSQL 的 Orleans 集群成员表和 grain 持久化。
+- 基于 Orleans 的匹配队列。
+- 持久化的房间和会话分配，包含运行时网关端点信息。
+- 支持运行时网关绑定的仅实时连接本地会话注册。
+- 包含 PostgreSQL 和 Redis 的本地 compose 基线。
 
-Removed from the active plan:
+已经从当前计划中移除的方向：
 
-- local memory grain storage as the intended server state model
-- localhost-only Orleans clustering as the intended deployment model
-- gateway-local matchmaking queue as the intended queue model
-- old knockback/dash/buff combat loop as the intended gameplay model
-- separate one-off docs for client architecture, production infra, and gateway refactors
+- 把本地内存 grain 存储作为目标服务端状态模型。
+- 把只限本机的 Orleans 集群作为目标部署模型。
+- 把网关本地匹配队列作为目标匹配队列模型。
+- 把旧的击退、冲刺、强化战斗循环作为目标玩法模型。
+- 为客户端架构、生产基础设施和网关重构继续维护分散的一次性文档。
 
-## Active Backlog
+## 活跃待办
 
-### Phase 1: Unity Gameplay Regression
+### 阶段 1：Unity 玩法回归
 
-- verify single-player start, food growth, player consumption, death, respawn, and settlement in the Unity editor
-- verify multiplayer login, matchmaking, realtime attach, input, world snapshots, and settlement with Silo + Server running
-- check HUD copy for stale dash/buff/stun language
-- check generated Unity `.csproj` and package references pick up KCP cleanly after project refresh
+任务：
 
-Acceptance criteria:
+- 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算。
+- 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算。
+- 检查 HUD 文案中是否还残留冲刺、强化、眩晕等旧玩法语义。
+- 检查 Unity 刷新项目后生成的 `.csproj` 和包引用是否能正确带上 KCP。
 
-- local single-player match is playable end-to-end
-- multiplayer match can start through matchmaking and receive realtime snapshots
-- no visible UI path depends on removed gameplay concepts
+验收标准：
 
-### Phase 2: Client Decomposition
+- 本地单机对局可以完整游玩到结束。
+- 联机对局可以通过匹配开始，并持续收到实时世界快照。
+- 可见 UI 路径不再依赖已移除的旧玩法概念。
 
-- extract match flow responsibilities from `DotArenaGame`
-- keep RPC lifecycle in `DotArenaNetworkSession`
-- keep callback draining in `DotArenaCallbackInbox`
-- reduce `DotArenaSceneUiPresenter` by moving repeated UI construction into smaller helpers or assets
-- split `DotArenaMetaProgression` into persistence, reward rules, and summary building when touched
+### 阶段 2：客户端拆分
 
-Acceptance criteria:
+任务：
 
-- mode entry, matchmaking, in-match, and settlement transitions are easier to reason about
-- no circular dependency is introduced between `SampleClient.Rpc` and `SampleClient.Gameplay`
-- generated RPC code remains untouched
+- 从 `DotArenaGame` 中拆出对局流程职责。
+- 保持 RPC 生命周期由 `DotArenaNetworkSession` 管理。
+- 保持回调缓存和主线程消化由 `DotArenaCallbackInbox` 管理。
+- 将 `DotArenaSceneUiPresenter` 中重复的 UI 构建逻辑移动到更小的辅助类或资源中。
+- 触碰 `DotArenaMetaProgression` 时，将它拆成存档、奖励规则和摘要生成三个方向。
 
-### Phase 3: Gateway Cleanup Semantics
+验收标准：
 
-- audit logout, disconnect, matchmaking cancel, room leave, and match-end cleanup
-- ensure control and realtime connections can detach independently
-- ensure session/room grain state and gateway-local callback state converge after failures
-- add focused tests or traceable manual validation for the above flows
+- 模式入口、匹配、对局中和结算状态切换更容易推理。
+- 不引入 `SampleClient.Rpc` 和 `SampleClient.Gameplay` 之间的循环依赖。
+- 生成的 RPC 代码保持不被手写修改。
 
-Acceptance criteria:
+### 阶段 3：网关清理语义
 
-- stale queue tickets are cleared
-- stale realtime callbacks are removed
-- room runtime removes players on disconnect/leave
-- repeated login/logout and match/cancel flows do not leave duplicate local registrations
+任务：
 
-### Phase 4: Cross-Gateway Realtime Routing Design
+- 审核登出、断线、取消匹配、离开房间和对局结束清理。
+- 确认控制连接和实时连接可以独立解绑。
+- 确认会话 grain、房间 grain 和网关本地回调状态在失败后能收敛。
+- 为上述流程增加聚焦测试，或者留下可追踪的手动验证步骤。
 
-- choose the gateway-to-gateway event mechanism: Orleans stream/observer or Redis pub/sub
-- define ownership for input forwarding, world-state fan-out, disconnect events, and backpressure
-- define ordering, retry, and stale-owner behavior
-- update `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md` before implementation
+验收标准：
 
-Acceptance criteria:
+- 过期匹配票据会被清理。
+- 过期实时回调会被移除。
+- 房间运行时会在断线或离房后移除玩家。
+- 重复登录、登出、匹配和取消匹配不会留下重复的本地注册。
 
-- a player whose control connection is on gateway A can send input to a room runtime on gateway B
-- match events can be delivered back to the correct live client connection
-- failure behavior is explicit enough to test
+### 阶段 4：跨网关实时路由设计
 
-### Phase 5: Cross-Gateway Realtime Routing Implementation
+任务：
 
-- implement the routing layer chosen in Phase 4
-- keep room simulation authoritative on one runtime owner at a time
-- avoid serializing live callback objects into Redis or Orleans state
-- add logging around routing decisions and failed deliveries
+- 选择网关到网关的事件机制：Orleans stream、Orleans observer 或 Redis 发布订阅。
+- 定义输入转发、世界状态扇出、断线事件和背压的所有权。
+- 定义顺序、重试和运行时所有者过期时的行为。
+- 实现前先更新 `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`。
 
-Acceptance criteria:
+验收标准：
 
-- multi-gateway deployment can handle separate control and realtime/runtime ownership
-- world-state broadcast reaches players connected through different gateway nodes
-- disconnect/logout/leave cleanup works across gateway ownership boundaries
+- 控制连接在网关 A 的玩家，可以把输入送到网关 B 上的房间运行时。
+- 对局事件可以送回正确的在线客户端连接。
+- 失败行为足够明确，可以编写测试或手动验证。
 
-### Phase 6: Validation And Packaging
+### 阶段 5：跨网关实时路由实现
 
-- build `samples/Agar.Unity/Shared/Shared.csproj`
-- build `samples/Agar.Unity/Server/Silo/Silo.csproj`
-- build `samples/Agar.Unity/Server/Server/Server.csproj`
-- run available automated tests
-- manually smoke-test Unity single-player and multiplayer when Unity is available
-- keep README and `CLAUDE.md` aligned when commands, ports, or architecture facts change
+任务：
 
-Acceptance criteria:
+- 实现阶段 4 选定的路由层。
+- 保持房间模拟在同一时刻只由一个运行时所有者权威推进。
+- 不把实时回调对象序列化到 Redis 或 Orleans 状态中。
+- 增加路由决策和投递失败日志。
 
-- touched projects compile
-- documented run instructions match the current code
-- no deleted docs are referenced
+验收标准：
+
+- 多网关部署可以处理控制连接、实时连接和房间运行时位于不同网关的情况。
+- 世界状态广播可以到达连接在不同网关节点上的玩家。
+- 断线、登出和离房清理在跨网关所有权下仍然正确。
+
+### 阶段 6：验证与打包
+
+任务：
+
+- 构建 `samples/Agar.Unity/Shared/Shared.csproj`。
+- 构建 `samples/Agar.Unity/Server/Silo/Silo.csproj`。
+- 构建 `samples/Agar.Unity/Server/Server/Server.csproj`。
+- 运行已有自动化测试。
+- Unity 可用时，手动冒烟测试单机和联机流程。
+- 当命令、端口或架构事实变化时，同步 README 和 `CLAUDE.md`。
+
+验收标准：
+
+- 被触碰的项目可以编译。
+- 文档中的运行说明和当前代码一致。
+- 不再引用已经删除的文档。

@@ -1,237 +1,245 @@
-# Gameplay And Architecture Design
+# 玩法与架构设计
 
-## Purpose
+这份文档记录样例游戏的长期设计状态。玩法规则、客户端服务端边界、联机流程、基础设施判断和暂不实现的内容都放在这里；阶段性任务安排放在 `DEVELOPMENT_PLAN.md`。
 
-This document is the single design entry point for the sample game. Keep gameplay rules, client/server boundaries, and production-infrastructure decisions here instead of creating one-off design notes.
+## 设计目标
 
-The project validates ULinkRPC in a lightweight multiplayer `agar.io` style game that also supports a fully offline single-player mode.
+样例要验证 ULinkGame 在一个轻量多人对战项目中的完整接入方式：
 
-## Gameplay Goal
+- 单机模式可以完全离线运行。
+- 联机模式由服务端权威推进对局。
+- 客户端只发送输入，服务端广播世界状态。
+- 玩法规则只实现一份，并被单机和联机复用。
+- 网络、界面、存档和部署细节不能污染玩法规则内核。
 
-Players control one cell in a square arena:
+当前玩法参考轻量小球吞噬对战。刻意不做分裂、吐质量、病毒、尖刺、组队和复杂技能树，避免样例被玩法复杂度拖偏。
 
-- collect food pellets to gain mass
-- consume sufficiently smaller players
-- move more slowly as mass increases
-- respawn after being consumed
-- finish the match on a timer and rank by mass first, score second
+## 核心规则
 
-The current scope intentionally excludes split, eject-mass, viruses, spikes, teams, and a persistent skill tree.
+玩家控制一个小球在方形场地中移动。
 
-## Design Principles
+- `W/A/S/D` 控制移动方向。
+- 移动是连续的。
+- 体型越大，移动越慢。
+- 协议里仍保留 `dash` 字段，但当前玩法不使用冲刺。
 
-- `samples/Agar.Unity/Shared/Gameplay/ArenaSimulation.cs` is the single source of truth for gameplay rules.
-- Single-player and multiplayer use the same simulation.
-- The client sends input; the authoritative multiplayer runtime sends world snapshots.
-- Extend existing RPC payloads when possible instead of replacing the contract.
-- Keep scene structure in checked-in Unity scene/scripts. Do not reintroduce editor-side gameplay scene baking.
-- Keep long-lived design state in this file and implementation sequencing in `DEVELOPMENT_PLAN.md`.
+成长来源：
 
-## Gameplay Rules
+- 吃地图上的中立食物。
+- 吞掉体型足够小的其他玩家。
 
-### Movement
+每个玩家记录：
 
-- `W/A/S/D` controls movement direction.
-- Movement is continuous.
-- The legacy `dash` input field remains in the protocol for compatibility, but the agar ruleset does not use dash.
-- Speed decreases as mass grows.
+- `Mass`：权威成长值。
+- `Radius`：由质量推导出的表现和碰撞半径。
+- `MoveSpeed`：由质量推导出的移动速度。
+- `Score`：用于界面展示和结算排序的本局贡献。
 
-Expected feel:
+吞噬条件：
 
-- small cells are agile
-- large cells are slower but threatening
+- 双方都存活。
+- 距离进入吞噬范围。
+- 吞噬者比目标大到配置要求的比例。
 
-### Growth
+吞噬结果：
 
-Growth comes from:
+- 目标死亡并进入复活倒计时。
+- 吞噬者获得质量。
+- 吞噬者获得积分。
 
-- neutral food pellets scattered around the arena
-- consuming smaller players
+食物规则：
 
-Each player tracks:
+- 场地维持目标数量的食物。
+- 食物被吃掉后会补回目标数量附近。
+- 单机和联机使用同一套刷新规则。
 
-- `Mass`
-- `Radius`
-- `MoveSpeed`
-- `Score`
+复活规则：
 
-`Mass` is the authoritative progression value. `Radius` and `MoveSpeed` are derived gameplay/presentation values. `Score` tracks match contribution for UI and settlement.
+- 玩家被吞后清空临时移动状态。
+- 倒计时结束后重新出生。
+- 复活时恢复初始质量和半径。
+- 本局积分保留。
 
-### Player Consumption
+单局结束：
 
-A player can consume another player when:
+- 对局按倒计时结束。
+- 排名优先按质量降序，其次按积分降序，最后按玩家标识升序作为稳定兜底。
+- 结算后返回主界面。
 
-- both players are alive
-- distance is within consume range
-- the eater is larger by the configured ratio
+## AI 规则
 
-On consume:
+AI 的目标是让局内始终有足够活动目标，而不是追求复杂智能。
 
-- the target dies and starts a respawn timer
-- the eater gains mass
-- the eater gains score
+AI 行为优先级：
 
-### Food
+- 小球优先找附近食物。
+- 优势足够时追逐更小的玩家。
+- 附近有更大威胁时优先远离。
+- 被压迫时向相对安全的开阔区域移动。
 
-The arena maintains a target food population.
+目标人数当前为 `4`：
 
-- Food is simple always-available mass.
-- Consumed food is replenished back toward the target count.
-- Server and local modes use the shared deterministic spawning rules.
+- 单机模式创建 1 个本地玩家，再补足 AI。
+- 联机模式真人加入房间后，由服务端补足 AI。
 
-### Respawn
+## 共享玩法内核
 
-When a player is consumed:
+`samples/Agar.Unity/Shared/Gameplay/ArenaSimulation.cs` 是玩法规则的唯一来源。
 
-- clear temporary movement state
-- respawn after a short delay
-- restore starter mass/radius
-- keep accumulated match score
+它负责：
 
-### Match End
+- 玩家移动。
+- 质量影响速度。
+- 食物刷新和成长结算。
+- 大球吞小球判定。
+- AI 决策。
+- 死亡、复活和胜负判定。
+- 世界状态快照生成。
 
-The match ends on the round timer.
+`Shared` 只能关心协议、配置、规则和状态，不应该依赖 Unity、服务端托管、传输层、数据库、存档或界面。
 
-Ranking order:
+## 客户端边界
 
-1. `Mass` descending
-2. `Score` descending
-3. `PlayerId` ascending as deterministic tie-breaker
+Unity 客户端负责：
 
-## AI
+- 启动菜单和模式切换。
+- 本地单机模拟。
+- 联机输入发送。
+- 世界状态接收和渲染。
+- HUD、玩家表现、食物表现和结算界面。
+- 控制连接、实时连接、断线处理和可靠推送确认。
+- 本地元进度展示和存储。
 
-Bots should:
+重要代码位置：
 
-- chase nearby food when small
-- chase smaller players when the advantage is meaningful
-- avoid larger nearby threats
-- drift toward safer open areas when pressured
+- `Client/Assets/Scenes/Gameplay.unity`：场景来源。
+- `Client/Assets/Scripts/Rpc`：传输创建和生成的 RPC 访问入口。
+- `Client/Assets/Scripts/Gameplay`：主流程、同步、视图、HUD 和本地进度。
 
-The AI target is practical match activity, not advanced flocking or split prediction.
-
-## Runtime Architecture
-
-### Shared
-
-`Shared` contains:
-
-- MemoryPack-serializable RPC contracts in `samples/Agar.Unity/Shared/Interfaces/IPlayerService.cs`
-- gameplay simulation in `samples/Agar.Unity/Shared/Gameplay/ArenaSimulation.cs`
-- shared arena configuration in `samples/Agar.Unity/Shared/Gameplay/ArenaConfig.cs`
-
-`Shared` must not depend on Unity, server hosting, transport setup, persistence, or UI.
-
-### Client
-
-The Unity client owns mode selection, input, rendering, HUD, local progression, and local single-player simulation.
-
-Important boundaries:
-
-- `samples/Agar.Unity/Client/Assets/Scenes/Gameplay.unity` is the scene source of truth.
-- `samples/Agar.Unity/Client/Assets/Scripts/Rpc` owns transport creation and generated RPC binding access.
-- `samples/Agar.Unity/Client/Assets/Scripts/Gameplay` owns runtime orchestration, world synchronization, view objects, HUD, and local meta progression.
-
-Assembly direction:
+依赖方向：
 
 ```txt
 Shared -> ULinkRPC.Generated -> SampleClient.Rpc -> SampleClient.Gameplay
 ```
 
-`Gameplay` may depend on RPC helpers. RPC helpers must not depend back on gameplay code.
+`Gameplay` 可以依赖 RPC 辅助代码；RPC 辅助代码不能反向依赖玩法界面代码。
 
-Known client refactor targets:
+已知客户端重构目标：
 
-- `DotArenaGame` is still the main application coordinator.
-- `DotArenaSceneUiPresenter` is large and still owns runtime widget construction.
-- `DotArenaMetaProgression` mixes persistence, reward rules, and summary building.
+- `DotArenaGame` 仍是主要应用协调器。
+- `DotArenaSceneUiPresenter` 仍偏大，并负责较多运行时控件构建。
+- `DotArenaMetaProgression` 仍混合了存档、奖励规则和摘要生成。
 
-### Server Gateway
+## 服务端边界
 
-`samples/Agar.Unity/Server/Server` is the RPC gateway and room runtime host.
+`samples/Agar.Unity/Server/Server` 是 RPC 网关和房间运行时宿主。
 
-Current responsibilities:
+当前职责：
 
-- WebSocket control-plane RPC for login, logout, matchmaking, and low-frequency business APIs
-- KCP realtime-plane RPC for match input/session attachment
-- gateway-local `SessionDirectory` for live callback objects
-- room runtime ownership through `RoomRuntimeHost` / `RoomRuntime`
-- pushing `WorldState`, death, settlement, and matchmaking status callbacks
+- 控制面 RPC：登录、登出、匹配和低频业务接口。
+- 实时面 RPC：对局输入和实时会话绑定。
+- 维护网关本地的在线会话和回调对象。
+- 通过 `RoomRuntimeHost` 和 `RoomRuntime` 承载房间运行时。
+- 推送世界状态、死亡事件、结算事件和匹配状态。
 
-### Orleans Silo
+`samples/Agar.Unity/Server/Silo` 承载 Orleans grains。
 
-`samples/Agar.Unity/Server/Silo` owns durable Orleans grains:
+当前职责：
 
-- user identity and win persistence
-- player sessions
-- matchmaking queue state
-- room assignment/snapshot state
+- 用户身份和胜场持久化。
+- 玩家会话状态。
+- 匹配队列状态。
+- 房间分配和房间快照状态。
 
-PostgreSQL is the configured Orleans ADO.NET clustering and grain persistence backend. Local memory grain storage and localhost-only clustering are no longer the current design.
+PostgreSQL 是 Orleans 集群成员表和 grain 状态的持久化后端。本地内存 grain 存储和只靠本机集群的方式不再是当前设计目标。
 
-### Infrastructure
+## 联机流程
 
-The local production-like baseline is:
+控制连接流程：
 
-- `samples/Agar.Unity/docker-compose.yml` starts PostgreSQL and Redis
-- PostgreSQL stores Orleans membership and grain state
-- `samples/Agar.Unity/Server/Silo/appsettings.json` and `samples/Agar.Unity/Server/Server/appsettings.json` externalize cluster, service, database, gateway, and realtime endpoint settings
-- Redis is available for later routing/presence/pub-sub work, but it is not yet a required runtime path for realtime gameplay
+1. 客户端连接控制面 RPC。
+2. 客户端登录。
+3. 客户端发起匹配。
+4. 网关调用匹配 grain。
+5. 匹配和房间 grain 分配房间与运行时网关。
+6. 网关可靠推送匹配状态，并携带实时连接信息。
 
-## Multiplayer Flow
+实时连接流程：
 
-Control connection:
+1. 客户端打开实时 RPC 连接。
+2. 客户端用玩家、会话、房间和对局令牌调用 `AttachRealtimeAsync`。
+3. 运行时网关登记实时回调。
+4. 客户端通过实时 RPC 发送输入。
+5. 房间运行时通过实时回调广播世界状态。
 
-1. Client connects to the WebSocket RPC server.
-2. Client logs in.
-3. Client enqueues for matchmaking.
-4. Gateway calls `IMatchmakingGrain`.
-5. Matchmaking/room grains assign a room and runtime gateway.
-6. Gateway pushes `MatchmakingStatusUpdate` with `RealtimeConnection`.
+联机同步边界：
 
-Realtime connection:
+- 客户端发送输入。
+- 服务端推进模拟。
+- 服务端广播快照。
+- 客户端对玩家位置做插值，减少快照跳动。
 
-1. Client opens KCP RPC to `RealtimeConnection`.
-2. Client calls `AttachRealtimeAsync` with player/session/room/match tokens.
-3. Runtime gateway registers a realtime callback.
-4. Client sends input through realtime RPC.
-5. Room runtime broadcasts world snapshots through realtime callbacks.
+客户端输入消息包含：
 
-`SessionDirectory` may contain a realtime-only local registration, which allows the control connection and realtime connection to land on different gateway nodes when the room runtime belongs to the realtime gateway.
+```txt
+InputMessage
+{
+    playerId
+    moveX
+    moveY
+    dash
+    tick
+}
+```
 
-## Current Distributed Boundary
+服务端广播的世界状态包含：
 
-Already distributed or durable:
+```txt
+WorldState
+{
+    tick
+    respawnDelaySeconds
+    players[]
+    pickups[]
+}
+```
 
-- Orleans membership and grain persistence use PostgreSQL.
-- Matchmaking queue state lives in Orleans.
-- Room assignment includes explicit runtime gateway endpoint metadata.
-- Clients receive an explicit realtime target instead of assuming the control gateway owns the room.
-- Realtime attach no longer requires a local control callback registration.
+`players[]` 包含位置、速度、生死状态、积分、质量、半径和移动速度。`pickups[]` 描述当前仍在地图上的食物。
 
-Still local to a gateway process:
+## 分布式边界
 
-- live RPC callback objects
-- active room runtime simulation
-- world-state broadcast fan-out
-- some disconnect/logout/leave cleanup semantics
+已经分布式或持久化的部分：
 
-The next distributed architecture step is a gateway-to-gateway input and event routing layer. Candidate mechanisms are Orleans streams/observers or Redis pub/sub. Redis should only enter that path with a clear ownership, ordering, and failure model.
+- Orleans 成员表和 grain 状态使用 PostgreSQL。
+- 匹配队列状态在 Orleans 中。
+- 房间分配携带明确的运行时网关信息。
+- 客户端收到明确的实时连接目标，不假设控制网关一定拥有房间。
+- 实时绑定不再要求本地已有控制连接回调。
 
-## Client Presentation
+仍然局限在单个网关进程内的部分：
 
-- Player scale follows `Radius`.
-- Overlays emphasize name, mass, rank, and survival state.
-- Pellets are small and numerous.
-- HUD language should use mass/rank/growth wording, not dash/buff wording.
-- Player collision/growth feedback may use jelly presentation, but stun/knockback should not be treated as core gameplay.
+- 活跃 RPC 回调对象。
+- 活跃房间模拟。
+- 世界状态广播扇出。
+- 部分断线、登出和离房清理语义。
 
-## Out Of Scope
+下一步分布式架构重点是网关到网关的输入和事件路由。候选方式包括 Orleans streams、Orleans observers 或 Redis 发布订阅。Redis 只有在明确所有权、顺序和失败模型后才应该进入实时玩法路径。
 
-- split mechanic
-- eject mass
-- viruses/spikes
-- teams
-- persistent skill tree changes
-- server reconciliation rewrite
-- automatic room runtime migration
-- Redis-backed realtime routing without a separate design update
+## 表现原则
+
+- 玩家显示大小跟随 `Radius`。
+- HUD 强调名字、质量、排名和存活状态。
+- 食物要小且数量多。
+- 界面文案使用质量、排名、成长和存活语义，不使用冲刺或技能强化作为核心表达。
+- 玩家碰撞和成长可以有果冻感表现，但眩晕、击退不应被当作当前核心玩法。
+
+## 暂不实现
+
+- 分裂。
+- 吐质量。
+- 病毒或尖刺。
+- 组队。
+- 持久技能树改造。
+- 服务端回滚或预测校正重写。
+- 房间运行时自动迁移。
+- 没有独立设计说明的 Redis 实时路由。
