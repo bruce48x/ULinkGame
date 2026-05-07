@@ -7,6 +7,22 @@ Environment.ExitCode = exitCode;
 
 internal static class ULinkGameToolCli
 {
+    private static readonly string[] NewOptions =
+    [
+        "--name",
+        "--output",
+        "--client-engine",
+        "--transport",
+        "--serializer",
+        "--nugetforunity-source"
+    ];
+
+    private static readonly string[] CodegenOptions =
+    [
+        "--config",
+        "--no-restore"
+    ];
+
     private static readonly string[] SupportedClientEngines = ["unity", "unity-cn", "tuanjie", "godot"];
     private static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
     private static readonly string[] SupportedSerializers = ["json", "memorypack"];
@@ -19,19 +35,28 @@ internal static class ULinkGameToolCli
 
     public static async Task<int> RunAsync(string[] args)
     {
-        if (args.Length == 0)
+        try
         {
-            PrintHelp();
-            return 0;
-        }
+            if (args.Length == 0)
+            {
+                PrintHelp();
+                return 0;
+            }
 
-        return args[0] switch
+            return args[0] switch
+            {
+                "help" or "--help" or "-h" => HelpResult(),
+                "new" or "init" => await NewAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "codegen" => await RegenerateCodeAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                _ => UnknownCommand(args[0])
+            };
+        }
+        catch (CliUsageException ex)
         {
-            "help" or "--help" or "-h" => HelpResult(),
-            "new" or "init" => await NewAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
-            "codegen" => await RegenerateCodeAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
-            _ => UnknownCommand(args[0])
-        };
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine("Run `ulinkgame-tool help` for usage.");
+            return 1;
+        }
     }
 
     private static int HelpResult()
@@ -51,7 +76,7 @@ internal static class ULinkGameToolCli
     private static async Task<int> NewAsync(string[] args)
     {
         var options = ParseNewOptions(args);
-        var outputDirectory = Path.GetFullPath(options.OutputPath ?? Path.Combine(Directory.GetCurrentDirectory(), "out"));
+        var outputDirectory = Path.GetFullPath(options.OutputPath ?? Directory.GetCurrentDirectory());
         Directory.CreateDirectory(outputDirectory);
 
         var projectName = string.IsNullOrWhiteSpace(options.Name) ? "MyGame" : options.Name;
@@ -129,11 +154,11 @@ internal static class ULinkGameToolCli
                 case "--no-restore":
                     noRestore = true;
                     break;
-                case "--config" when index + 1 < args.Length:
-                    configPath = Path.GetFullPath(args[++index]);
+                case "--config":
+                    configPath = Path.GetFullPath(ReadOptionValue(args, ref index, "--config"));
                     break;
                 default:
-                    throw new InvalidOperationException($"Unsupported option: {args[index]}");
+                    throw CreateUnsupportedArgumentException(args[index], CodegenOptions);
             }
         }
 
@@ -153,30 +178,40 @@ internal static class ULinkGameToolCli
         {
             switch (args[index])
             {
-                case "--name" when index + 1 < args.Length:
-                    name = args[++index];
+                case "--name":
+                    name = ReadOptionValue(args, ref index, "--name");
                     break;
-                case "--output" when index + 1 < args.Length:
-                    outputPath = args[++index];
+                case "--output":
+                    outputPath = ReadOptionValue(args, ref index, "--output");
                     break;
-                case "--client-engine" when index + 1 < args.Length:
-                    clientEngine = ValidateChoice("--client-engine", args[++index], SupportedClientEngines);
+                case "--client-engine":
+                    clientEngine = ValidateChoice("--client-engine", ReadOptionValue(args, ref index, "--client-engine"), SupportedClientEngines);
                     break;
-                case "--transport" when index + 1 < args.Length:
-                    transport = ValidateChoice("--transport", args[++index], SupportedTransports);
+                case "--transport":
+                    transport = ValidateChoice("--transport", ReadOptionValue(args, ref index, "--transport"), SupportedTransports);
                     break;
-                case "--serializer" when index + 1 < args.Length:
-                    serializer = ValidateChoice("--serializer", args[++index], SupportedSerializers);
+                case "--serializer":
+                    serializer = ValidateChoice("--serializer", ReadOptionValue(args, ref index, "--serializer"), SupportedSerializers);
                     break;
-                case "--nugetforunity-source" when index + 1 < args.Length:
-                    nuGetForUnitySource = ValidateChoice("--nugetforunity-source", args[++index], SupportedNuGetForUnitySources);
+                case "--nugetforunity-source":
+                    nuGetForUnitySource = ValidateChoice("--nugetforunity-source", ReadOptionValue(args, ref index, "--nugetforunity-source"), SupportedNuGetForUnitySources);
                     break;
                 default:
-                    throw new InvalidOperationException($"Unsupported option: {args[index]}");
+                    throw CreateUnsupportedArgumentException(args[index], NewOptions);
             }
         }
 
         return new NewCommandOptions(name, outputPath, clientEngine, transport, serializer, nuGetForUnitySource);
+    }
+
+    private static string ReadOptionValue(string[] args, ref int index, string optionName)
+    {
+        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+        {
+            throw new CliUsageException($"Missing value for {optionName}.");
+        }
+
+        return args[++index];
     }
 
     private static string ValidateChoice(string optionName, string value, IReadOnlyCollection<string> supportedValues)
@@ -187,8 +222,79 @@ internal static class ULinkGameToolCli
             return normalized;
         }
 
-        throw new InvalidOperationException(
-            $"Unsupported value '{value}' for {optionName}. Expected one of: {string.Join("|", supportedValues)}");
+        var suggestion = GetValueSuggestion(optionName, normalized, supportedValues);
+        var message = $"Unsupported value '{value}' for {optionName}. Expected one of: {string.Join("|", supportedValues)}.";
+        if (suggestion is not null)
+        {
+            message += $" Did you mean '{suggestion}'?";
+        }
+
+        throw new CliUsageException(message);
+    }
+
+    private static CliUsageException CreateUnsupportedArgumentException(string argument, IReadOnlyList<string> supportedOptions)
+    {
+        if (!argument.StartsWith("--", StringComparison.Ordinal))
+        {
+            return new CliUsageException($"Unexpected argument: {argument}.");
+        }
+
+        var suggestion = GetClosestMatch(argument, supportedOptions);
+        var message = $"Unsupported option: {argument}.";
+        if (suggestion is not null)
+        {
+            message += $" Did you mean {suggestion}?";
+        }
+
+        return new CliUsageException(message);
+    }
+
+    private static string? GetValueSuggestion(string optionName, string value, IReadOnlyCollection<string> supportedValues)
+    {
+        if (optionName == "--transport" && value is "ws" or "websocket transport")
+        {
+            return "websocket";
+        }
+
+        return GetClosestMatch(value, supportedValues);
+    }
+
+    private static string? GetClosestMatch(string value, IReadOnlyCollection<string> candidates)
+    {
+        var best = candidates
+            .Select(candidate => new { Value = candidate, Distance = GetEditDistance(value, candidate) })
+            .OrderBy(candidate => candidate.Distance)
+            .FirstOrDefault();
+
+        return best is not null && best.Distance <= 2 ? best.Value : null;
+    }
+
+    private static int GetEditDistance(string left, string right)
+    {
+        var distances = new int[left.Length + 1, right.Length + 1];
+
+        for (var i = 0; i <= left.Length; i++)
+        {
+            distances[i, 0] = i;
+        }
+
+        for (var j = 0; j <= right.Length; j++)
+        {
+            distances[0, j] = j;
+        }
+
+        for (var i = 1; i <= left.Length; i++)
+        {
+            for (var j = 1; j <= right.Length; j++)
+            {
+                var cost = left[i - 1] == right[j - 1] ? 0 : 1;
+                distances[i, j] = Math.Min(
+                    Math.Min(distances[i - 1, j] + 1, distances[i, j - 1] + 1),
+                    distances[i - 1, j - 1] + cost);
+            }
+        }
+
+        return distances[left.Length, right.Length];
     }
 
     private static async Task<int> RunProcessAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
@@ -219,8 +325,10 @@ internal static class ULinkGameToolCli
         {
             "--name", projectName,
             "--output", outputDirectory,
+            "--client-engine", options.ClientEngine,
             "--transport", options.Transport,
-            "--serializer", options.Serializer
+            "--serializer", options.Serializer,
+            "--nugetforunity-source", options.NuGetForUnitySource
         };
 
         foreach (var invocation in EnumerateULinkRpcStarterInvocations(arguments))
@@ -907,7 +1015,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             ULinkGame.Tool
 
             Commands:
-              new [--name MyGame] [--output ./out] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--nugetforunity-source embedded|openupm]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--nugetforunity-source embedded|openupm]
                   Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server and Microsoft Orleans.
 
               codegen [--config <path>] [--no-restore]
@@ -986,6 +1094,8 @@ internal readonly record struct NewCommandOptions(
     string Transport,
     string Serializer,
     string NuGetForUnitySource);
+
+internal sealed class CliUsageException(string message) : Exception(message);
 
 internal sealed class CodegenTargetConfig
 {

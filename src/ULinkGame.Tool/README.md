@@ -18,7 +18,7 @@
 命令参数面向 ULinkGame 项目创建，并会把可兼容的参数转发给 `ulinkrpc-starter`：
 
 ```bash
-ulinkgame-tool new --name MyGame --output ./out --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
 ```
 
 该命令会先调用 `ulinkrpc-starter` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施：
@@ -40,7 +40,7 @@ ulinkgame-tool new --name MyGame --output ./out --client-engine unity --transpor
 ulinkgame-tool new
 ```
 
-默认输出目录是 `./out`。
+默认输出目录是当前目录。未传 `--output` 时会在当前目录创建项目目录；传入 `--output` 时会在指定目录下创建项目目录。
 
 前提：
 

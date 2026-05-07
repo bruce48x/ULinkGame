@@ -70,7 +70,7 @@ dotnet tool install --global ULinkGame.Tool
 Create a starter project:
 
 ```powershell
-ulinkgame-tool new --name MyGame --output ./out --client-engine unity --transport kcp --serializer memorypack
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack
 ```
 
 The generated project uses ULinkRPC for typed RPC and Microsoft Orleans for distributed actor hosting, then augments the server with ULinkGame hosting and reliable push infrastructure.

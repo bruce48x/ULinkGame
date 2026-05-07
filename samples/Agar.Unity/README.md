@@ -176,7 +176,7 @@ samples/Agar.Unity
          └ DotArenaGame.cs
 ```
 
-相关单元测试位于 `tests/BusinessLogic.Tests`，并由样例自己的 `Server/Server.slnx` 引用。仓库根目录 `tests/tests.slnx` 只包含 ULinkGame 框架测试。
+相关单元测试位于 `tests/BusinessLogic.Tests`。仓库根目录 `tests/tests.slnx` 只包含 ULinkGame 框架测试。
 
 ## 7. 运行
 
