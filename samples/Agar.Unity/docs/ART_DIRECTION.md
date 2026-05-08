@@ -1,6 +1,6 @@
-# 美术方向
+# 美术与 UI 方向
 
-这份文档定义 Agar.Unity 样例的美术标准。它的目标不是把样例改造成重资产项目，而是让它具备完整游戏项目应有的视觉一致性、可读性和交互反馈。后续生成、替换或接入美术资产时，应先对照本文档判断风格是否成立。
+这份文档定义 Agar.Unity 样例的美术、UI、资产生成和 Unity 接入标准。目标不是把样例做成重资产项目，而是让它具备完整游戏应有的视觉一致性、可读性和交互反馈。
 
 ## 目标定位
 
@@ -8,7 +8,7 @@ Agar.Unity 的视觉定位是：
 
 > 轻量、清晰、带果冻质感的多人吞噬竞技游戏。
 
-项目仍然首先服务于 ULinkGame / ULinkRPC 框架演示，因此美术方案必须保持轻量、易维护、易替换。视觉表现要让玩家感到这是一个完整可玩的游戏，而不是只用占位图验证网络流程的技术样例。
+项目首先服务于 ULinkGame / ULinkRPC 框架演示，因此美术方案必须轻量、易维护、易替换。所有资产和 UI 都应优先服务玩法判断：位置、体型、速度、可吞噬关系、危险边界、分数和对局状态。
 
 ## 风格关键词
 
@@ -16,291 +16,437 @@ Agar.Unity 的视觉定位是：
 - 发光细胞。
 - 半透明果冻质感。
 - 清爽街机 UI。
+- 青色与柔金强调。
 - 友好但有竞技感。
 - 高可读性。
 - 少量科技感，不做厚重科幻。
 
-英文提示词中可以使用以下稳定风格描述：
+稳定英文风格描述：
 
 ```text
-clean neon cellular arena style, dark sci-fi arcade palette, soft glow, jelly-like translucent material, high readability, friendly competitive mood
+clean neon cellular arena style, dark sci-fi arcade palette, soft glow, jelly-like translucent material, cyan and soft gold accents, high readability, friendly competitive mood
 ```
+
+避免方向：
+
+- 写实细胞、医学显微镜、病毒恐怖。
+- 厚重机甲、硬科幻、赛博城市。
+- 大面积角色插画、营销首页、复杂 3D 场景。
+- 血腥、尖刺、枪械或当前玩法没有定义的旧强化概念。
+- 图片内嵌文字、水印、签名。
 
 ## 视觉原则
 
 ### 可读性优先
 
-吞噬类玩法的核心判断是位置、体型、速度、可吞噬关系和危险边界。所有美术资产都必须服务这些判断：
-
-- 玩家、敌人、食物、边界和 UI 信息必须在移动中可快速识别。
+- 玩家、敌人、食物、边界和 UI 信息必须在移动中快速识别。
 - 小尺寸物体不能依赖复杂细节表达身份。
-- 玩家主体不能被背景、粒子或 UI 遮挡。
+- 背景、粒子和 UI 不能遮挡玩家主体、名称、分数、HUD 或排行榜。
 - 特效持续时间应短，不能长期覆盖核心视野。
-- 敌我关系应通过颜色、描边、名称和 HUD 信息共同表达。
+- 敌我关系通过颜色、描边、名称和 HUD 信息共同表达。
 
 ### 统一性优先
 
-所有资产应属于同一个视觉系统。允许有皮肤变化，但不允许风格混杂：
-
-- 玩家皮肤可以有不同颜色和内部纹理，但轮廓语言应统一。
-- 食物、拾取物和特效应共享发光、圆润、轻量的视觉语法。
-- UI 面板、按钮、图标和文本应共享同一套边框、透明度和强调色。
-- 背景应衬托主体，不能成为视觉中心。
+- 玩家皮肤可以多色，但轮廓语言必须统一。
+- 食物、拾取物和特效共享发光、圆润、轻量的视觉语法。
+- UI 面板、按钮、图标和文本共享边框、透明度、字号和强调色。
+- 背景只衬托主体，不能成为视觉中心。
 
 ### 样例友好
 
-美术资产不应让样例项目变得难以理解或难以维护：
-
-- 优先使用 2D PNG、Sprite、材质参数和少量 Shader。
-- 避免大型资源包、复杂骨骼动画和过度依赖第三方美术插件。
-- 资产命名、目录和用途必须清楚。
-- 每类资产至少有一个可替换的基准版本，便于未来迭代。
+- 优先使用 2D PNG、Sprite、材质参数、ParticleSystem 和少量 Shader。
+- 避免大型资源包、复杂骨骼动画和强依赖第三方美术插件。
+- 每类资产至少保留一个可替换的基准版本。
+- 脚本负责状态和布局，资产负责质感和识别。
 
 ## 调色板
 
-当前代码已经采用深色背景、明亮玩家色、金色强调色和青色拾取物。后续美术应在此基础上扩展，而不是重做成完全不同的色系。
+当前代码已经采用深色背景、明亮玩家色、金色强调和青色拾取物。后续只扩展，不重做成完全不同色系。
 
-| 用途 | 推荐方向 | 说明 |
-|------|----------|------|
-| 背景 | 深蓝黑、低饱和蓝灰 | 提供空间感和对比度，不抢主体 |
-| 棋盘/地面 | 暗蓝灰、轻微网格 | 表达运动参照和场地边界 |
-| 玩家 | 高饱和果冻色 | 青、绿、红、黄、蓝、紫等变体 |
-| 本地玩家 | 更明亮的青蓝或自选皮肤色 | 需要最强识别度 |
-| 敌方玩家 | 与本地玩家区分明显的高饱和色 | 颜色哈希可继续保留 |
-| 食物/质量点 | 青色、薄荷色、淡蓝色 | 小而亮，但不能像玩家 |
-| 危险提示 | 红色低透明发光 | 只做警示，不做大面积压迫 |
-| 边界强调 | 暖金色或琥珀色 | 和深色场地形成边缘提示 |
-| UI 背景 | 深蓝黑半透明 | 保持信息密度和可读性 |
-| UI 强调 | 柔金、青色 | 分别用于标题/奖励与在线/行动状态 |
+| 用途 | 推荐方向 |
+|------|----------|
+| 背景 | 深蓝黑、低饱和蓝灰 |
+| 地面/网格 | 暗蓝灰、低透明细胞纹理 |
+| 玩家 | 高饱和果冻色：青、绿、红、黄、蓝、紫 |
+| 本地玩家 | 更明亮的青蓝或玩家选中皮肤色 |
+| 食物/质量点 | 青色、薄荷色、淡蓝色 |
+| 危险提示 | 低透明红色 |
+| 边界强调 | 暖金色或琥珀色 |
+| UI 背景 | 深蓝黑半透明 |
+| UI 主行动 | 青色 |
+| UI 奖励/标题 | 柔金色 |
+| UI 成功 | 绿色 |
+| UI 禁用 | 蓝灰色 |
 
-禁止把界面做成单一紫色、单一蓝色或大面积米色调。玩家皮肤可以多彩，但场景主视觉应保持深色竞技场基调。
+推荐 UI 色值：
 
-## 核心资产类型
+| 用途 | 色值 |
+|------|------|
+| 页面底色 | `#05080D` 到 `#0A1018` |
+| 面板底色 | `#111A24`，90% 到 96% 不透明 |
+| 输入框底色 | `#24303F` |
+| 主文字 | `#F5FAFF` |
+| 次级文字 | `#D6E6F5` |
+| 弱文字 | `#BACCDC` |
+| 主行动青色 | `#38E6FF` |
+| 奖励柔金 | `#FFEAB3` |
+| 危险红 | `#FF4A5C` |
+| 成功绿 | `#58F0A2` |
+
+限制：
+
+- 不做单一紫色、单一蓝色或大面积米色调。
+- 金色只做强调，不做大面积底色。
+- 红色只用于危险、失败、取消。
+
+## 游戏资产标准
 
 ### 玩家球
 
-玩家球是游戏中最重要的资产。
-
-标准：
+玩家球是最重要的资产。
 
 - 圆形或近圆形轮廓。
 - 半透明果冻质感。
-- 有柔和高光、内发光或轻微渐变。
-- 边缘干净，透明背景无白边或黑边。
-- 缩小到实际游戏尺寸后仍然可辨。
-- 同一皮肤在不同缩放下不能出现过多噪点。
+- 柔和高光、内发光或轻微渐变。
+- 透明背景边缘干净，无白边黑边。
+- 缩小到实际游戏尺寸后仍可辨。
+- 不出现复杂噪点、文字、水印。
 
 建议首批皮肤：
 
 - `Skin_Jelly_Cyan`
-- `Skin_Jelly_Mint`
 - `Skin_Jelly_Crimson`
 - `Skin_Jelly_Sunburst`
+- `Skin_Jelly_Mint`
 - `Skin_Jelly_Glacier`
 - `Skin_Jelly_Violet`
 
 ### 食物与拾取物
 
-食物需要大量出现在场上，因此必须轻量、统一、低干扰。
-
-标准：
+当前 `PickupType` 只保留 `ScorePoint`，第一阶段只需要质量/得分拾取物。
 
 - 小型发光颗粒或圆润碎片。
 - 不使用复杂图案。
 - 不使用与玩家完全相同的尺寸和质感。
 - 多个食物聚集时不能形成刺眼噪声。
 
-当前玩法中 `PickupType` 只保留 `ScorePoint`，因此第一阶段只需要质量/得分拾取物，不需要旧版速度、击退、护盾等强化图标。
-
 ### 场地与边界
-
-场地应强化空间感和移动参照。
-
-标准：
 
 - 深色地面。
 - 低透明网格或细胞纹理。
-- 边界应明确但不刺眼。
-- 安全区、危险区和场地外区域可以通过透明覆盖层表达。
+- 边界明确但不刺眼。
+- 安全区、危险区和场地外区域可通过透明覆盖表达。
 - 背景不能影响玩家球颜色判断。
-
-### UI
-
-UI 应像完整游戏界面，而不是调试面板。
-
-标准：
-
-- 深色半透明面板。
-- 细边框或柔和外发光。
-- 文本高对比、字号克制。
-- 主按钮、次按钮、危险按钮有明确层级。
-- 登录、匹配、排行榜、结算、任务、商店等入口风格统一。
-- 不在界面中使用解释性装饰文案；说明文字只服务实际状态和操作。
-
-### 图标
-
-图标用于大厅、任务、商店、记录、排行榜和设置。
-
-标准：
-
-- 线性或半实心图标。
-- 圆润、发光、透明背景。
-- 在 32x32 显示时仍可识别。
-- 不包含文字。
-- 不使用写实物体贴图。
 
 ### 特效
 
-特效用于补足游戏感，而不是炫技。
-
 首批需要：
 
-- 吸收食物：短促收缩、粒子汇入、亮点闪烁。
+- 吸收食物：粒子汇入、亮点闪烁或短促收缩。
 - 吞噬玩家：环形波纹、柔和爆散或溶解。
-- 复活/生成：从透明到实体，带一圈扩散波纹。
-- 成长：球体轻微弹性缩放和高光闪动。
+- 复活/生成：透明到实体，带一圈扩散波纹。
+- 成长：轻微弹性缩放和高光闪动。
 - 匹配/等待：轻量循环动效。
 
 标准：
 
-- 单次反馈建议控制在 0.15 到 0.45 秒。
+- 单次反馈 0.15 到 0.45 秒。
 - 不遮挡玩家当前位置判断。
-- 不使用血腥或攻击性过强的表现。
-- 粒子数量控制在移动端和编辑器中都可接受的范围。
+- 不使用血腥或攻击性过强表现。
+- 粒子数量控制在编辑器和移动端都可接受。
 
-## 动画标准
+## UI 标准
 
-动画应使用少量关键动效提升完整度：
+UI 应像完整游戏界面，而不是调试面板。它需要支持入口、登录、匹配、HUD、结算、任务、商店、记录、排行榜和设置。
 
-- 玩家移动时可以有轻微果冻形变或呼吸缩放。
-- 玩家成长时应有短促弹性反馈。
-- 食物被吸收时应向玩家方向收拢或淡出。
-- 玩家死亡/被吞噬时应快速消散，避免长时间残留。
-- UI 按钮需要 hover、press、disabled 状态差异。
-- 匹配和结算面板切换应有短过渡，但不能拖慢操作。
+### 组件语言
 
-后续如果实现运行时动画，应优先使用已有 Sprite、材质参数、ParticleSystem 或简单脚本控制，不优先引入复杂 Animator 状态机。
+- 面板：深色半透明，6 到 8 像素圆角，薄描边，轻微内外发光。
+- 按钮：圆角矩形，状态变化清楚。
+- 标签：选中态明显，可用青色下划线、柔光边框或底色提升。
+- 输入框：深蓝灰底，聚焦态用青色细边框，错误态用红色细边框。
+- 图标：线性或半实心，圆润，透明背景，32x32 下可识别，不含文字。
+- 进度条：蓝灰轨道；青色表示进度，绿色表示完成，金色表示奖励。
+
+按钮层级：
+
+| 类型 | 用途 | 视觉 |
+|------|------|------|
+| Primary | 开始、匹配、领取、确认 | 青色边框或青色填充 |
+| Secondary | 返回、查看、普通导航 | 深色底、蓝灰边框 |
+| Danger | 取消、退出、失败重试 | 暗红边框或红色重点 |
+| Tab | 大厅分页 | 选中态明显，普通态克制 |
+| IconButton | 设置、关闭、小操作 | 正方形，图标居中 |
+
+按钮和面板图片不包含文字。所有文字由 TextMesh Pro 渲染。
+
+### 字体与文案
+
+默认使用 `DotArenaCJK SDF`。设计基准为 1200x600：
+
+| 类型 | 字号 | 样式 |
+|------|------|------|
+| 大标题 | 22-26 | Bold |
+| 面板标题 | 18-22 | Bold |
+| 主要按钮 | 13-15 | Bold |
+| 正文/详情 | 13-14 | Regular |
+| 小标签 | 11-12 | Regular |
+| HUD 核心数字 | 16-22 | Bold |
+| HUD 辅助信息 | 11-13 | Regular |
+
+文案规则：
+
+- 按钮用动作词，例如“开始匹配”“领取奖励”“返回大厅”。
+- 状态短而明确，例如“匹配中 00:12”“已登录”“连接失败”。
+- 不放解释美术风格、快捷键说明或功能介绍型装饰文案。
+- 文本必须支持省略号或换行，不能溢出按钮和面板。
+
+### 核心界面
+
+| 界面 | 结构重点 | 素材重点 |
+|------|----------|----------|
+| 入口/模式选择 | 居中面板，模式按钮，登录状态 | 面板、Primary 按钮、模式图标 |
+| 登录/联机 | 账号密码输入、登录、游客登录、返回 | 输入框、Secondary/Danger 按钮、账号图标 |
+| 大厅 | 顶部状态、标签导航、快捷操作、详情区、底部状态 | 大厅面板、Tab、列表行、功能图标 |
+| 匹配中 | 标题、等待指示、队列/房间/耗时、取消 | 匹配面板、Loading、Cancel 图标 |
+| HUD | 左上状态，顶部倒计时，右上排行榜，短事件提示 | 紧凑背板、排行榜行、质量/时间/网络图标 |
+| 结算 | 结果、分数、奖励、任务、再来一局、返回大厅 | 结算面板、胜负光效、奖励行 |
+| 任务 | 任务列表、进度、奖励、领取状态 | 任务行、进度条、领取图标 |
+| 商店 | 皮肤预览、价格、购买/装备状态 | 商品格、价格标签、锁定/装备图标 |
+| 记录/排行榜 | 列表行、名次、玩家、分数、本地高亮 | 表头、交替行、本地玩家行 |
+| 设置 | 音量、语言、全屏 | 滑杆、开关、下拉、设置图标 |
+
+### UI 状态与交互
+
+网络或异步按钮必须有明确状态：
+
+- 点击后立即禁用相关按钮。
+- 显示 `Submitting`、`Matching`、`Canceling` 等状态。
+- 成功后切换界面。
+- 失败后恢复可操作并显示错误。
+- 不允许重复点击发起重复请求。
+
+典型状态：
+
+| 流程 | 状态 |
+|------|------|
+| 登录 | Idle / Submitting / Success / Failed |
+| 匹配 | Idle / Queued / Matched / CancelPending / Failed |
+| 任务领取 | Claimable / Claiming / Claimed / Failed |
+| 购买皮肤 | Available / Purchasing / Owned / Equipped / InsufficientCurrency |
+| 设置保存 | Idle / Dirty / Saving / Saved / Failed |
+
+### UI 布局与动效
+
+- 当前窗口基准：1200x600。
+- 需要检查 960x540、1280x720、1920x1080。
+- 中央弹窗最大宽度建议 420 到 520 Unity UI 单位。
+- 大厅左右边距至少 36。
+- HUD 距边缘至少 12 到 16，不能遮挡玩法中心。
+- 可点击目标不低于 30x30。
+- 表格列宽固定，数字右对齐。
+
+动效建议：
+
+| 动效 | 时长 |
+|------|------|
+| 面板出现 | 0.12-0.2 秒 |
+| 面板消失 | 0.08-0.15 秒 |
+| 按钮按下 | 0.06-0.1 秒 |
+| 标签切换 | 0.1-0.16 秒 |
+| 奖励出现 | 0.18-0.3 秒 |
+| 错误提示 | 0.18 秒 |
+| 匹配等待 | 1.0-1.4 秒循环 |
+
+实现优先级：`CanvasGroup` alpha、`RectTransform` 轻微缩放、`Image.color`、简单序列帧。除非界面稳定并需要复用，不优先引入复杂 Animator 状态机。
 
 ## 资产目录
 
-建议使用以下目录组织新增资产：
+推荐目录：
 
 ```txt
 Client/Assets/Art
  ├─ Backgrounds
  ├─ FX
  ├─ Icons
+ │  └─ _Source
  ├─ Materials
+ ├─ Pickups
+ │  └─ _Source
  ├─ Sprites
  │  ├─ Pickups
  │  └─ Skins
  └─ UI
+    ├─ _Source
+    ├─ Buttons
+    ├─ HUD
+    ├─ Inputs
+    ├─ Lists
+    ├─ Panels
+    ├─ Progress
+    └─ Tabs
 ```
 
-当前已有 `Art/Materials` 和 `Art/Sprites`，后续可以在此基础上扩展。不要把正式资产放到 `Textures` 根目录下，除非它是代码或 Unity 导入历史已经依赖的通用贴图。
+如果现有脚本暂时只引用 `Art/UI` 根目录，可以先放根目录，稳定后再分目录迁移。不要把正式资产放到 `Textures` 根目录，除非代码或导入历史已依赖。
 
 ## 命名规则
 
-资产命名应表达类型、用途和状态：
-
 ```txt
 Skin_Jelly_Cyan.png
-Skin_Jelly_Crimson.png
 Pickup_Mass_Teal_01.png
-FX_Absorb_Ring_01.png
-FX_Spawn_Wave_01.png
 BG_Arena_Grid_Dark_01.png
-UI_Panel_Dark_01.png
+FX_Absorb_Ring_01.png
+UI_Panel_Lobby_Dark_01.png
 UI_Button_Primary_Normal.png
 UI_Button_Primary_Pressed.png
+UI_Input_Error_01.png
+UI_HUD_Rank_Row_01.png
 Icon_Leaderboard_01.png
-Icon_Shop_01.png
+Icon_Task_Claimable_01.png
 ```
 
 规则：
 
 - 使用 PascalCase 或下划线分段，不使用空格。
+- UI 用 `UI_` 前缀，图标用 `Icon_` 前缀。
+- 状态写在末尾：`Normal`、`Hover`、`Pressed`、`Disabled`、`Selected`、`Error`。
 - 后缀数字用于同类型变体。
-- 不使用 `final`、`new`、`copy`、`test` 作为正式文件名。
-- 占位资产继续保留 `Placeholder`，正式资产不要使用该后缀。
+- 不使用 `final`、`new`、`copy`、`test`。
+- `_Source` 只用于源图，正式 Unity Sprite 不带 `_Source`。
+- 占位资产可保留 `Placeholder`，正式资产不要使用。
 
-## 规格建议
+## 规格与导入
 
 | 类型 | 推荐尺寸 | 背景 | 说明 |
 |------|----------|------|------|
 | 玩家皮肤 | 512x512 | 透明 | 可缩放到不同体型 |
 | 食物/拾取物 | 128x128 或 256x256 | 透明 | 小尺寸仍需清晰 |
-| 图标 | 256x256 | 透明 | UI 中常用 24-48 像素显示 |
-| UI 面板 | 512x512 或 1024x1024 | 透明 | 适合九宫格或 Sprite 切片 |
-| 按钮 | 512x192 或 768x256 | 透明 | 需要 normal / pressed / disabled |
+| 图标 | 256x256 | 透明 | 24-48 像素显示仍可识别 |
+| UI 面板 | 512x512 或 1024x1024 | 透明 | 适合九宫格 |
+| 按钮 | 512x192 或 768x256 | 透明 | 至少 normal/pressed/disabled |
 | 背景/地面 | 2048x2048 | 不透明或透明 | 可平铺优先 |
-| 特效帧 | 256x256 或 512x512 | 透明 | 可做序列帧或单张 Sprite |
+| 特效帧 | 256x256 或 512x512 | 透明 | 单张或序列帧 |
 
-PNG 是默认格式。除非 Unity 工作流明确需要，不优先生成 PSD、TIFF 或大体积源文件。
+UI PNG 导入建议：
 
-## 生成提示词模板
+- `Texture Type`: Sprite (2D and UI)
+- `Sprite Mode`: Single，图集按需 Multiple
+- `Alpha Is Transparency`: 开启
+- `Pixels Per Unit`: 100
+- `Mesh Type`: Full Rect
+- `Filter Mode`: Bilinear
+- `Compression`: None 或 High Quality
 
-基础模板：
+九宫格面板和按钮：
+
+- 在 Sprite Editor 设置 Border。
+- 面板边框建议 12 到 24 像素。
+- 按钮边框建议 8 到 16 像素。
+- Unity `Image.type` 使用 `Sliced`。
+
+## Unity 接入
+
+当前客户端已有 UGUI、TextMesh Pro、`Client/Assets/Art/UI`、`Client/Assets/Art/Icons`、`DotArenaCJK SDF` 和 `DotArenaTuning.cs` 色彩常量。后续正式 UI 应优先替换 sprite 和 prefab，不把复杂视觉硬编码进脚本。
+
+接入原则：
+
+- 面板使用 `Image` + sliced sprite。
+- 按钮使用 `Button` + `Image`，状态优先用 `SpriteState`，颜色只做微调。
+- 文本使用 `TextMeshProUGUI`。
+- 输入框使用 `TMP_InputField`，背景 sprite 按状态切换。
+- 图标使用独立 `Image`，不要并入按钮底图。
+- 多处复用组件做成 prefab 或统一创建方法。
+
+建议顺序：
+
+1. 建立 `DotArenaUiTheme` 或等价配置，集中引用 UI sprite、icon、颜色、字体。
+2. 替换入口、匹配、结算三个弹窗的面板和按钮。
+3. 替换大厅标签、列表行和功能图标。
+4. 增加 HUD 排行榜和状态背板。
+5. 把任务、商店、记录、排行榜从纯文本详情升级为列表组件。
+6. 最后统一动效和音效反馈。
+
+## 生成提示词
+
+通用模板：
 
 ```text
-2D game asset, clean neon cellular arena style, dark sci-fi arcade palette, soft glow, jelly-like translucent material, high readability, friendly competitive mood, centered object, transparent background, no text, no watermark, suitable for Unity sprite
+2D game asset, clean neon cellular arena style, dark sci-fi arcade palette, soft glow, jelly-like translucent material, cyan and soft gold accents, high readability, centered object, transparent background, no text, no watermark, suitable for Unity sprite
 ```
 
-玩家皮肤模板：
+玩家皮肤：
 
 ```text
 2D game asset, circular jelly blob player skin, translucent [color] gel, glossy highlight, subtle inner glow, clean silhouette, transparent background, no text, no watermark, suitable for Unity sprite
 ```
 
-拾取物模板：
+拾取物：
 
 ```text
 2D game asset, tiny glowing mass pickup, [color] energy pellet, simple rounded shape, soft bloom, readable at small size, transparent background, no text, no watermark, suitable for Unity sprite
 ```
 
-UI 图标模板：
-
-```text
-2D UI icon, clean rounded line icon, neon arcade style, [subject], cyan and gold accent, transparent background, no text, no watermark, readable at 32 pixels
-```
-
-背景模板：
+背景：
 
 ```text
 2D game arena background texture, dark blue black cellular grid, subtle microscopic pattern, low contrast, seamless or tileable feel, does not distract from bright player sprites, no text, no watermark
 ```
 
-## 质量验收
+UI 面板：
 
-生成或接入资产前，需要通过以下检查：
+```text
+2D Unity UI panel sprite, dark blue black translucent glass rectangle, subtle cyan rim light, soft inner shadow, compact rounded corners, clean center area for text, nine-slice friendly border, transparent background, no text, no watermark
+```
 
-- 在 Unity 中以实际显示尺寸查看，主体仍然可读。
-- 透明边缘干净，没有明显白边、黑边或脏边。
-- 颜色与现有深色竞技场 UI 协调。
-- 不遮挡玩家名、分数、HUD 和排行榜信息。
+UI 按钮：
+
+```text
+2D Unity UI button sprite, [primary/secondary/danger] action button, dark translucent base, subtle neon edge, compact rounded rectangle, [normal/hover/pressed/disabled] state, high readability, transparent background, no text, no watermark
+```
+
+UI 图标：
+
+```text
+2D game UI icon, clean rounded line icon, neon cellular arcade style, [subject], cyan and soft gold accents, transparent background, no text, no watermark, readable at 32 pixels, Unity UI sprite
+```
+
+负面约束：
+
+```text
+no text, no letters, no numbers, no watermark, no logo, no realistic metal, no cyberpunk city, no busy pattern, no large illustration, no opaque background, no excessive bloom
+```
+
+## 生产流程
+
+不要一次生成完整资产库。先做小型可运行基准包：
+
+1. 玩家果冻皮肤 3 张。
+2. 质量拾取物 2 张。
+3. 竞技场背景或地面纹理 1 张。
+4. UI 风格基准图 1 张，只作方向确认，不进游戏。
+5. 最小 UI 素材包：面板、Primary/Secondary/Danger 按钮状态、输入框、8-10 个核心图标、HUD 背板。
+6. 吸收特效和复活波纹原型各 1 个。
+
+UI 接入顺序：
+
+1. 基准图确认整体方向。
+2. 生成最小 UI 素材包。
+3. 先接入口/模式选择、匹配中、结算。
+4. 在 Unity 游戏视图检查 1200x600 和 960x540。
+5. 通过后再扩展大厅、任务、商店、记录、排行榜、设置。
+
+## 验收清单
+
+生成或接入资产前检查：
+
+- Unity 实际显示尺寸下主体仍可读。
+- 透明边缘干净，无白边、黑边或脏边。
 - 同一批资产风格一致。
 - 文件命名和目录符合本文档。
 - 没有文字、水印、签名或明显生成瑕疵。
-- 没有引入与当前玩法不符的旧概念，例如冲刺、护盾、击退强化。
-
-## 首批资产计划
-
-第一轮不要直接生成完整资产库，应先做小型基准包并在 Unity 中验证：
-
-1. 竞技场背景或地面纹理 1 张。
-2. 玩家果冻皮肤 3 张。
-3. 质量拾取物 2 张。
-4. UI 面板或按钮风格 1 套。
-5. 吸收特效和复活波纹原型各 1 个。
-
-基准包通过游戏视图验证后，再扩展到完整资产列表。这样可以避免资产单独看起来不错，但进入实际玩法后破坏可读性或风格统一。
-
-## 暂不追求
-
-- 写实细胞或医学显微镜风格。
-- 厚重机甲、硬科幻或赛博城市风格。
-- 大量角色插画。
-- 复杂 3D 场景。
-- 骨骼动画角色。
-- 血腥、尖刺、病毒等当前玩法没有定义的视觉元素。
-- 与框架演示无关的营销型首页美术。
+- 没有引入当前玩法不存在的冲刺、护盾、击退强化等旧概念。
+- 玩家球、食物、特效不降低玩法判断效率。
+- UI 文字不溢出，按钮状态清楚，图标 32x32 可识别。
+- 九宫格拉伸后边框不变形。
+- HUD 不遮挡玩家名、分数和游戏中心视野。
+- 异步按钮不会重复提交请求。
