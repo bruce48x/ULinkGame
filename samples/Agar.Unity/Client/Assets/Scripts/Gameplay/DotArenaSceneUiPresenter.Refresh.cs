@@ -62,7 +62,7 @@ namespace SampleClient.Gameplay
             }
 
             SetText(_entryTitleText, "点阵竞技场");
-            SetText(_entryStatusText, snapshot.Status);
+            SetText(_entryStatusText, snapshot.EntryMenuState == EntryMenuState.MultiplayerAuth ? string.Empty : snapshot.Status);
             SetText(_matchmakingTitleText, snapshot.MatchmakingTitle);
             SetText(_matchmakingDetailText, snapshot.MatchmakingDetail);
             SetText(_matchmakingCancelButtonText, "取消匹配");
@@ -76,7 +76,7 @@ namespace SampleClient.Gameplay
             SetText(_lobbyPrimaryActionButtonText, _lobbyUi.GetLobbyPrimaryActionLabel(snapshot));
             SetText(_lobbySecondaryActionButtonText, _lobbyUi.GetLobbySecondaryActionLabel(snapshot));
             _lobbyUi.ApplyLobbyActionLayout(snapshot, _lobbyPanel?.GetComponent<RectTransform>(), _lobbyDetailText?.rectTransform, _lobbyPrimaryActionButton?.GetComponent<RectTransform>(), _lobbySecondaryActionButton?.GetComponent<RectTransform>(), _lobbyFooterText?.rectTransform);
-            SetText(_multiplayerSubtitleText, "联机登录");
+            SetText(_multiplayerSubtitleText, string.Empty);
             SetText(_accountLabelText, "账号");
             SetText(_passwordLabelText, "密码");
             SetText(_accountPlaceholderText, "请输入账号");
