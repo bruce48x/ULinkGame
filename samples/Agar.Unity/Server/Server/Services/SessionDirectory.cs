@@ -149,6 +149,12 @@ internal sealed class SessionDirectory
             registration.RoomId = null;
             registration.MatchId = null;
             registration.SeatIndex = -1;
+            registration.RealtimeConnectionId = null;
+            registration.RealtimeCallback = null;
+            if (registration.ControlCallback is null)
+            {
+                _byPlayerId.Remove(playerId);
+            }
         }
     }
 

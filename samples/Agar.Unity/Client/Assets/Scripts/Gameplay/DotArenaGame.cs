@@ -53,7 +53,10 @@ namespace SampleClient.Gameplay
         private Sprite _playerSprite = null!;
         private Sprite _playerOutlineSprite = null!;
         private Sprite? _scorePickupSprite;
+        private Sprite? _goldPickupSprite;
         private Sprite? _arenaBackgroundSprite;
+        private Sprite? _pickupGlowSprite;
+        private Sprite? _spawnWaveSprite;
         private readonly Dictionary<string, Sprite> _playerSkinSprites = new(StringComparer.Ordinal);
         private readonly List<Sprite> _remotePlayerSkinSprites = new();
         private Shader? _jellyShader;

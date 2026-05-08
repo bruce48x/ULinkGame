@@ -20,6 +20,9 @@ public sealed class LeaderboardSnapshot
 
     [Id(2)]
     public List<LeaderboardEntrySnapshot> Entries { get; set; } = new();
+
+    [Id(3)]
+    public string PeriodStartLocalDate { get; set; } = "";
 }
 
 [GenerateSerializer]

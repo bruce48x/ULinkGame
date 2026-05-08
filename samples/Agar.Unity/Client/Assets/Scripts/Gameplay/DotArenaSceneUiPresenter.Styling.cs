@@ -120,9 +120,11 @@ namespace SampleClient.Gameplay
 
             StyleInputField(_accountInputField);
             StyleInputField(_passwordInputField);
+            ApplyButtonIcon(_lobbyShopButton, _shopIconSprite);
+            ApplyButtonIcon(_lobbyLeaderboardButton, _leaderboardIconSprite);
         }
 
-        private static void StylePanelImage(GameObject? panel, Color color)
+        private void StylePanelImage(GameObject? panel, Color color)
         {
             if (panel == null)
             {
@@ -131,7 +133,18 @@ namespace SampleClient.Gameplay
 
             if (panel.TryGetComponent<Image>(out var image))
             {
-                image.color = color;
+                if (_uiPanelSprite != null && color.a > 0f)
+                {
+                    image.sprite = _uiPanelSprite;
+                    image.type = Image.Type.Simple;
+                    image.color = Color.white;
+                }
+                else
+                {
+                    image.sprite = null;
+                    image.color = color;
+                }
+
                 image.raycastTarget = color.a > 0f;
             }
         }
@@ -151,21 +164,43 @@ namespace SampleClient.Gameplay
             text.richText = false;
         }
 
-        private static void StyleButton(Button? button)
+        private void StyleButton(Button? button)
         {
             if (button == null)
             {
                 return;
             }
 
+            if (button.targetGraphic is Image buttonImage && _uiButtonNormalSprite != null)
+            {
+                buttonImage.sprite = _uiButtonNormalSprite;
+                buttonImage.type = Image.Type.Simple;
+                buttonImage.color = Color.white;
+            }
+
             var colors = button.colors;
-            colors.normalColor = new Color(0.2f, 0.29f, 0.38f, 1f);
-            colors.highlightedColor = new Color(0.27f, 0.39f, 0.5f, 1f);
-            colors.pressedColor = new Color(0.14f, 0.22f, 0.3f, 1f);
+            colors.normalColor = _uiButtonNormalSprite != null ? Color.white : new Color(0.2f, 0.29f, 0.38f, 1f);
+            colors.highlightedColor = _uiButtonNormalSprite != null ? new Color(1.08f, 1.08f, 1.08f, 1f) : new Color(0.27f, 0.39f, 0.5f, 1f);
+            colors.pressedColor = _uiButtonNormalSprite != null ? new Color(0.86f, 0.9f, 0.94f, 1f) : new Color(0.14f, 0.22f, 0.3f, 1f);
             colors.selectedColor = colors.highlightedColor;
             colors.disabledColor = new Color(0.2f, 0.2f, 0.22f, 0.7f);
             colors.colorMultiplier = 1f;
             button.colors = colors;
+
+            if (_uiButtonPressedSprite != null)
+            {
+                button.transition = Selectable.Transition.SpriteSwap;
+                var spriteState = button.spriteState;
+                spriteState.highlightedSprite = _uiButtonNormalSprite;
+                spriteState.pressedSprite = _uiButtonPressedSprite;
+                spriteState.selectedSprite = _uiButtonNormalSprite;
+                spriteState.disabledSprite = _uiButtonNormalSprite;
+                button.spriteState = spriteState;
+            }
+            else
+            {
+                button.transition = Selectable.Transition.ColorTint;
+            }
         }
 
         private static void StyleInputField(TMP_InputField? inputField)
@@ -223,6 +258,75 @@ namespace SampleClient.Gameplay
 
             var fallback = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
             return fallback ?? TMP_Settings.defaultFontAsset;
+        }
+
+        private void LoadSceneUiArtSprites()
+        {
+            _uiPanelSprite = null;
+            _uiButtonNormalSprite = null;
+            _uiButtonPressedSprite = null;
+            _shopIconSprite = null;
+            _leaderboardIconSprite = null;
+
+#if UNITY_EDITOR
+            _uiPanelSprite = TryLoadSceneUiSprite("UI panel", "Assets/Art/UI/UI_Panel_Dark_01.png");
+            _uiButtonNormalSprite = TryLoadSceneUiSprite("UI button normal", "Assets/Art/UI/UI_Button_Primary_Normal.png");
+            _uiButtonPressedSprite = TryLoadSceneUiSprite("UI button pressed", "Assets/Art/UI/UI_Button_Primary_Pressed.png");
+            _shopIconSprite = TryLoadSceneUiSprite("shop icon", "Assets/Art/Icons/Icon_Shop_01.png");
+            _leaderboardIconSprite = TryLoadSceneUiSprite("leaderboard icon", "Assets/Art/Icons/Icon_Leaderboard_01.png");
+#endif
+        }
+
+#if UNITY_EDITOR
+        private static Sprite? TryLoadSceneUiSprite(string label, string assetPath)
+        {
+            var sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+            if (sprite == null)
+            {
+                Debug.LogWarning($"[DotArena] {label} sprite not found: {assetPath}");
+            }
+
+            return sprite;
+        }
+#endif
+
+        private void ApplyButtonIcon(Button? button, Sprite? iconSprite)
+        {
+            if (button == null || iconSprite == null)
+            {
+                return;
+            }
+
+            var iconTransform = button.transform.Find("Icon");
+            GameObject iconObject;
+            if (iconTransform == null)
+            {
+                iconObject = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+                iconObject.transform.SetParent(button.transform, false);
+            }
+            else
+            {
+                iconObject = iconTransform.gameObject;
+            }
+
+            var rect = (RectTransform)iconObject.transform;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.anchoredPosition = new Vector2(10f, 0f);
+            rect.sizeDelta = new Vector2(20f, 20f);
+
+            var image = iconObject.GetComponent<Image>();
+            image.sprite = iconSprite;
+            image.type = Image.Type.Simple;
+            image.color = Color.white;
+            image.raycastTarget = false;
+
+            if (button.transform.Find("Label") is RectTransform labelRect)
+            {
+                labelRect.offsetMin = new Vector2(28f, 0f);
+                labelRect.offsetMax = Vector2.zero;
+            }
         }
 
         private TMP_Text? FindSceneUiText(string path)

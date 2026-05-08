@@ -135,6 +135,11 @@ namespace SampleClient.Gameplay
         private TMP_InputField? _accountInputField;
         private TMP_InputField? _passwordInputField;
         private TMP_FontAsset? _tmpFontAsset;
+        private Sprite? _uiPanelSprite;
+        private Sprite? _uiButtonNormalSprite;
+        private Sprite? _uiButtonPressedSprite;
+        private Sprite? _shopIconSprite;
+        private Sprite? _leaderboardIconSprite;
         private readonly DotArenaSceneLobbyUiCoordinator _lobbyUi = new();
 
         public bool HasSceneUi => _sceneUiRoot != null;
@@ -165,6 +170,7 @@ namespace SampleClient.Gameplay
 
             _tmpFontAsset ??= LoadTmpFontAsset();
             ApplySceneUiFonts();
+            LoadSceneUiArtSprites();
 
             OverlayLayer = FindSceneUiRect("SceneUI/OverlayLayer");
             _hudPanel = FindSceneUiObject("SceneUI/HUDPanel");

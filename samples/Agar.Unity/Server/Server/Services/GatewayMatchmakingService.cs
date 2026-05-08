@@ -113,10 +113,32 @@ internal sealed class GatewayMatchmakingService
         }
 
         var roomId = registration?.RoomId;
-        _sessionDirectory.ClearRoom(playerId);
         if (!string.IsNullOrWhiteSpace(roomId))
         {
+            await _clusterClient.GetGrain<IRoomGrain>(roomId)
+                .LeaveAsync(new RoomPlayerLeaveRequest
+                {
+                    UserId = playerId,
+                    RoomId = roomId,
+                    LeftAtUtc = DateTime.UtcNow,
+                    Reason = reason
+                })
+                .ConfigureAwait(false);
+            await _clusterClient.GetGrain<IPlayerSessionGrain>(playerId)
+                .ClearRoomAsync(new PlayerRoomClearRequest
+                {
+                    UserId = playerId,
+                    RoomId = roomId,
+                    ClearedAtUtc = DateTime.UtcNow,
+                    Reason = reason
+                })
+                .ConfigureAwait(false);
+            _sessionDirectory.ClearRoom(playerId, roomId);
             await _roomRuntimeHost.RemovePlayerAsync(roomId, playerId).ConfigureAwait(false);
+        }
+        else
+        {
+            _sessionDirectory.ClearRoom(playerId);
         }
     }
 

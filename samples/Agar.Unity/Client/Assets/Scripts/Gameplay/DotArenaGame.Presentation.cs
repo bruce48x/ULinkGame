@@ -90,11 +90,17 @@ namespace SampleClient.Gameplay
         private void LoadEnvironmentArtSprites()
         {
             _scorePickupSprite = null;
+            _goldPickupSprite = null;
             _arenaBackgroundSprite = null;
+            _pickupGlowSprite = null;
+            _spawnWaveSprite = null;
 
 #if UNITY_EDITOR
             _scorePickupSprite = TryLoadArtSprite("score pickup", "Assets/Art/Pickups/Pickup_Mass_Teal_01.png");
+            _goldPickupSprite = TryLoadArtSprite("gold score pickup", "Assets/Art/Pickups/Pickup_Mass_Gold_01.png");
             _arenaBackgroundSprite = TryLoadArtSprite("arena background", "Assets/Art/Backgrounds/BG_Arena_Grid_Dark_01.png");
+            _pickupGlowSprite = TryLoadArtSprite("pickup absorb ring", "Assets/Art/FX/FX_Absorb_Ring_01.png");
+            _spawnWaveSprite = TryLoadArtSprite("player spawn wave", "Assets/Art/FX/FX_Spawn_Wave_01.png");
 #endif
         }
 

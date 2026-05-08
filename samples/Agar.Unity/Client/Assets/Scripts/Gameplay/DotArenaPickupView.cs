@@ -10,6 +10,7 @@ namespace SampleClient.Gameplay
         private Vector3 _absorbStartPosition;
         private Vector3 _absorbTargetPosition;
         private float _absorbStartedAt;
+        private float _shownAt;
         private bool _isAbsorbing;
 
         public PickupView(GameObject root, SpriteRenderer renderer, SpriteRenderer glowRenderer, TextMesh labelText)
@@ -30,13 +31,13 @@ namespace SampleClient.Gameplay
         public void ShowAt(Vector3 position, float scale)
         {
             _isAbsorbing = false;
+            _shownAt = Time.time;
             Root.SetActive(true);
             Root.transform.position = position;
             Root.transform.localScale = new Vector3(scale, scale, 1f);
-            GlowRenderer.enabled = false;
+            GlowRenderer.enabled = true;
             GlowRenderer.transform.localScale = Vector3.one * 1.24f;
-
-            GlowRenderer.color = Color.clear;
+            GlowRenderer.color = new Color(1f, 1f, 1f, 0.16f);
 
             var labelColor = _baseLabelColor;
             labelColor.a = _baseLabelColor.a;
@@ -76,6 +77,9 @@ namespace SampleClient.Gameplay
                 if (Root.activeSelf)
                 {
                     Root.transform.localScale = new Vector3(pulseScale, pulseScale, 1f);
+                    var idlePulse = 0.12f + (Mathf.Sin((time - _shownAt) * 5.1f) * 0.04f);
+                    GlowRenderer.transform.localScale = Vector3.one * (1.16f + (pulseScale * 0.08f));
+                    GlowRenderer.color = new Color(1f, 1f, 1f, idlePulse);
                 }
 
                 return;
@@ -86,7 +90,7 @@ namespace SampleClient.Gameplay
             Root.transform.position = Vector3.Lerp(_absorbStartPosition, _absorbTargetPosition, eased);
             var scale = Mathf.Lerp(pulseScale, pulseScale * 0.24f, eased);
             Root.transform.localScale = new Vector3(scale, scale, 1f);
-            GlowRenderer.enabled = false;
+            GlowRenderer.enabled = true;
             GlowRenderer.transform.localScale = Vector3.one * Mathf.Lerp(1.24f, 0.42f, eased);
 
             var material = Renderer.material;
@@ -95,7 +99,8 @@ namespace SampleClient.Gameplay
                 material.SetFloat("_Dissolve", Mathf.SmoothStep(0f, 1f, progress));
             }
 
-            GlowRenderer.color = Color.clear;
+            GlowRenderer.transform.Rotate(0f, 0f, 280f * Time.deltaTime);
+            GlowRenderer.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.72f, 0f, eased));
 
             var labelColor = _baseLabelColor;
             labelColor.a = Mathf.Lerp(_baseLabelColor.a, 0f, Mathf.Clamp01(progress * 1.25f));

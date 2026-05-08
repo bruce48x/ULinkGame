@@ -16,6 +16,9 @@ public sealed class LeaderboardState
 
     [Id(2)]
     public List<WeeklyLeaderboardSnapshot> WeeklySnapshots { get; set; } = new();
+
+    [Id(3)]
+    public string CurrentPeriodStartLocalDate { get; set; } = "";
 }
 
 [GenerateSerializer]
@@ -39,15 +42,20 @@ public sealed class WeeklyLeaderboardSnapshot
 
     [Id(1)]
     public List<LeaderboardEntrySnapshot> Entries { get; set; } = new();
+
+    [Id(2)]
+    public string PeriodStartLocalDate { get; set; } = "";
 }
 
 public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
 {
     private readonly IPersistentState<LeaderboardState> _state;
+    private readonly TimeZoneInfo _leaderboardTimeZone;
 
     public LeaderboardGrain([PersistentState("leaderboard", "leaderboards")] IPersistentState<LeaderboardState> state)
     {
         _state = state;
+        _leaderboardTimeZone = TimeZoneInfo.Local;
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -66,27 +74,30 @@ public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
             .Take(topN)
             .ToList();
 
-        return new LeaderboardSnapshot
+        var snapshot = new LeaderboardSnapshot
         {
-            PeriodStartUtc = _state.State.CurrentPeriodStartUtc,
-            SecondsUntilReset = Math.Max(0, (int)Math.Ceiling((GetNextPeriodStart(now) - now).TotalSeconds)),
+            PeriodStartLocalDate = _state.State.CurrentPeriodStartLocalDate,
+            PeriodStartUtc = _state.State.CurrentPeriodStartLocalDate,
+            SecondsUntilReset = Math.Max(0, (int)Math.Ceiling((LeaderboardPeriodPolicy.GetNextPeriodStartUtc(now, _leaderboardTimeZone) - now).TotalSeconds)),
             Entries = entries
         };
+        return snapshot;
     }
 
     public async Task ResetWeeklyIfNeededAsync()
     {
         var now = DateTime.UtcNow;
         EnsurePeriodInitialized(now);
-        var currentPeriod = GetCurrentPeriodStart(now);
-        if (string.Equals(_state.State.CurrentPeriodStartUtc, FormatPeriod(currentPeriod), StringComparison.Ordinal))
+        var currentPeriod = LeaderboardPeriodPolicy.GetCurrentPeriodStartLocalDate(now, _leaderboardTimeZone);
+        if (string.Equals(_state.State.CurrentPeriodStartLocalDate, currentPeriod, StringComparison.Ordinal))
         {
             return;
         }
 
         var archived = new WeeklyLeaderboardSnapshot
         {
-            PeriodStartUtc = _state.State.CurrentPeriodStartUtc,
+            PeriodStartLocalDate = _state.State.CurrentPeriodStartLocalDate,
+            PeriodStartUtc = _state.State.CurrentPeriodStartLocalDate,
             Entries = GetRankedEntries().Take(100).ToList()
         };
 
@@ -106,7 +117,8 @@ public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
         }
 
         _state.State.Players.Clear();
-        _state.State.CurrentPeriodStartUtc = FormatPeriod(currentPeriod);
+        _state.State.CurrentPeriodStartLocalDate = currentPeriod;
+        _state.State.CurrentPeriodStartUtc = currentPeriod;
         await _state.WriteStateAsync();
     }
 
@@ -132,7 +144,34 @@ public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
 
     private List<LeaderboardEntrySnapshot> GetRankedEntries()
     {
-        return _state.State.Players.Values
+        return LeaderboardRankingPolicy.GetRankedEntries(_state.State.Players.Values);
+    }
+
+    private void EnsurePeriodInitialized(DateTime now)
+    {
+        if (string.IsNullOrWhiteSpace(_state.State.CurrentPeriodStartLocalDate)
+            && !string.IsNullOrWhiteSpace(_state.State.CurrentPeriodStartUtc))
+        {
+            _state.State.CurrentPeriodStartLocalDate = LeaderboardPeriodPolicy.MigrateLegacyPeriodStartUtc(
+                _state.State.CurrentPeriodStartUtc,
+                now,
+                _leaderboardTimeZone);
+        }
+
+        if (string.IsNullOrWhiteSpace(_state.State.CurrentPeriodStartLocalDate))
+        {
+            _state.State.CurrentPeriodStartLocalDate = LeaderboardPeriodPolicy.GetCurrentPeriodStartLocalDate(now, _leaderboardTimeZone);
+        }
+
+        _state.State.CurrentPeriodStartUtc = _state.State.CurrentPeriodStartLocalDate;
+    }
+}
+
+public static class LeaderboardRankingPolicy
+{
+    public static List<LeaderboardEntrySnapshot> GetRankedEntries(IEnumerable<LeaderboardPlayerState> players)
+    {
+        return players
             .Where(static player => player.VictoryPoints > 0)
             .OrderByDescending(static player => player.VictoryPoints)
             .ThenByDescending(static player => player.WinCount)
@@ -146,29 +185,94 @@ public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
             })
             .ToList();
     }
+}
 
-    private void EnsurePeriodInitialized(DateTime now)
+public static class LeaderboardPeriodPolicy
+{
+    public static string GetCurrentPeriodStartLocalDate(DateTime utcNow, TimeZoneInfo timeZone)
     {
-        if (string.IsNullOrWhiteSpace(_state.State.CurrentPeriodStartUtc))
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(NormalizeUtc(utcNow), timeZone);
+        var localDate = localNow.Date;
+        var daysSinceMonday = ((int)localDate.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        return localDate.AddDays(-daysSinceMonday).ToString("yyyy-MM-dd");
+    }
+
+    public static DateTime GetNextPeriodStartUtc(DateTime utcNow, TimeZoneInfo timeZone)
+    {
+        var currentLocalStart = DateTime.ParseExact(
+            GetCurrentPeriodStartLocalDate(utcNow, timeZone),
+            "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None);
+        var nextLocalStart = DateTime.SpecifyKind(currentLocalStart.AddDays(7), DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(nextLocalStart, timeZone);
+    }
+
+    public static WeeklyLeaderboardSnapshot? ResetWeeklyIfNeeded(LeaderboardState state, DateTime utcNow, TimeZoneInfo timeZone)
+    {
+        EnsurePeriodInitialized(state, utcNow, timeZone);
+        var currentPeriod = GetCurrentPeriodStartLocalDate(utcNow, timeZone);
+        if (string.Equals(state.CurrentPeriodStartLocalDate, currentPeriod, StringComparison.Ordinal))
         {
-            _state.State.CurrentPeriodStartUtc = FormatPeriod(GetCurrentPeriodStart(now));
+            return null;
         }
+
+        var archived = new WeeklyLeaderboardSnapshot
+        {
+            PeriodStartLocalDate = state.CurrentPeriodStartLocalDate,
+            PeriodStartUtc = state.CurrentPeriodStartLocalDate,
+            Entries = LeaderboardRankingPolicy.GetRankedEntries(state.Players.Values).Take(100).ToList()
+        };
+
+        if (archived.Entries.Count > 0)
+        {
+            state.WeeklySnapshots.Insert(0, archived);
+            if (state.WeeklySnapshots.Count > 2)
+            {
+                state.WeeklySnapshots.RemoveRange(2, state.WeeklySnapshots.Count - 2);
+            }
+        }
+
+        state.Players.Clear();
+        state.CurrentPeriodStartLocalDate = currentPeriod;
+        state.CurrentPeriodStartUtc = currentPeriod;
+        return archived.Entries.Count > 0 ? archived : null;
     }
 
-    private static DateTime GetCurrentPeriodStart(DateTime utcNow)
+    private static void EnsurePeriodInitialized(LeaderboardState state, DateTime utcNow, TimeZoneInfo timeZone)
     {
-        var date = utcNow.Date;
-        var daysSinceMonday = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
-        return date.AddDays(-daysSinceMonday);
+        if (string.IsNullOrWhiteSpace(state.CurrentPeriodStartLocalDate)
+            && !string.IsNullOrWhiteSpace(state.CurrentPeriodStartUtc))
+        {
+            state.CurrentPeriodStartLocalDate = MigrateLegacyPeriodStartUtc(state.CurrentPeriodStartUtc, utcNow, timeZone);
+        }
+
+        if (string.IsNullOrWhiteSpace(state.CurrentPeriodStartLocalDate))
+        {
+            state.CurrentPeriodStartLocalDate = GetCurrentPeriodStartLocalDate(utcNow, timeZone);
+        }
+
+        state.CurrentPeriodStartUtc = state.CurrentPeriodStartLocalDate;
     }
 
-    private static DateTime GetNextPeriodStart(DateTime utcNow)
+    private static DateTime NormalizeUtc(DateTime utcNow)
     {
-        return GetCurrentPeriodStart(utcNow).AddDays(7);
+        return utcNow.Kind == DateTimeKind.Utc
+            ? utcNow
+            : DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
     }
 
-    private static string FormatPeriod(DateTime periodStartUtc)
+    public static string MigrateLegacyPeriodStartUtc(string legacyPeriodStartUtc, DateTime utcNow, TimeZoneInfo timeZone)
     {
-        return periodStartUtc.ToString("yyyy-MM-dd");
+        var normalizedUtc = NormalizeUtc(utcNow);
+        var utcDate = normalizedUtc.Date;
+        var daysSinceMonday = ((int)utcDate.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var currentUtcPeriodStart = utcDate.AddDays(-daysSinceMonday).ToString("yyyy-MM-dd");
+        if (string.Equals(legacyPeriodStartUtc, currentUtcPeriodStart, StringComparison.Ordinal))
+        {
+            return GetCurrentPeriodStartLocalDate(normalizedUtc, timeZone);
+        }
+
+        return legacyPeriodStartUtc;
     }
 }

@@ -131,6 +131,18 @@ namespace SampleClient.Gameplay
             outlineRenderer.enabled = false;
             outlineRenderer.material = CreateJellyMaterial(UnityEngine.Random.Range(0f, Mathf.PI * 2f), 4.2f, 0.08f);
 
+            SpriteRenderer? spawnWaveRenderer = null;
+            if (_spawnWaveSprite != null)
+            {
+                var spawnWave = new GameObject("SpawnWave");
+                spawnWave.transform.SetParent(viewRoot.transform, false);
+                spawnWave.transform.localPosition = new Vector3(0f, 0f, 0.02f);
+                spawnWaveRenderer = spawnWave.AddComponent<SpriteRenderer>();
+                spawnWaveRenderer.sprite = _spawnWaveSprite;
+                spawnWaveRenderer.color = new Color(1f, 1f, 1f, 0.58f);
+                spawnWaveRenderer.sortingOrder = PlayerSortingOrder - 2;
+            }
+
             var nameBackdrop = new GameObject("NameBackdrop");
             nameBackdrop.transform.SetParent(viewRoot.transform, false);
             nameBackdrop.transform.localPosition = new Vector3(0f, PlayerNameOffsetY, PlayerTextDepth + 0.01f);
@@ -179,7 +191,7 @@ namespace SampleClient.Gameplay
             scoreText.color = new Color(1f, 0.97f, 0.72f, 1f);
             DotArenaSpriteFactory.ConfigureTextRenderer(scoreText.GetComponent<MeshRenderer>(), PlayerTextSortingOrder);
 
-            var view = new DotView(viewRoot, renderer, outlineRenderer, nameText, scoreText, usesAuthoredSkin);
+            var view = new DotView(viewRoot, renderer, outlineRenderer, spawnWaveRenderer, nameText, scoreText, usesAuthoredSkin);
             view.SetIdentity(playerId, 0);
             view.ApplyPresentation(baseColor, PlayerLifeState.Idle, true, GameplayConfig.PlayerVisualRadius);
             return view;
@@ -191,9 +203,10 @@ namespace SampleClient.Gameplay
             pickupRoot.transform.SetParent(transform, false);
 
             var pickupColor = DotArenaPresentation.GetPickupColor(pickupType);
-            var usesAuthoredPickupSprite = pickupType == PickupType.ScorePoint && _scorePickupSprite != null;
+            var scorePickupSprite = ResolveScorePickupSprite();
+            var usesAuthoredPickupSprite = pickupType == PickupType.ScorePoint && scorePickupSprite != null;
             var renderer = pickupRoot.AddComponent<SpriteRenderer>();
-            renderer.sprite = usesAuthoredPickupSprite ? _scorePickupSprite : _playerSprite;
+            renderer.sprite = usesAuthoredPickupSprite ? scorePickupSprite : _playerSprite;
             renderer.color = usesAuthoredPickupSprite ? Color.white : pickupColor;
             renderer.sortingOrder = PickupSortingOrder;
             renderer.material = CreatePickupAbsorbMaterial(pickupColor);
@@ -204,7 +217,7 @@ namespace SampleClient.Gameplay
             glow.transform.localScale = Vector3.one * 1.24f;
 
             var glowRenderer = glow.AddComponent<SpriteRenderer>();
-            glowRenderer.sprite = _playerOutlineSprite;
+            glowRenderer.sprite = _pickupGlowSprite != null ? _pickupGlowSprite : _playerOutlineSprite;
             glowRenderer.color = Color.clear;
             glowRenderer.sortingOrder = PickupSortingOrder - 1;
             glowRenderer.enabled = false;
@@ -226,6 +239,21 @@ namespace SampleClient.Gameplay
 
             pickupRoot.SetActive(false);
             return new PickupView(pickupRoot, renderer, glowRenderer, labelText);
+        }
+
+        private Sprite? ResolveScorePickupSprite()
+        {
+            if (_scorePickupSprite == null)
+            {
+                return _goldPickupSprite;
+            }
+
+            if (_goldPickupSprite == null)
+            {
+                return _scorePickupSprite;
+            }
+
+            return (_pickupViews.Count & 1) == 0 ? _scorePickupSprite : _goldPickupSprite;
         }
 
         private Material CreatePickupAbsorbMaterial(Color baseColor)
