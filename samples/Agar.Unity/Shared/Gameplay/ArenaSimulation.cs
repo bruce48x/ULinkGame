@@ -441,14 +441,14 @@ namespace Shared.Gameplay
                 return false;
             }
 
-            if (a.Mass >= b.Mass * _options.EatMassRatio && a.Radius > b.Radius)
+            if (CanConsumeByMass(a, b))
             {
                 eater = a;
                 victim = b;
                 return true;
             }
 
-            if (b.Mass >= a.Mass * _options.EatMassRatio && b.Radius > a.Radius)
+            if (CanConsumeByMass(b, a))
             {
                 eater = b;
                 victim = a;
@@ -833,7 +833,7 @@ namespace Shared.Gameplay
                         fleeVector += safeDirection * pressure;
                     }
 
-                    if (bot.Mass > candidate.Mass * 1.2f && distanceSquared < bestPreyDistance)
+                    if (CanConsumeByMass(bot, candidate) && distanceSquared < bestPreyDistance)
                     {
                         bestPreyDistance = distanceSquared;
                         prey = candidate;
@@ -889,6 +889,11 @@ namespace Shared.Gameplay
             }
 
             return bestDistance < float.MaxValue ? bestPosition : null;
+        }
+
+        private bool CanConsumeByMass(ArenaPlayer eater, ArenaPlayer victim)
+        {
+            return eater.Mass >= victim.Mass * _options.EatMassRatio && eater.Radius > victim.Radius;
         }
 
         private void ClampPlayerInsideArena(ArenaPlayer player)

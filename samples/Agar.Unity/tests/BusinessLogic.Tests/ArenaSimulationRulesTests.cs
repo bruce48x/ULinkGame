@@ -1,5 +1,8 @@
 using Shared.Gameplay;
 using Shared.Interfaces;
+using System.Collections;
+using System.Reflection;
+using UnityEngine;
 using Xunit;
 
 namespace Agar.Unity.Tests;
@@ -125,6 +128,29 @@ public sealed class ArenaSimulationRulesTests
         Assert.All(world.Pickups, pickup => Assert.Equal(PickupType.ScorePoint, pickup.Type));
     }
 
+    [Fact]
+    public void BotChasesOtherBotWhenItMeetsConfiguredEatRatio()
+    {
+        var simulation = new ArenaSimulation(new ArenaSimulationOptions
+        {
+            FoodTargetCount = 0,
+            MinPlayersToStart = 1,
+            TargetParticipantCount = 3,
+            MaxRoundSeconds = 0f,
+            EatMassRatio = 1.15f
+        });
+
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Player", Score = 1 });
+        SetPlayerState(simulation, "Player", score: 1, position: new Vector2(0f, -8f));
+        SetPlayerState(simulation, "AI01", score: 4, position: new Vector2(0f, 8f));
+        SetPlayerState(simulation, "AI02", score: 1, position: new Vector2(10f, 8f));
+
+        var result = simulation.Tick(0.1f);
+        var hunter = result.WorldState.Players.Single(player => player.PlayerId == "AI01");
+
+        Assert.True(hunter.Vx > MathF.Abs(hunter.Vy));
+    }
+
     [Theory]
     [InlineData(1, 10)]
     [InlineData(2, 7)]
@@ -165,5 +191,20 @@ public sealed class ArenaSimulationRulesTests
         });
 
         return Assert.Single(simulation.CreateWorldState().Players);
+    }
+
+    private static void SetPlayerState(ArenaSimulation simulation, string playerId, int score, Vector2 position)
+    {
+        var playersField = typeof(ArenaSimulation).GetField("_players", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var players = (IDictionary)playersField.GetValue(simulation)!;
+        var player = players[playerId]!;
+
+        typeof(ArenaSimulation)
+            .GetMethod("SetScore", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(simulation, new[] { player, score });
+
+        player.GetType().GetProperty("Position")!.SetValue(player, position);
+        player.GetType().GetProperty("Velocity")!.SetValue(player, new Vector2(0f, 0f));
+        player.GetType().GetProperty("Input")!.SetValue(player, new Vector2(0f, 0f));
     }
 }
