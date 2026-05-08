@@ -22,7 +22,9 @@ namespace SampleClient.Gameplay
                             !snapshot.HasSession &&
                             snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby;
             var showEntry = !showSettlement && !showMatchmaking && !showHud && !showLobby;
+            var showMenuBackground = showEntry || showLobby || showMatchmaking || showSettlement;
 
+            if (_menuBackground != null) _menuBackground.SetActive(showMenuBackground);
             if (_hudPanel != null) _hudPanel.SetActive(showHud);
             if (_debugPanel != null) _debugPanel.SetActive(showDebug);
             if (_entryPanel != null) _entryPanel.SetActive(showEntry);

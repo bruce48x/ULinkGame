@@ -265,10 +265,12 @@ namespace SampleClient.Gameplay
             _uiPanelSprite = null;
             _uiButtonNormalSprite = null;
             _uiButtonPressedSprite = null;
+            _uiBackgroundSprite = null;
             _shopIconSprite = null;
             _leaderboardIconSprite = null;
 
 #if UNITY_EDITOR
+            _uiBackgroundSprite = TryLoadSceneUiSprite("UI background", "Assets/Art/Backgrounds/BG_Arena_Grid_Dark_01.png");
             _uiPanelSprite = TryLoadSceneUiSprite("UI panel", "Assets/Art/UI/UI_Panel_Dark_01.png");
             _uiButtonNormalSprite = TryLoadSceneUiSprite("UI button normal", "Assets/Art/UI/UI_Button_Primary_Normal.png");
             _uiButtonPressedSprite = TryLoadSceneUiSprite("UI button pressed", "Assets/Art/UI/UI_Button_Primary_Pressed.png");

@@ -8,6 +8,91 @@ namespace SampleClient.Gameplay
 {
     internal sealed partial class DotArenaSceneUiPresenter
     {
+        private void EnsureMenuBackground()
+        {
+            if (_sceneUiRoot == null)
+            {
+                return;
+            }
+
+            _menuBackground = FindSceneUiObject("SceneUI/MenuBackground");
+            if (_menuBackground == null)
+            {
+                _menuBackground = new GameObject("MenuBackground", typeof(RectTransform), typeof(Image));
+                _menuBackground.transform.SetParent(_sceneUiRoot.transform, false);
+            }
+
+            _menuBackground.transform.SetAsFirstSibling();
+
+            var rect = (RectTransform)_menuBackground.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            var image = _menuBackground.GetComponent<Image>();
+            image.sprite = _uiBackgroundSprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.color = _uiBackgroundSprite != null ? Color.white : new Color(0.02f, 0.04f, 0.07f, 1f);
+            image.raycastTarget = false;
+        }
+
+        private void EnsureEntryPanelLayout()
+        {
+            if (_entryPanel == null)
+            {
+                return;
+            }
+
+            var panelRect = (RectTransform)_entryPanel.transform;
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = new Vector2(460f, 330f);
+
+            EnsureEntryTextLayout("TitleText", new Vector2(0f, -44f), new Vector2(360f, 32f), 22f, FontStyles.Bold);
+            EnsureEntryTextLayout("StatusText", new Vector2(0f, -82f), new Vector2(360f, 28f), 14f, FontStyles.Normal);
+            StretchEntryChildPanel(_modeSelectPanel);
+            StretchEntryChildPanel(_multiplayerPanel);
+        }
+
+        private void EnsureEntryTextLayout(string name, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyles)
+        {
+            var text = FindSceneUiText($"SceneUI/EntryPanel/{name}");
+            if (text == null)
+            {
+                return;
+            }
+
+            var rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            text.fontSize = fontSize;
+            text.fontStyle = fontStyles;
+            text.alignment = TextAlignmentOptions.Center;
+        }
+
+        private static void StretchEntryChildPanel(GameObject? panel)
+        {
+            if (panel == null)
+            {
+                return;
+            }
+
+            var rect = (RectTransform)panel.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
         private void EnsureModeSelectPanelContents()
         {
             if (_modeSelectPanel == null)
@@ -15,9 +100,9 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            EnsureModeSelectButton("SinglePlayerButton", new Vector2(0f, -124f), "单机：普通模式");
-            EnsureModeSelectButton("InvincibleSinglePlayerButton", new Vector2(0f, -172f), "单机：无敌模式");
-            EnsureModeSelectButton("MultiplayerButton", new Vector2(0f, -220f), "联机");
+            EnsureModeSelectButton("SinglePlayerButton", new Vector2(0f, -132f), "单机：普通模式");
+            EnsureModeSelectButton("InvincibleSinglePlayerButton", new Vector2(0f, -190f), "单机：无敌模式");
+            EnsureModeSelectButton("MultiplayerButton", new Vector2(0f, -248f), "联机");
         }
 
         private void EnsureModeSelectButton(string name, Vector2 anchoredPosition, string label)
@@ -41,14 +126,24 @@ namespace SampleClient.Gameplay
                 rect.anchorMax = new Vector2(0.5f, 1f);
                 rect.pivot = new Vector2(0.5f, 1f);
                 rect.anchoredPosition = anchoredPosition;
-                rect.sizeDelta = new Vector2(260f, 38f);
+                rect.sizeDelta = new Vector2(300f, 42f);
             }
 
             var text = FindSceneUiText($"SceneUI/EntryPanel/ModeSelectPanel/{name}/Label");
             if (text != null)
             {
+                StretchButtonLabel(text.rectTransform);
                 text.text = label;
             }
+        }
+
+        private static void StretchButtonLabel(RectTransform labelRect)
+        {
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.pivot = new Vector2(0.5f, 0.5f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
         }
 
         private void EnsureMultiplayerAuthActionButtons()
@@ -90,6 +185,7 @@ namespace SampleClient.Gameplay
             var text = FindSceneUiText($"SceneUI/EntryPanel/MultiplayerPanel/{name}/Label");
             if (text != null)
             {
+                StretchButtonLabel(text.rectTransform);
                 text.text = label;
             }
         }

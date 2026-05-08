@@ -58,6 +58,7 @@ namespace SampleClient.Gameplay
     {
         private Transform? _owner;
         private GameObject? _sceneUiRoot;
+        private GameObject? _menuBackground;
         private GameObject? _hudPanel;
         private GameObject? _debugPanel;
         private GameObject? _entryPanel;
@@ -138,6 +139,7 @@ namespace SampleClient.Gameplay
         private Sprite? _uiPanelSprite;
         private Sprite? _uiButtonNormalSprite;
         private Sprite? _uiButtonPressedSprite;
+        private Sprite? _uiBackgroundSprite;
         private Sprite? _shopIconSprite;
         private Sprite? _leaderboardIconSprite;
         private readonly DotArenaSceneLobbyUiCoordinator _lobbyUi = new();
@@ -171,6 +173,7 @@ namespace SampleClient.Gameplay
             _tmpFontAsset ??= LoadTmpFontAsset();
             ApplySceneUiFonts();
             LoadSceneUiArtSprites();
+            EnsureMenuBackground();
 
             OverlayLayer = FindSceneUiRect("SceneUI/OverlayLayer");
             _hudPanel = FindSceneUiObject("SceneUI/HUDPanel");
@@ -185,6 +188,7 @@ namespace SampleClient.Gameplay
             EnsureLobbyQuickActionButtons();
             _modeSelectPanel = FindSceneUiObject("SceneUI/EntryPanel/ModeSelectPanel");
             _multiplayerPanel = FindSceneUiObject("SceneUI/EntryPanel/MultiplayerPanel");
+            EnsureEntryPanelLayout();
             EnsureModeSelectPanelContents();
             EnsureMultiplayerAuthActionButtons();
             EnsureSettlementPanel();
