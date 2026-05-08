@@ -1,0 +1,77 @@
+name: Publish NuGet
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-nuget.yml"
+      - "Directory.Build.props"
+      - "NuGet.config"
+      - "src/**"
+      - "Tests/**"
+
+concurrency:
+  group: publish-nuget
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Ensure local NuGet feed path exists
+        run: mkdir -p artifacts
+
+      - name: Restore test projects
+        run: |
+          for project in $(find Tests -maxdepth 2 -name "*.csproj" -print); do
+            dotnet restore "$project"
+          done
+
+      - name: Restore package projects
+        run: |
+          for project in src/*/*.csproj; do
+            dotnet restore "$project"
+          done
+
+      - name: Test client package
+        run: dotnet test Tests/ULinkGame.Client.Tests/ULinkGame.Client.Tests.csproj --no-restore -c Release -m:1 /nr:false /p:UseSharedCompilation=false
+
+      - name: Test server package
+        run: dotnet test Tests/ULinkGame.Server.Tests/ULinkGame.Server.Tests.csproj --no-restore -c Release -m:1 /nr:false /p:UseSharedCompilation=false
+
+      - name: Pack NuGet packages
+        run: |
+          mkdir -p artifacts/nuget
+          for project in src/*/*.csproj; do
+            dotnet pack "$project" --no-restore -c Release -o artifacts/nuget
+          done
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push NuGet packages
+        run: |
+          dotnet nuget push "artifacts/nuget/*.nupkg" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
