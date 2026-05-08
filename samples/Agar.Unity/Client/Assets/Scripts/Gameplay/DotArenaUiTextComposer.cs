@@ -14,19 +14,16 @@ namespace SampleClient.Gameplay
                 return "未登录";
             }
 
-            return $"已登录: {authenticatedPlayerId}   胜场: {localWinCount}";
+            return $"已登录：{authenticatedPlayerId}   胜场：{localWinCount}";
         }
 
         public static string BuildSettlementDetail(SessionMode sessionMode, int localScore, int localWinCount, string winnerPlayerId, bool localPlayerWon, ArenaMapVariant mapVariant, ArenaRuleVariant ruleVariant)
         {
-            var modeText = sessionMode == SessionMode.SinglePlayer ? "Single-player" : "Multiplayer";
-            var resultText = localPlayerWon ? "Victory" : "Defeat";
+            var modeText = sessionMode == SessionMode.SinglePlayer ? "单机" : "联机";
+            var resultText = localPlayerWon ? "胜利" : "失败";
             var presetLabel = DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant);
-            var presetLine = sessionMode == SessionMode.SinglePlayer ? $"\nPreset: {presetLabel}" : string.Empty;
-            var followupLine = sessionMode == SessionMode.Multiplayer
-                ? "\nNext: Return to Lobby to start another online match."
-                : $"\nNext: Return to Mode Select or replay {presetLabel}.";
-            return $"Mode: {modeText}{presetLine}\nResult: {resultText}\nWinner: {winnerPlayerId}\nScore: {localScore}\nWins: {localWinCount}{followupLine}";
+            var presetLine = sessionMode == SessionMode.SinglePlayer ? $"\n预设：{presetLabel}" : string.Empty;
+            return $"模式：{modeText}{presetLine}\n结果：{resultText}\n胜者：{winnerPlayerId}\n得分：{localScore}\n胜场：{localWinCount}";
         }
 
         public static string BuildSettlementRewardSummary(SessionMode sessionMode, DotArenaRewardSummary? lastRewardSummary)
@@ -34,71 +31,35 @@ namespace SampleClient.Gameplay
             if (lastRewardSummary == null)
             {
                 return sessionMode == SessionMode.Multiplayer
-                    ? "Rewards: pending profile sync."
-                    : "Rewards: none recorded yet.";
+                    ? "奖励：正在同步。"
+                    : "奖励：本局暂无。";
             }
 
-            return $"Rewards: +{lastRewardSummary.ExperienceGained} XP, +{lastRewardSummary.CurrencyGained} Coins, Level {lastRewardSummary.NewLevel}";
+            return $"奖励：经验 +{lastRewardSummary.ExperienceGained}，金币 +{lastRewardSummary.CurrencyGained}，等级 {lastRewardSummary.NewLevel}";
         }
 
         public static string BuildSettlementTaskSummary(DotArenaMetaState? metaState)
         {
-            if (metaState == null)
-            {
-                return "Tasks: no profile data available.";
-            }
-
-            var readySummary = DotArenaMetaProgression.GetClaimableTaskSummary(metaState);
-            var readyCount = readySummary.TotalClaimableCount;
-            if (readyCount <= 0)
-            {
-                return "Tasks: no claimable tasks right now.";
-            }
-
-            var scopeText = readySummary.DailyClaimableCount > 0 && readySummary.NewPlayerClaimableCount > 0
-                ? $"Daily {readySummary.DailyClaimableCount}, New {readySummary.NewPlayerClaimableCount}"
-                : readySummary.DailyClaimableCount > 0
-                    ? $"Daily {readySummary.DailyClaimableCount}"
-                    : $"New {readySummary.NewPlayerClaimableCount}";
-
-            return $"Tasks: {readyCount} claimable now ({scopeText}).";
+            return string.Empty;
         }
 
         public static string BuildSettlementNextStepSummary(SessionMode sessionMode, ArenaMapVariant mapVariant, ArenaRuleVariant ruleVariant)
         {
             return sessionMode == SessionMode.Multiplayer
-                ? "Next: Return to Lobby, then Start Match to queue again."
-                : $"Next: Return to Mode Select or replay {DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant)}.";
+                ? "下一步：返回大厅后再次开始匹配。"
+                : $"下一步：返回模式选择，或重开 {DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant)}。";
         }
 
         public static string BuildDebugPanelDetail(string status, FrontendFlowState flowState, EntryMenuState entryMenuState, SessionMode sessionMode, string localPlayerId, int lastWorldTick, int viewCount, string localPlayerBuffText, string currentEventMessage, string endpoint, bool isConnected, bool isRealtimeConnected, bool isConnecting)
         {
-            var mode = sessionMode switch
-            {
-                SessionMode.SinglePlayer => "Single-player",
-                SessionMode.Multiplayer => "Multiplayer",
-                _ => "None"
-            };
-
-            return
-                $"Status: {status}\n" +
-                $"Flow: {flowState} / Entry: {entryMenuState}\n" +
-                $"Mode: {mode}\n" +
-                $"Player: {localPlayerId}\n" +
-                $"Hint: W/A/S/D move, eat pellets, avoid larger cells, P debug\n" +
-                $"Tick: {lastWorldTick}\n" +
-                $"Views: {viewCount}\n" +
-                $"Mass: {localPlayerBuffText}\n" +
-                $"Event: {currentEventMessage}\n" +
-                $"Endpoint: {endpoint}\n" +
-                $"Control: {isConnected} / Realtime: {isRealtimeConnected} / Connecting: {isConnecting}";
+            return string.Empty;
         }
 
         public static string BuildMatchmakingDetail(SessionMode sessionMode, ArenaMapVariant mapVariant, ArenaRuleVariant ruleVariant, string status, string currentEventMessage, int elapsedSeconds, bool cancelRequestPending)
         {
             if (sessionMode == SessionMode.SinglePlayer)
             {
-                return $"Preset: {DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant)}\nSpawning the local arena and filling the roster with bots.";
+                return $"预设：{DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant)}\n正在创建本地对局。";
             }
 
             var elapsedText = $"已等待 {FormatElapsedSeconds(elapsedSeconds)}";
@@ -128,12 +89,12 @@ namespace SampleClient.Gameplay
         {
             if (metaState == null)
             {
-                return "Guest profile";
+                return "游客资料";
             }
 
             return isInMultiplayerLobby
-                ? $"{metaState.PlayerId}   Wins {metaState.TotalWins}   Coins {metaState.SoftCurrency}   Online Ready"
-                : $"{metaState.PlayerId}   Lv.{metaState.Level}   XP {metaState.Experience}/{GetMetaNextLevelRequirement(metaState.Level)}   Coins {metaState.SoftCurrency}";
+                ? $"{metaState.PlayerId}   胜场 {metaState.TotalWins}   金币 {metaState.SoftCurrency}   已就绪"
+                : $"{metaState.PlayerId}   等级 {metaState.Level}   经验 {metaState.Experience}/{GetMetaNextLevelRequirement(metaState.Level)}   金币 {metaState.SoftCurrency}";
         }
 
         public static string BuildMetaLobbyHighlights(DotArenaMetaState? metaState, bool isInMultiplayerLobby, SinglePlayerMatchPreset previewPreset)
@@ -143,145 +104,67 @@ namespace SampleClient.Gameplay
                 return string.Empty;
             }
 
-            var readyTaskCount = DotArenaMetaProgression.GetClaimableTaskCount(metaState);
-            var recentSummary = DotArenaMetaProgression.GetRecentMatchSummary(metaState);
-            var recentResult = recentSummary.HasRecord
-                ? $"{recentSummary.Mode} / {recentSummary.Result}"
-                : "No recent result";
-            var shopSummary = DotArenaMetaProgression.GetShopAvailabilitySummary(metaState);
-
             return isInMultiplayerLobby
-                ? $"Ready to match now   |   Recent: {recentResult}   |   Claimable tasks: {readyTaskCount}   |   Shop ready: {shopSummary.AffordableAndUnownedCount}"
-                : $"Next preset: {DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}   |   Recent: {recentResult}   |   Claimable tasks: {readyTaskCount}   |   Shop ready: {shopSummary.AffordableAndUnownedCount}";
+                ? "可以开始匹配"
+                : $"下一预设：{DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}";
         }
 
         public static string BuildMetaProfileDetail(DotArenaMetaState? metaState, bool isInMultiplayerLobby, SinglePlayerMatchPreset previewPreset, DotArenaRewardSummary? lastRewardSummary, string endpoint)
         {
             if (metaState == null)
             {
-                return "No profile data loaded.";
+                return "尚未加载资料。";
             }
 
             var modeLine = isInMultiplayerLobby
-                ? $"Lobby: Multiplayer lobby ready as {metaState.PlayerId}\nAction: Click the bottom '开始匹配' button to enter queue"
-                : $"Next local preset: {DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}";
+                ? $"联机大厅：{metaState.PlayerId} 已就绪\n操作：点击“开始匹配”进入队列"
+                : $"下一本地预设：{DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}";
 
             var lastReward = lastRewardSummary == null
-                ? "No recent reward summary."
-                : $"Last rewards: +{lastRewardSummary.ExperienceGained} XP, +{lastRewardSummary.CurrencyGained} Coins, Level {lastRewardSummary.NewLevel}";
-            return $"Wins: {metaState.TotalWins}\nMatches: {metaState.TotalMatches}\nStreak: {metaState.CurrentLoginStreak}\nEquipped: {metaState.EquippedCosmeticId}\n{modeLine}\n{lastReward}";
+                ? "最近奖励：暂无。"
+                : $"最近奖励：经验 +{lastRewardSummary.ExperienceGained}，金币 +{lastRewardSummary.CurrencyGained}，等级 {lastRewardSummary.NewLevel}";
+            return $"胜场：{metaState.TotalWins}\n对局：{metaState.TotalMatches}\n连续登录：{metaState.CurrentLoginStreak}\n当前皮肤：{metaState.EquippedCosmeticId}\n{modeLine}\n{lastReward}";
         }
 
         public static string BuildMetaTasksDetail(DotArenaMetaState? metaState)
         {
-            if (metaState == null)
-            {
-                return "No tasks available.";
-            }
-
-            var lines = new List<string>();
-            var readySummary = DotArenaMetaProgression.GetClaimableTaskSummary(metaState);
-            lines.Add($"Ready to claim: {readySummary.TotalClaimableCount} (Daily {readySummary.DailyClaimableCount} / New {readySummary.NewPlayerClaimableCount})");
-            foreach (var task in metaState.DailyTasks)
-            {
-                lines.Add($"Daily: {task.Title} ({task.Progress}/{task.Target}) {(task.Claimed ? "[Claimed]" : string.Empty)}".TrimEnd());
-            }
-
-            foreach (var task in metaState.NewPlayerTasks)
-            {
-                lines.Add($"New: {task.Title} ({task.Progress}/{task.Target}) {(task.Claimed ? "[Claimed]" : string.Empty)}".TrimEnd());
-            }
-
-            return lines.Count == 0 ? "No task data." : string.Join("\n", lines);
+            return string.Empty;
         }
 
         public static string BuildMetaShopDetail(DotArenaMetaState? metaState)
         {
-            if (metaState == null)
-            {
-                return "No shop data.";
-            }
-
-            var lines = new List<string>();
-            var availability = DotArenaMetaProgression.GetShopAvailabilitySummary(metaState);
-            var cheapest = availability.CheapestAffordableUnownedItem?.Name ?? "None";
-            lines.Add($"Affordable now: {availability.AffordableAndUnownedCount}");
-            lines.Add($"Cheapest next item: {cheapest}");
-            foreach (var item in DotArenaMetaProgression.GetShopCatalog())
-            {
-                var state = metaState.OwnedCosmeticIds.Contains(item.Id)
-                    ? (metaState.EquippedCosmeticId == item.Id ? "Equipped" : "Owned")
-                    : $"{item.Price} Coins";
-                lines.Add($"{item.Name}: {state}");
-            }
-
-            return string.Join("\n", lines);
+            return string.Empty;
         }
 
         public static string BuildMetaRecordsDetail(DotArenaMetaState? metaState)
         {
-            if (metaState == null || metaState.MatchHistory.Count == 0)
-            {
-                return "No recent matches.";
-            }
-
-            var recent = DotArenaMetaProgression.GetRecentMatchSummary(metaState);
-            var trend = DotArenaMetaProgression.GetRecentMatchTrendSummary(metaState, 5);
-            var lines = new List<string>
-            {
-                "Recent Match",
-                $"Mode: {recent.Mode}",
-                $"Result: {recent.Result}",
-                $"Score: {recent.Score}",
-                $"Winner: {recent.WinnerPlayerId}",
-                string.IsNullOrWhiteSpace(recent.PlayedAtUtcIso) ? "Played: Unknown" : $"Played: {recent.PlayedAtUtcIso[..Math.Min(10, recent.PlayedAtUtcIso.Length)]}",
-                string.Empty,
-                "Trend Summary",
-                $"Window: Last {trend.SampleCount}",
-                $"Form: {trend.FormStrip}",
-                $"Wins / Losses: {trend.WinCount} / {trend.LossCount}",
-                $"Trend: {trend.TrendLabel}",
-                $"Streak: {trend.CurrentStreakType} {trend.CurrentStreak}",
-                $"Avg Score: {trend.AverageScore}",
-                $"Best Score: {trend.BestScore}",
-                string.Empty,
-                "Recent History"
-            };
-
-            var count = Math.Min(5, metaState.MatchHistory.Count);
-            for (var i = 0; i < count; i++)
-            {
-                var record = metaState.MatchHistory[i];
-                var date = record.PlayedAtUtcIso.Length >= 10 ? record.PlayedAtUtcIso[..10] : record.PlayedAtUtcIso;
-                lines.Add($"{date}  {record.Mode}  {record.Result}  Score {record.Score}");
-            }
-
-            return string.Join("\n", lines);
+            return string.Empty;
         }
 
         public static string BuildMetaLeaderboardDetail(DotArenaMetaState? metaState)
         {
             if (metaState == null)
             {
-                return "No leaderboard data.";
+                return "暂无排行榜数据。";
             }
 
             var summary = DotArenaMetaProgression.GetLeaderboardSummary(metaState);
+            var resetText = metaState.LeaderboardSecondsUntilReset > 0
+                ? $"本周剩余：{FormatDurationZh(metaState.LeaderboardSecondsUntilReset)}"
+                : "本周剩余：等待服务器刷新";
             var lines = new List<string>
             {
-                "Leaderboard Summary",
-                summary.PlayerLine,
-                summary.RankLine,
-                summary.TrendLine,
-                summary.FormLine,
+                "排行榜",
+                $"玩家：{metaState.PlayerId} | 胜场：{metaState.TotalWins} | 对局：{metaState.TotalMatches}",
+                resetText,
                 string.Empty,
-                summary.Title
+                "本周排名"
             };
 
             foreach (var entry in summary.Entries)
             {
-                var marker = entry.IsLocalPlayer ? " [You]" : string.Empty;
-                lines.Add($"{entry.Position}. {entry.Name} - {entry.VictoryPoints} VP / {entry.Wins} wins{marker}");
+                var marker = entry.IsLocalPlayer ? "（你）" : string.Empty;
+                lines.Add($"{entry.Position}. {entry.Name} - 胜利积分 {entry.VictoryPoints} / 胜场 {entry.Wins}{marker}");
             }
 
             return string.Join("\n", lines);
@@ -291,22 +174,43 @@ namespace SampleClient.Gameplay
         {
             if (metaState == null)
             {
-                return "No settings loaded.";
+                return "尚未加载设置。";
             }
 
-            return $"Master Volume: {metaState.Settings.MasterVolume:0.0}\nMusic Volume: {metaState.Settings.MusicVolume:0.0}\nSfx Volume: {metaState.Settings.SfxVolume:0.0}\nLanguage: {metaState.Settings.Language}\nFullscreen: {metaState.Settings.Fullscreen}";
+            return $"主音量：{metaState.Settings.MasterVolume:0.0}\n音乐音量：{metaState.Settings.MusicVolume:0.0}\n音效音量：{metaState.Settings.SfxVolume:0.0}\n全屏：{FormatBoolZh(metaState.Settings.Fullscreen)}";
         }
 
         public static string BuildMetaFooterHint(bool isInMultiplayerLobby)
         {
             return isInMultiplayerLobby
                 ? "底部左侧按钮“开始匹配”进入队列，右侧按钮“退出登录”返回模式选择。"
-                : "Use the top tabs to switch sections. Start from Lobby or Tasks.";
+                : "顶部页签可切换资料、排行榜和设置。";
         }
 
         public static string GetRematchButtonLabel(SessionMode sessionMode)
         {
-            return sessionMode == SessionMode.SinglePlayer ? "Play Again" : "Queue Again";
+            return sessionMode == SessionMode.SinglePlayer ? "再来一局" : "再次匹配";
+        }
+
+        private static string FormatDurationZh(int seconds)
+        {
+            var span = TimeSpan.FromSeconds(Math.Max(0, seconds));
+            if (span.TotalDays >= 1d)
+            {
+                return $"{(int)span.TotalDays}天{span.Hours}小时";
+            }
+
+            if (span.TotalHours >= 1d)
+            {
+                return $"{(int)span.TotalHours}小时{span.Minutes}分";
+            }
+
+            return $"{span.Minutes}分";
+        }
+
+        private static string FormatBoolZh(bool value)
+        {
+            return value ? "开" : "关";
         }
 
         public static int GetMetaNextLevelRequirement(int level)

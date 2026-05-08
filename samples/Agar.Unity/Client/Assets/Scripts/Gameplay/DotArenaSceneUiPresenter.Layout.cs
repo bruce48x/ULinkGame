@@ -9,6 +9,163 @@ namespace SampleClient.Gameplay
 {
     internal sealed partial class DotArenaSceneUiPresenter
     {
+        private void EnsureMatchRankingPanel()
+        {
+            if (_sceneUiRoot == null)
+            {
+                return;
+            }
+
+            _matchRankingPanel = FindSceneUiObject("SceneUI/MatchRankingPanel");
+            if (_matchRankingPanel == null)
+            {
+                _matchRankingPanel = new GameObject("MatchRankingPanel", typeof(RectTransform), typeof(Image));
+                _matchRankingPanel.transform.SetParent(_sceneUiRoot.transform, false);
+            }
+
+            EnsureMatchRankingPanelContents();
+            _matchRankingPanel.SetActive(false);
+        }
+
+        private void EnsureMatchRankingPanelContents()
+        {
+            if (_matchRankingPanel == null)
+            {
+                return;
+            }
+
+            var panelRect = (RectTransform)_matchRankingPanel.transform;
+            panelRect.anchorMin = new Vector2(1f, 0.5f);
+            panelRect.anchorMax = new Vector2(1f, 0.5f);
+            panelRect.pivot = new Vector2(1f, 0.5f);
+            panelRect.anchoredPosition = new Vector2(-18f, 0f);
+            panelRect.sizeDelta = new Vector2(260f, 390f);
+
+            _matchRankingTitleText = EnsureMatchRankingText(
+                _matchRankingPanel.transform,
+                "TitleText",
+                new Vector2(0f, -16f),
+                new Vector2(220f, 28f),
+                18f,
+                FontStyles.Bold,
+                TextAlignmentOptions.Center);
+            _matchRankingHeaderText = EnsureMatchRankingText(
+                _matchRankingPanel.transform,
+                "HeaderText",
+                new Vector2(0f, -48f),
+                new Vector2(224f, 20f),
+                12f,
+                FontStyles.Bold,
+                TextAlignmentOptions.Center);
+
+            _matchRankingRows.Clear();
+            for (var i = 0; i < MatchRankingMaxRows; i++)
+            {
+                _matchRankingRows.Add(EnsureMatchRankingRow(i));
+            }
+        }
+
+        private TMP_Text EnsureMatchRankingText(
+            Transform parent,
+            string name,
+            Vector2 anchoredPosition,
+            Vector2 size,
+            float fontSize,
+            FontStyles fontStyles,
+            TextAlignmentOptions alignment)
+        {
+            var text = FindSceneUiText($"SceneUI/MatchRankingPanel/{name}");
+            if (text == null)
+            {
+                var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+                textObject.transform.SetParent(parent, false);
+                text = textObject.GetComponent<TextMeshProUGUI>();
+                text.font = _tmpFontAsset ??= LoadTmpFontAsset();
+            }
+
+            var rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            text.fontSize = fontSize;
+            text.fontStyle = fontStyles;
+            text.alignment = alignment;
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.richText = false;
+            return text;
+        }
+
+        private MatchRankingRowUi EnsureMatchRankingRow(int index)
+        {
+            var rowName = $"Row{index + 1}";
+            var rowTransform = _matchRankingPanel!.transform.Find(rowName);
+            GameObject rowObject;
+            if (rowTransform == null)
+            {
+                rowObject = new GameObject(rowName, typeof(RectTransform), typeof(Image));
+                rowObject.transform.SetParent(_matchRankingPanel.transform, false);
+            }
+            else
+            {
+                rowObject = rowTransform.gameObject;
+            }
+
+            var rect = (RectTransform)rowObject.transform;
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -76f - (index * 29f));
+            rect.sizeDelta = new Vector2(224f, 24f);
+
+            var background = rowObject.GetComponent<Image>();
+            if (background == null)
+            {
+                background = rowObject.AddComponent<Image>();
+            }
+
+            background.raycastTarget = false;
+
+            var rankText = EnsureMatchRankingRowText(rowObject.transform, "RankText", 0f, 34f, TextAlignmentOptions.Left);
+            var nameText = EnsureMatchRankingRowText(rowObject.transform, "NameText", 36f, 92f, TextAlignmentOptions.Left);
+            var massText = EnsureMatchRankingRowText(rowObject.transform, "MassText", 130f, 50f, TextAlignmentOptions.Right);
+            var scoreText = EnsureMatchRankingRowText(rowObject.transform, "ScoreText", 184f, 38f, TextAlignmentOptions.Right);
+            return new MatchRankingRowUi(rowObject, background, rankText, nameText, massText, scoreText);
+        }
+
+        private TMP_Text EnsureMatchRankingRowText(Transform parent, string name, float x, float width, TextAlignmentOptions alignment)
+        {
+            var textTransform = parent.Find(name);
+            TMP_Text text;
+            if (textTransform == null)
+            {
+                var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+                textObject.transform.SetParent(parent, false);
+                text = textObject.GetComponent<TextMeshProUGUI>();
+                text.font = _tmpFontAsset ??= LoadTmpFontAsset();
+            }
+            else
+            {
+                text = textTransform.GetComponent<TMP_Text>();
+            }
+
+            var rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            rect.sizeDelta = new Vector2(width, 20f);
+            text.fontSize = 12f;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = alignment;
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.richText = false;
+            return text;
+        }
+
         private void EnsureHudCountdownText()
         {
             var parent = OverlayLayer != null ? OverlayLayer.transform : _sceneUiRoot?.transform;
@@ -166,12 +323,12 @@ namespace SampleClient.Gameplay
 
             EnsureLobbyTextElement("TitleText", new Vector2(0f, -22f), new Vector2(720f, 38f), 24f, FontStyles.Bold, TextAlignmentOptions.Center);
             EnsureLobbyTextElement("SummaryText", new Vector2(0f, -72f), new Vector2(980f, 30f), 14f, FontStyles.Normal, TextAlignmentOptions.Center);
-            EnsureLobbyButtonElement("ProfileButton", new Vector2(-300f, -128f), new Vector2(120f, 34f), "Profile");
-            EnsureLobbyButtonElement("TasksButton", new Vector2(-180f, -128f), new Vector2(110f, 34f), "Tasks");
-            EnsureLobbyButtonElement("ShopButton", new Vector2(-60f, -128f), new Vector2(110f, 34f), "Shop");
-            EnsureLobbyButtonElement("RecordsButton", new Vector2(60f, -128f), new Vector2(110f, 34f), "Records");
-            EnsureLobbyButtonElement("LeaderboardButton", new Vector2(190f, -128f), new Vector2(130f, 34f), "Board");
-            EnsureLobbyButtonElement("SettingsButton", new Vector2(330f, -128f), new Vector2(130f, 34f), "Settings");
+            EnsureLobbyButtonElement("ProfileButton", new Vector2(-300f, -128f), new Vector2(120f, 34f), "资料");
+            EnsureLobbyButtonElement("TasksButton", new Vector2(-180f, -128f), new Vector2(110f, 34f), string.Empty);
+            EnsureLobbyButtonElement("ShopButton", new Vector2(-60f, -128f), new Vector2(110f, 34f), string.Empty);
+            EnsureLobbyButtonElement("RecordsButton", new Vector2(60f, -128f), new Vector2(110f, 34f), string.Empty);
+            EnsureLobbyButtonElement("LeaderboardButton", new Vector2(190f, -128f), new Vector2(130f, 34f), "排行榜");
+            EnsureLobbyButtonElement("SettingsButton", new Vector2(330f, -128f), new Vector2(130f, 34f), "设置");
             EnsureLobbyTextElement("HighlightsText", new Vector2(0f, -184f), new Vector2(980f, 56f), 14f, FontStyles.Bold, TextAlignmentOptions.Center);
             EnsureLobbyTextElement("QuickActionsText", new Vector2(-410f, -250f), new Vector2(220f, 28f), 13f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             EnsureLobbyButtonElement("QuickActionButton1", new Vector2(-220f, -246f), new Vector2(180f, 40f), "Action");
@@ -244,6 +401,13 @@ namespace SampleClient.Gameplay
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = size;
+
+            var text = FindSceneUiText($"SceneUI/LobbyPanel/{name}/Label");
+            if (text != null)
+            {
+                StretchButtonLabel(text.rectTransform);
+                text.text = label;
+            }
         }
     }
 }

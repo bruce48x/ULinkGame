@@ -2,7 +2,6 @@
 
 using System.Collections.Generic;
 using TMPro;
-using ULinkRPC.Client;
 using UnityEngine;
 using static SampleClient.Gameplay.DotArenaTuning;
 
@@ -32,7 +31,7 @@ namespace SampleClient.Gameplay
             IReadOnlyDictionary<string, PlayerRenderState> renderStates)
         {
             const float width = 400f;
-            const float height = 160f;
+            const float height = 128f;
 
             var boxRect = new Rect(16f, 16f, width, height);
             var contentRect = new Rect(28f, 24f, width - 24f, height - 16f);
@@ -55,20 +54,17 @@ namespace SampleClient.Gameplay
                 normal = { textColor = new Color(0.86f, 0.91f, 0.96f, 1f) }
             };
 
-            GUI.Label(new Rect(contentRect.x, contentRect.y, contentRect.width, 24f), "ULinkRPC Dot Arena", titleStyle);
+            GUI.Label(new Rect(contentRect.x, contentRect.y, contentRect.width, 24f), "点阵竞技场", titleStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 24f, contentRect.width, 18f), $"状态: {snapshot.Status}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 44f, contentRect.width, 18f),
                 $"玩家: {(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   分数/质量: {snapshot.LocalPlayerScoreText}   胜场: {snapshot.LocalWinCount}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 64f, contentRect.width, 18f),
-                $"服务端 Tick: {snapshot.LastWorldTick}   同步人数: {views.Count}   状态: {snapshot.LocalPlayerBuffText}", bodyStyle);
+                $"场上人数: {views.Count}   状态: {snapshot.LocalPlayerBuffText}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 84f, contentRect.width, 18f),
                 snapshot.SessionMode == SessionMode.SinglePlayer
                     ? "模式: 本地单机"
-                    : $"地址: {Rpc.WebSocketRpcClientFactory.BuildUrl(snapshot.Host, snapshot.Port, snapshot.Path)}", bodyStyle);
-
+                    : "模式: 联机对局", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 104f, contentRect.width, 18f),
-                "W/A/S/D 移动。吃豆成长，躲开更大的球，主动吞掉更小的球。", bodyStyle);
-            GUI.Label(new Rect(contentRect.x, contentRect.y + 124f, contentRect.width, 18f),
                 $"事件: {snapshot.EventMessage}", bodyStyle);
 
             DrawPlayerOverlays(views, renderStates);
@@ -132,7 +128,7 @@ namespace SampleClient.Gameplay
                 var scoreRect = new Rect(centerX - (labelWidth * 0.5f), centerY + (scoreHeight * 0.05f), labelWidth, scoreHeight);
 
                 GUI.Label(nameRect, entry.Key, nameStyle);
-                GUI.Label(scoreRect, $"mass: {DotArenaPresentation.FormatMass(renderState.Mass)}", scoreStyle);
+                GUI.Label(scoreRect, $"质量: {DotArenaPresentation.FormatMass(renderState.Mass)}", scoreStyle);
             }
         }
     }

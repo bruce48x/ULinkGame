@@ -76,7 +76,7 @@ namespace SampleClient.Gameplay
                 }
 
                 _owner._entryMenuState = EntryMenuState.MultiplayerAuth;
-                _owner._status = "Enter account credentials";
+                _owner._status = "请输入账号信息";
                 _owner._eventMessage = "点击匹配开始联机";
                 RefreshSceneUi();
             }
@@ -182,12 +182,6 @@ namespace SampleClient.Gameplay
                     case MetaTab.Lobby:
                         HandleLobbyPresetAction(isPrimaryAction);
                         break;
-                    case MetaTab.Tasks:
-                        HandleTaskLobbyAction(isPrimaryAction);
-                        break;
-                    case MetaTab.Shop:
-                        HandleShopLobbyAction(isPrimaryAction);
-                        break;
                     case MetaTab.Settings:
                         HandleSettingsLobbyAction(isPrimaryAction);
                         break;
@@ -213,12 +207,12 @@ namespace SampleClient.Gameplay
                 if (!isPrimaryAction)
                 {
                     var previewPreset = DotArenaSinglePlayerCatalog.PeekPreset(_owner._singlePlayerPlaylistIndex);
-                    _owner.PushEvent($"Next local preset: {DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}", 4f);
+                    _owner.PushEvent($"下一本地预设：{DotArenaSinglePlayerCatalog.GetPresetLabel(previewPreset.MapVariant, previewPreset.RuleVariant)}", 4f);
                     return;
                 }
 
                 var selectedPreset = DotArenaSinglePlayerCatalog.AdvancePresetSelection(ref _owner._singlePlayerPlaylistIndex);
-                _owner.PushEvent($"Preset switched to {DotArenaSinglePlayerCatalog.GetPresetLabel(selectedPreset.MapVariant, selectedPreset.RuleVariant)}", 4f);
+                _owner.PushEvent($"已切换预设：{DotArenaSinglePlayerCatalog.GetPresetLabel(selectedPreset.MapVariant, selectedPreset.RuleVariant)}", 4f);
             }
 
             public bool IsInMultiplayerLobby()
@@ -260,65 +254,6 @@ namespace SampleClient.Gameplay
                 }
             }
 
-            public void HandleTaskLobbyAction(bool isPrimaryAction)
-            {
-                if (_owner._metaState == null)
-                {
-                    return;
-                }
-
-                var task = FindReadyTask(isPrimaryAction ? _owner._metaState.DailyTasks : _owner._metaState.NewPlayerTasks)
-                    ?? FindReadyTask(isPrimaryAction ? _owner._metaState.NewPlayerTasks : _owner._metaState.DailyTasks);
-                if (task == null)
-                {
-                    _owner.PushEvent("No claimable task right now.");
-                    return;
-                }
-
-                if (DotArenaMetaProgression.TryClaimTaskById(_owner._metaState, task.TaskId))
-                {
-                    _owner.PushEvent($"Claimed task: {task.Title}");
-                }
-            }
-
-            public void HandleShopLobbyAction(bool isPrimaryAction)
-            {
-                if (_owner._metaState == null)
-                {
-                    return;
-                }
-
-                if (isPrimaryAction)
-                {
-                    foreach (var item in DotArenaMetaProgression.GetShopCatalog())
-                    {
-                        if (_owner._metaState.OwnedCosmeticIds.Contains(item.Id))
-                        {
-                            continue;
-                        }
-
-                        if (DotArenaMetaProgression.TryPurchaseAndOptionallyEquip(_owner._metaState, item.Id, false))
-                        {
-                            _owner.PushEvent($"Purchased {item.Name}");
-                            return;
-                        }
-                    }
-
-                    _owner.PushEvent("No affordable cosmetic available.");
-                    return;
-                }
-
-                var nextOwnedCosmeticId = GetNextOwnedCosmeticId();
-                if (nextOwnedCosmeticId.Length == 0)
-                {
-                    _owner.PushEvent("No owned cosmetic to equip.");
-                    return;
-                }
-
-                DotArenaMetaProgression.Equip(_owner._metaState, nextOwnedCosmeticId);
-                _owner.PushEvent($"Equipped {nextOwnedCosmeticId}");
-            }
-
             public void HandleSettingsLobbyAction(bool isPrimaryAction)
             {
                 if (_owner._metaState == null)
@@ -333,31 +268,14 @@ namespace SampleClient.Gameplay
                         : "zh-CN";
                     if (DotArenaMetaProgression.SetLanguage(_owner._metaState, nextLanguage))
                     {
-                        _owner.PushEvent($"Language set to {nextLanguage}");
+                        _owner.PushEvent($"语言已切换为 {nextLanguage}");
                     }
 
                     return;
                 }
 
                 var fullscreen = DotArenaMetaProgression.ToggleFullscreen(_owner._metaState);
-                _owner.PushEvent(fullscreen ? "Fullscreen enabled" : "Fullscreen disabled");
-            }
-
-            public string GetNextOwnedCosmeticId()
-            {
-                if (_owner._metaState == null || _owner._metaState.OwnedCosmeticIds.Count == 0)
-                {
-                    return string.Empty;
-                }
-
-                var ownedCosmetics = _owner._metaState.OwnedCosmeticIds;
-                var currentIndex = ownedCosmetics.IndexOf(_owner._metaState.EquippedCosmeticId);
-                if (currentIndex < 0)
-                {
-                    return ownedCosmetics[0];
-                }
-
-                return ownedCosmetics[(currentIndex + 1) % ownedCosmetics.Count];
+                _owner.PushEvent(fullscreen ? "已开启全屏" : "已关闭全屏");
             }
 
             public DotArenaSceneUiSnapshot BuildSceneUiSnapshot()
@@ -405,6 +323,7 @@ namespace SampleClient.Gameplay
                     Path = _owner._path,
                     CurrentEventMessage = currentEventMessage,
                     LastRoundRemainingSeconds = _owner._lastRoundRemainingSeconds,
+                    MatchRankingEntries = BuildMatchRankingEntries(),
                     MenuLoginStatusText = _owner.GetMenuLoginStatusText(),
                     IsConnecting = _owner.IsConnecting,
                     IsBusy = _owner.IsUiBusy,
@@ -417,7 +336,7 @@ namespace SampleClient.Gameplay
                         ? string.Empty
                         : DotArenaUiTextComposer.GetRematchButtonLabel(settlementSummary.SessionMode),
                     MatchmakingTitle = _owner._sessionMode == SessionMode.SinglePlayer
-                        ? "Preparing Local Match"
+                        ? "准备本地对局"
                         : _owner._flowState == FrontendFlowState.Matchmaking
                             ? "正在排队"
                             : "联机大厅",
@@ -442,18 +361,44 @@ namespace SampleClient.Gameplay
                 };
             }
 
-            private static DotArenaTaskProgress? FindReadyTask(List<DotArenaTaskProgress> tasks)
+            private List<DotArenaMatchRankingEntry> BuildMatchRankingEntries()
             {
-                foreach (var task in tasks)
+                var rankedStates = new List<KeyValuePair<string, PlayerRenderState>>(_owner._renderStates);
+                rankedStates.Sort(static (left, right) =>
                 {
-                    if (!task.Claimed && task.Progress >= task.Target)
+                    var massCompare = NormalizeRankingMass(right.Value.Mass).CompareTo(NormalizeRankingMass(left.Value.Mass));
+                    if (massCompare != 0)
                     {
-                        return task;
+                        return massCompare;
                     }
+
+                    var scoreCompare = right.Value.Score.CompareTo(left.Value.Score);
+                    return scoreCompare != 0
+                        ? scoreCompare
+                        : StringComparer.Ordinal.Compare(left.Key, right.Key);
+                });
+
+                var entries = new List<DotArenaMatchRankingEntry>(rankedStates.Count);
+                for (var i = 0; i < rankedStates.Count; i++)
+                {
+                    var playerId = rankedStates[i].Key;
+                    var renderState = rankedStates[i].Value;
+                    entries.Add(new DotArenaMatchRankingEntry(
+                        i + 1,
+                        playerId,
+                        NormalizeRankingMass(renderState.Mass),
+                        renderState.Score,
+                        string.Equals(playerId, _owner._localPlayerId, StringComparison.Ordinal)));
                 }
 
-                return null;
+                return entries;
             }
+
+            private static float NormalizeRankingMass(float mass)
+            {
+                return float.IsNaN(mass) || float.IsInfinity(mass) ? 0f : mass;
+            }
+
         }
     }
 }

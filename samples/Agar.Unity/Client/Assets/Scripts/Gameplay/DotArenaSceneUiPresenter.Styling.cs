@@ -45,6 +45,7 @@ namespace SampleClient.Gameplay
         private void ApplySceneUiTheme()
         {
             StylePanelImage(_hudPanel, Color.clear);
+            StylePanelImage(_matchRankingPanel, UiPanelBackgroundColor);
             StylePanelImage(_debugPanel, UiPanelBackgroundColor);
             StylePanelImage(_entryPanel, UiPanelBackgroundColor);
             StylePanelImage(_matchmakingPanel, UiPanelBackgroundColor);
@@ -61,6 +62,16 @@ namespace SampleClient.Gameplay
             StyleText(_hudHintText, UiMutedTextColor, 1f, false, TextAlignmentOptions.TopLeft, TextOverflowModes.Ellipsis);
             StyleText(_hudEventText, UiMutedTextColor, 1f, false, TextAlignmentOptions.TopLeft, TextOverflowModes.Ellipsis);
             StyleText(_hudCountdownText, UiAccentTextColor, 18f, false, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+            StyleText(_matchRankingTitleText, UiAccentTextColor, 18f, false, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+            StyleText(_matchRankingHeaderText, UiMutedTextColor, 12f, false, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+            foreach (var row in _matchRankingRows)
+            {
+                StyleText(row.RankText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Left, TextOverflowModes.Ellipsis);
+                StyleText(row.NameText, UiPrimaryTextColor, 12f, false, TextAlignmentOptions.Left, TextOverflowModes.Ellipsis);
+                StyleText(row.MassText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Right, TextOverflowModes.Ellipsis);
+                StyleText(row.ScoreText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Right, TextOverflowModes.Ellipsis);
+            }
+
             StyleText(_debugTitleText, UiAccentTextColor, 16f, false, TextAlignmentOptions.TopLeft, TextOverflowModes.Ellipsis);
             StyleText(_debugDetailText, UiSecondaryTextColor, 12f, true, TextAlignmentOptions.TopLeft, TextOverflowModes.Overflow);
 
@@ -120,7 +131,6 @@ namespace SampleClient.Gameplay
 
             StyleInputField(_accountInputField);
             StyleInputField(_passwordInputField);
-            ApplyButtonIcon(_lobbyShopButton, _shopIconSprite);
             ApplyButtonIcon(_lobbyLeaderboardButton, _leaderboardIconSprite);
         }
 
@@ -266,7 +276,6 @@ namespace SampleClient.Gameplay
             _uiButtonNormalSprite = null;
             _uiButtonPressedSprite = null;
             _uiBackgroundSprite = null;
-            _shopIconSprite = null;
             _leaderboardIconSprite = null;
 
 #if UNITY_EDITOR
@@ -274,7 +283,6 @@ namespace SampleClient.Gameplay
             _uiPanelSprite = TryLoadSceneUiSprite("UI panel", "Assets/Art/UI/UI_Panel_Dark_01.png");
             _uiButtonNormalSprite = TryLoadSceneUiSprite("UI button normal", "Assets/Art/UI/UI_Button_Primary_Normal.png");
             _uiButtonPressedSprite = TryLoadSceneUiSprite("UI button pressed", "Assets/Art/UI/UI_Button_Primary_Pressed.png");
-            _shopIconSprite = TryLoadSceneUiSprite("shop icon", "Assets/Art/Icons/Icon_Shop_01.png");
             _leaderboardIconSprite = TryLoadSceneUiSprite("leaderboard icon", "Assets/Art/Icons/Icon_Leaderboard_01.png");
 #endif
         }

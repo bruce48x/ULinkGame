@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using TMPro;
 using ULinkRPC.Client;
 using UnityEngine;
@@ -52,14 +53,36 @@ namespace SampleClient.Gameplay
         public string MetaLeaderboardDetail { get; set; }
         public string MetaSettingsDetail { get; set; }
         public string MetaFooterHint { get; set; }
+        public IReadOnlyList<DotArenaMatchRankingEntry>? MatchRankingEntries { get; set; }
+    }
+
+    internal readonly struct DotArenaMatchRankingEntry
+    {
+        public DotArenaMatchRankingEntry(int rank, string playerId, float mass, int score, bool isLocalPlayer)
+        {
+            Rank = rank;
+            PlayerId = playerId;
+            Mass = mass;
+            Score = score;
+            IsLocalPlayer = isLocalPlayer;
+        }
+
+        public int Rank { get; }
+        public string PlayerId { get; }
+        public float Mass { get; }
+        public int Score { get; }
+        public bool IsLocalPlayer { get; }
     }
 
     internal sealed partial class DotArenaSceneUiPresenter
     {
+        private const int MatchRankingMaxRows = 10;
+
         private Transform? _owner;
         private GameObject? _sceneUiRoot;
         private GameObject? _menuBackground;
         private GameObject? _hudPanel;
+        private GameObject? _matchRankingPanel;
         private GameObject? _debugPanel;
         private GameObject? _entryPanel;
         private GameObject? _matchmakingPanel;
@@ -102,6 +125,8 @@ namespace SampleClient.Gameplay
         private TMP_Text? _hudHintText;
         private TMP_Text? _hudEventText;
         private TMP_Text? _hudCountdownText;
+        private TMP_Text? _matchRankingTitleText;
+        private TMP_Text? _matchRankingHeaderText;
         private TMP_Text? _debugTitleText;
         private TMP_Text? _debugDetailText;
         private TMP_Text? _entryTitleText;
@@ -140,9 +165,9 @@ namespace SampleClient.Gameplay
         private Sprite? _uiButtonNormalSprite;
         private Sprite? _uiButtonPressedSprite;
         private Sprite? _uiBackgroundSprite;
-        private Sprite? _shopIconSprite;
         private Sprite? _leaderboardIconSprite;
         private readonly DotArenaSceneLobbyUiCoordinator _lobbyUi = new();
+        private readonly List<MatchRankingRowUi> _matchRankingRows = new();
 
         public bool HasSceneUi => _sceneUiRoot != null;
 
@@ -177,6 +202,8 @@ namespace SampleClient.Gameplay
 
             OverlayLayer = FindSceneUiRect("SceneUI/OverlayLayer");
             _hudPanel = FindSceneUiObject("SceneUI/HUDPanel");
+            EnsureMatchRankingPanel();
+            _matchRankingPanel = FindSceneUiObject("SceneUI/MatchRankingPanel");
             EnsureDebugPanel();
             _debugPanel = FindSceneUiObject("SceneUI/DebugPanel");
             _entryPanel = FindSceneUiObject("SceneUI/EntryPanel");
@@ -203,6 +230,8 @@ namespace SampleClient.Gameplay
             _hudCountdownText = FindSceneUiText("SceneUI/OverlayLayer/CountdownText")
                 ?? FindSceneUiText("SceneUI/CountdownText")
                 ?? FindSceneUiText("SceneUI/HUDPanel/CountdownText");
+            _matchRankingTitleText = FindSceneUiText("SceneUI/MatchRankingPanel/TitleText");
+            _matchRankingHeaderText = FindSceneUiText("SceneUI/MatchRankingPanel/HeaderText");
             _debugTitleText = FindSceneUiText("SceneUI/DebugPanel/TitleText");
             _debugDetailText = FindSceneUiText("SceneUI/DebugPanel/DetailText");
             EnsureHudCountdownText();
@@ -237,6 +266,9 @@ namespace SampleClient.Gameplay
             _lobbyRecordsButton = FindSceneUiButton("SceneUI/LobbyPanel/RecordsButton");
             _lobbyLeaderboardButton = FindSceneUiButton("SceneUI/LobbyPanel/LeaderboardButton");
             _lobbySettingsButton = FindSceneUiButton("SceneUI/LobbyPanel/SettingsButton");
+            HideDeprecatedLobbyButton(_lobbyTasksButton);
+            HideDeprecatedLobbyButton(_lobbyShopButton);
+            HideDeprecatedLobbyButton(_lobbyRecordsButton);
 
             _multiplayerSubtitleText = FindSceneUiText("SceneUI/EntryPanel/MultiplayerPanel/SubtitleText");
             _accountLabelText = FindSceneUiText("SceneUI/EntryPanel/MultiplayerPanel/AccountLabel");
@@ -318,9 +350,6 @@ namespace SampleClient.Gameplay
             }
 
             _lobbyUi.BindLobbyTabButton(_lobbyProfileButton, MetaTab.Lobby);
-            _lobbyUi.BindLobbyTabButton(_lobbyTasksButton, MetaTab.Tasks);
-            _lobbyUi.BindLobbyTabButton(_lobbyShopButton, MetaTab.Shop);
-            _lobbyUi.BindLobbyTabButton(_lobbyRecordsButton, MetaTab.Records);
             _lobbyUi.BindLobbyTabButton(_lobbyLeaderboardButton, MetaTab.Leaderboard);
             _lobbyUi.BindLobbyTabButton(_lobbySettingsButton, MetaTab.Settings);
 
@@ -356,5 +385,35 @@ namespace SampleClient.Gameplay
             }
         }
 
+        private static void HideDeprecatedLobbyButton(Button? button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.onClick.RemoveAllListeners();
+            button.gameObject.SetActive(false);
+        }
+
+        private sealed class MatchRankingRowUi
+        {
+            public MatchRankingRowUi(GameObject root, Image background, TMP_Text rankText, TMP_Text nameText, TMP_Text massText, TMP_Text scoreText)
+            {
+                Root = root;
+                Background = background;
+                RankText = rankText;
+                NameText = nameText;
+                MassText = massText;
+                ScoreText = scoreText;
+            }
+
+            public GameObject Root { get; }
+            public Image Background { get; }
+            public TMP_Text RankText { get; }
+            public TMP_Text NameText { get; }
+            public TMP_Text MassText { get; }
+            public TMP_Text ScoreText { get; }
+        }
     }
 }

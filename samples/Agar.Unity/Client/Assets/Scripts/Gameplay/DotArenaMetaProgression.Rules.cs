@@ -195,16 +195,6 @@ namespace SampleClient.Gameplay
                 state.MatchHistory.RemoveRange(20, state.MatchHistory.Count - 20);
             }
 
-            IncrementTask(state, "daily_play_matches", 1);
-            IncrementTask(state, "daily_collect_score", Math.Max(1, score));
-            if (won)
-            {
-                IncrementTask(state, "daily_get_win", 1);
-                IncrementTask(state, "newbie_first_win", 1);
-            }
-            IncrementTask(state, "newbie_play_match", 1);
-            IncrementTask(state, "newbie_score_points", Math.Max(1, score));
-
             Save(state);
             return new DotArenaRewardSummary
             {
@@ -213,25 +203,6 @@ namespace SampleClient.Gameplay
                 ClaimedFirstWinReward = claimedFirstWin,
                 NewLevel = state.Level
             };
-        }
-
-        private static void IncrementTask(DotArenaMetaState state, string taskId, int value)
-        {
-            foreach (var task in state.DailyTasks)
-            {
-                if (task.TaskId == taskId && !task.Claimed)
-                {
-                    task.Progress = Math.Min(task.Target, task.Progress + value);
-                }
-            }
-
-            foreach (var task in state.NewPlayerTasks)
-            {
-                if (task.TaskId == taskId && !task.Claimed)
-                {
-                    task.Progress = Math.Min(task.Target, task.Progress + value);
-                }
-            }
         }
 
         public static bool ClaimTask(DotArenaMetaState state, string taskId)

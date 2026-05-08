@@ -342,7 +342,7 @@ namespace SampleClient.Gameplay
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(420f, 372f);
+            panelRect.sizeDelta = new Vector2(460f, 430f);
             EnsureSettlementPanelContents();
             _settlementPanel.SetActive(false);
         }
@@ -355,41 +355,76 @@ namespace SampleClient.Gameplay
             }
 
             var panelRect = (RectTransform)_settlementPanel.transform;
-            panelRect.sizeDelta = new Vector2(420f, 372f);
+            panelRect.sizeDelta = new Vector2(460f, 430f);
 
-            if (FindSceneUiText("SceneUI/SettlementPanel/TitleText") == null)
-            {
-                CreateSettlementText(_settlementPanel.transform, "TitleText", new Vector2(0f, -18f), new Vector2(340f, 32f), 22f, FontStyles.Bold);
-            }
-
-            if (FindSceneUiText("SceneUI/SettlementPanel/DetailText") == null)
-            {
-                CreateSettlementText(_settlementPanel.transform, "DetailText", new Vector2(0f, -58f), new Vector2(340f, 72f), 12f, FontStyles.Normal);
-            }
-
-            if (FindSceneUiText("SceneUI/SettlementPanel/RewardText") == null)
-            {
-                CreateSettlementText(_settlementPanel.transform, "RewardText", new Vector2(0f, -138f), new Vector2(340f, 42f), 13f, FontStyles.Normal);
-            }
-
-            if (FindSceneUiText("SceneUI/SettlementPanel/TaskText") == null)
-            {
-                CreateSettlementText(_settlementPanel.transform, "TaskText", new Vector2(0f, -182f), new Vector2(340f, 42f), 13f, FontStyles.Normal);
-            }
-
-            if (FindSceneUiText("SceneUI/SettlementPanel/NextStepText") == null)
-            {
-                CreateSettlementText(_settlementPanel.transform, "NextStepText", new Vector2(0f, -226f), new Vector2(340f, 42f), 13f, FontStyles.Normal);
-            }
+            EnsureSettlementText("TitleText", new Vector2(0f, -18f), new Vector2(360f, 32f), 22f, FontStyles.Bold);
+            EnsureSettlementText("DetailText", new Vector2(0f, -58f), new Vector2(360f, 122f), 12f, FontStyles.Normal);
+            EnsureSettlementText("RewardText", new Vector2(0f, -190f), new Vector2(360f, 34f), 13f, FontStyles.Normal);
+            EnsureSettlementText("TaskText", new Vector2(0f, -230f), new Vector2(360f, 1f), 1f, FontStyles.Normal);
+            EnsureSettlementText("NextStepText", new Vector2(0f, -250f), new Vector2(360f, 42f), 13f, FontStyles.Normal);
 
             if (FindSceneUiButton("SceneUI/SettlementPanel/PrimaryButton") == null)
             {
-                CreateSettlementButton(_settlementPanel.transform, "PrimaryButton", new Vector2(0f, -286f), new Vector2(260f, 32f), "Play Again");
+                CreateSettlementButton(_settlementPanel.transform, "PrimaryButton", new Vector2(0f, -330f), new Vector2(260f, 32f), "再来一局");
             }
 
             if (FindSceneUiButton("SceneUI/SettlementPanel/SecondaryButton") == null)
             {
-                CreateSettlementButton(_settlementPanel.transform, "SecondaryButton", new Vector2(0f, -328f), new Vector2(260f, 32f), "Return to Lobby");
+                CreateSettlementButton(_settlementPanel.transform, "SecondaryButton", new Vector2(0f, -372f), new Vector2(260f, 32f), "返回大厅");
+            }
+
+            LayoutSettlementButton("PrimaryButton", new Vector2(0f, -330f), new Vector2(260f, 32f), "再来一局");
+            LayoutSettlementButton("SecondaryButton", new Vector2(0f, -372f), new Vector2(260f, 32f), "返回大厅");
+        }
+
+        private void EnsureSettlementText(string name, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyles)
+        {
+            var text = FindSceneUiText($"SceneUI/SettlementPanel/{name}");
+            if (text == null)
+            {
+                CreateSettlementText(_settlementPanel!.transform, name, anchoredPosition, size, fontSize, fontStyles);
+                text = FindSceneUiText($"SceneUI/SettlementPanel/{name}");
+            }
+
+            if (text == null)
+            {
+                return;
+            }
+
+            var rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            text.fontSize = fontSize;
+            text.fontStyle = fontStyles;
+            text.alignment = TextAlignmentOptions.Center;
+        }
+
+        private void LayoutSettlementButton(string name, Vector2 anchoredPosition, Vector2 size, string label)
+        {
+            var button = FindSceneUiButton($"SceneUI/SettlementPanel/{name}");
+            if (button == null)
+            {
+                return;
+            }
+
+            var rect = button.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = new Vector2(0.5f, 1f);
+                rect.anchorMax = new Vector2(0.5f, 1f);
+                rect.pivot = new Vector2(0.5f, 1f);
+                rect.anchoredPosition = anchoredPosition;
+                rect.sizeDelta = size;
+            }
+
+            var text = FindSceneUiText($"SceneUI/SettlementPanel/{name}/Label");
+            if (text != null)
+            {
+                StretchButtonLabel(text.rectTransform);
+                text.text = label;
             }
         }
 
@@ -416,7 +451,7 @@ namespace SampleClient.Gameplay
 
             CreateSettlementText(_matchmakingPanel.transform, "TitleText", new Vector2(0f, -18f), new Vector2(340f, 32f), 22f, FontStyles.Bold);
             CreateSettlementText(_matchmakingPanel.transform, "DetailText", new Vector2(0f, -62f), new Vector2(340f, 100f), 13f, FontStyles.Normal);
-            CreateSettlementButton(_matchmakingPanel.transform, "CancelButton", new Vector2(0f, -188f), new Vector2(260f, 32f), "Cancel");
+            CreateSettlementButton(_matchmakingPanel.transform, "CancelButton", new Vector2(0f, -188f), new Vector2(260f, 32f), "取消匹配");
             _matchmakingPanel.SetActive(false);
         }
 

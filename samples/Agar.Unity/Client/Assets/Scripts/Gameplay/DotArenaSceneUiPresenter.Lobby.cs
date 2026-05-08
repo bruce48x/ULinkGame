@@ -24,7 +24,7 @@ namespace SampleClient.Gameplay
             }
 
             button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(() => SelectedTab = tab);
+            button.onClick.AddListener(() => SelectedTab = NormalizeTab(tab));
         }
 
         public void BindLobbyQuickActionButton(Button? button, int index)
@@ -62,27 +62,23 @@ namespace SampleClient.Gameplay
 
         public string GetLobbyTabTitle(in DotArenaSceneUiSnapshot snapshot)
         {
+            SelectedTab = NormalizeTab(SelectedTab);
             return SelectedTab switch
             {
-                MetaTab.Lobby when snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer => "Multiplayer Lobby",
-                MetaTab.Lobby => "Profile",
-                MetaTab.Tasks => "Tasks",
-                MetaTab.Shop => "Shop",
-                MetaTab.Records => snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby ? "Match History" : "Records",
-                MetaTab.Leaderboard => snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby ? "Lobby Board" : "Leaderboard",
-                MetaTab.Settings => "Settings",
-                _ => "Lobby"
+                MetaTab.Lobby when snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer => "联机大厅",
+                MetaTab.Lobby => "资料",
+                MetaTab.Leaderboard => "排行榜",
+                MetaTab.Settings => "设置",
+                _ => "大厅"
             };
         }
 
         public string GetLobbyTabDetail(in DotArenaSceneUiSnapshot snapshot)
         {
+            SelectedTab = NormalizeTab(SelectedTab);
             return SelectedTab switch
             {
                 MetaTab.Lobby => snapshot.MetaProfileDetail,
-                MetaTab.Tasks => snapshot.MetaTasksDetail,
-                MetaTab.Shop => snapshot.MetaShopDetail,
-                MetaTab.Records => snapshot.MetaRecordsDetail,
                 MetaTab.Leaderboard => snapshot.MetaLeaderboardDetail,
                 MetaTab.Settings => snapshot.MetaSettingsDetail,
                 _ => snapshot.MetaProfileDetail
@@ -91,93 +87,53 @@ namespace SampleClient.Gameplay
 
         public string GetLobbyHighlightsText(in DotArenaSceneUiSnapshot snapshot)
         {
+            SelectedTab = NormalizeTab(SelectedTab);
             return SelectedTab == MetaTab.Lobby ? snapshot.MetaLobbyHighlights : string.Empty;
         }
 
         public string GetLobbyQuickActionsText(in DotArenaSceneUiSnapshot snapshot)
         {
-            if (snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer)
-            {
-                return string.Empty;
-            }
-
-            return SelectedTab == MetaTab.Lobby ? "Quick Access" : "Sections";
+            return string.Empty;
         }
 
         public bool HasLobbyPrimaryAction()
         {
-            return SelectedTab is MetaTab.Lobby or MetaTab.Tasks or MetaTab.Shop or MetaTab.Settings;
+            SelectedTab = NormalizeTab(SelectedTab);
+            return SelectedTab == MetaTab.Lobby;
         }
 
         public bool HasLobbySecondaryAction()
         {
-            return SelectedTab is MetaTab.Lobby or MetaTab.Tasks or MetaTab.Shop or MetaTab.Settings;
+            SelectedTab = NormalizeTab(SelectedTab);
+            return SelectedTab is MetaTab.Lobby or MetaTab.Settings;
         }
 
         public string GetLobbyPrimaryActionLabel(in DotArenaSceneUiSnapshot snapshot)
         {
+            SelectedTab = NormalizeTab(SelectedTab);
             return SelectedTab switch
             {
                 MetaTab.Lobby when snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer => "开始匹配",
-                MetaTab.Lobby => "Cycle Preset",
-                MetaTab.Tasks => "Claim Ready",
-                MetaTab.Shop => "Buy Cheapest",
-                MetaTab.Settings => "Toggle Lang",
+                MetaTab.Lobby => "切换预设",
                 _ => string.Empty
             };
         }
 
         public string GetLobbySecondaryActionLabel(in DotArenaSceneUiSnapshot snapshot)
         {
+            SelectedTab = NormalizeTab(SelectedTab);
             return SelectedTab switch
             {
                 MetaTab.Lobby when snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer => "退出登录",
-                MetaTab.Lobby => "Preview",
-                MetaTab.Tasks => "Claim Next",
-                MetaTab.Shop => "Equip Next",
-                MetaTab.Settings => "Fullscreen",
+                MetaTab.Lobby => "查看预设",
+                MetaTab.Settings => "切换全屏",
                 _ => string.Empty
             };
         }
 
         public string GetLobbyQuickActionHint(in DotArenaSceneUiSnapshot snapshot, int index)
         {
-            return (snapshot.EntryMenuState, snapshot.SessionMode, SelectedTab, index) switch
-            {
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, MetaTab.Lobby, 0) => "Match History",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, MetaTab.Lobby, 1) => "Lobby Board",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, MetaTab.Lobby, 2) => "Tasks",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, MetaTab.Lobby, 3) => "Shop",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, _, 0) => "Profile",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, _, 1) => "Shop",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, _, 2) => "Records",
-                (EntryMenuState.MultiplayerLobby, SessionMode.Multiplayer, _, 3) => "Board",
-                (_, SessionMode.SinglePlayer, MetaTab.Lobby, 0) => "Tasks",
-                (_, SessionMode.SinglePlayer, MetaTab.Lobby, 1) => "Shop",
-                (_, SessionMode.SinglePlayer, MetaTab.Lobby, 2) => "Board",
-                (_, SessionMode.SinglePlayer, MetaTab.Lobby, 3) => "Settings",
-                (_, SessionMode.SinglePlayer, MetaTab.Tasks, 0) => "Shop",
-                (_, SessionMode.SinglePlayer, MetaTab.Tasks, 1) => "Settings",
-                (_, SessionMode.SinglePlayer, MetaTab.Shop, 0) => "Tasks",
-                (_, SessionMode.SinglePlayer, MetaTab.Shop, 1) => "Board",
-                (_, SessionMode.SinglePlayer, MetaTab.Settings, 0) => "Tasks",
-                (_, SessionMode.SinglePlayer, MetaTab.Settings, 1) => "Shop",
-                (_, SessionMode.SinglePlayer, _, 0) => "Tasks",
-                (_, SessionMode.SinglePlayer, _, 1) => "Shop",
-                (_, _, MetaTab.Tasks, 0) => "Shop",
-                (_, _, MetaTab.Tasks, 1) => "Profile",
-                (_, _, MetaTab.Shop, 0) => "Tasks",
-                (_, _, MetaTab.Shop, 1) => "Settings",
-                (_, _, MetaTab.Records, 0) => "Profile",
-                (_, _, MetaTab.Records, 1) => "Shop",
-                (_, _, MetaTab.Leaderboard, 0) => "Profile",
-                (_, _, MetaTab.Leaderboard, 1) => "Records",
-                (_, _, MetaTab.Settings, 0) => "Tasks",
-                (_, _, MetaTab.Settings, 1) => "Shop",
-                (_, _, _, 0) => "Tasks",
-                (_, _, _, 1) => "Shop",
-                _ => string.Empty
-            };
+            return string.Empty;
         }
 
         public void RefreshLobbyQuickActionButtons(
@@ -191,19 +147,10 @@ namespace SampleClient.Gameplay
             Button? button4,
             TMP_Text? label4)
         {
-            if (snapshot.EntryMenuState == EntryMenuState.MultiplayerLobby && snapshot.SessionMode == SessionMode.Multiplayer)
-            {
-                HideLobbyQuickActionButton(button1);
-                HideLobbyQuickActionButton(button2);
-                HideLobbyQuickActionButton(button3);
-                HideLobbyQuickActionButton(button4);
-                return;
-            }
-
-            RefreshLobbyQuickActionButton(button1, label1, snapshot, 0);
-            RefreshLobbyQuickActionButton(button2, label2, snapshot, 1);
-            RefreshLobbyQuickActionButton(button3, label3, snapshot, 2);
-            RefreshLobbyQuickActionButton(button4, label4, snapshot, 3);
+            HideLobbyQuickActionButton(button1);
+            HideLobbyQuickActionButton(button2);
+            HideLobbyQuickActionButton(button3);
+            HideLobbyQuickActionButton(button4);
         }
 
         public void ApplyLobbyActionLayout(
@@ -256,34 +203,12 @@ namespace SampleClient.Gameplay
 
         private static MetaTab? GetLobbyQuickActionTarget(MetaTab currentTab, int index)
         {
-            return (currentTab, index) switch
-            {
-                (MetaTab.Lobby, 0) => MetaTab.Records,
-                (MetaTab.Lobby, 1) => MetaTab.Leaderboard,
-                (MetaTab.Lobby, 2) => MetaTab.Tasks,
-                (MetaTab.Lobby, 3) => MetaTab.Shop,
-                (MetaTab.Tasks, 0) => MetaTab.Shop,
-                (MetaTab.Tasks, 1) => MetaTab.Settings,
-                (MetaTab.Tasks, 2) => MetaTab.Records,
-                (MetaTab.Tasks, 3) => MetaTab.Leaderboard,
-                (MetaTab.Shop, 0) => MetaTab.Tasks,
-                (MetaTab.Shop, 1) => MetaTab.Leaderboard,
-                (MetaTab.Shop, 2) => MetaTab.Records,
-                (MetaTab.Shop, 3) => MetaTab.Settings,
-                (MetaTab.Records, 0) => MetaTab.Lobby,
-                (MetaTab.Records, 1) => MetaTab.Shop,
-                (MetaTab.Records, 2) => MetaTab.Tasks,
-                (MetaTab.Records, 3) => MetaTab.Settings,
-                (MetaTab.Leaderboard, 0) => MetaTab.Lobby,
-                (MetaTab.Leaderboard, 1) => MetaTab.Records,
-                (MetaTab.Leaderboard, 2) => MetaTab.Tasks,
-                (MetaTab.Leaderboard, 3) => MetaTab.Shop,
-                (MetaTab.Settings, 0) => MetaTab.Tasks,
-                (MetaTab.Settings, 1) => MetaTab.Shop,
-                (MetaTab.Settings, 2) => MetaTab.Records,
-                (MetaTab.Settings, 3) => MetaTab.Leaderboard,
-                _ => null
-            };
+            return null;
+        }
+
+        private static MetaTab NormalizeTab(MetaTab tab)
+        {
+            return tab is MetaTab.Leaderboard or MetaTab.Settings ? tab : MetaTab.Lobby;
         }
 
         private void RefreshLobbyQuickActionButton(Button? button, TMP_Text? label, in DotArenaSceneUiSnapshot snapshot, int index)

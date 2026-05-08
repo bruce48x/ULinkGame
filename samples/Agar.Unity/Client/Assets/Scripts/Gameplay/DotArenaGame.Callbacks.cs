@@ -90,7 +90,7 @@ namespace SampleClient.Gameplay
             }
 
             ResetToModeSelect(
-                status: string.IsNullOrWhiteSpace(disconnectMessage) ? "Disconnected" : $"Disconnected: {disconnectMessage}",
+                status: string.IsNullOrWhiteSpace(disconnectMessage) ? "已断开连接" : $"已断开连接: {disconnectMessage}",
                 eventMessage: "联机连接已断开",
                 toastMessage: null);
             Debug.LogWarning($"[DotArena] {_status}");
@@ -144,8 +144,8 @@ namespace SampleClient.Gameplay
                 _flowState = FrontendFlowState.InMatch;
                 _entryMenuState = EntryMenuState.Hidden;
                 _status = _sessionMode == SessionMode.SinglePlayer
-                    ? $"Single-player Match: {_localPlayerId}"
-                    : $"In Match: {_localPlayerId}";
+                    ? $"单机对局: {_localPlayerId}"
+                    : $"联机对局: {_localPlayerId}";
             }
         }
 

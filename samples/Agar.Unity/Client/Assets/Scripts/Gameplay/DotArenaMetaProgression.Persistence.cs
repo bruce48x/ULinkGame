@@ -67,68 +67,6 @@ namespace SampleClient.Gameplay
             state.SoftCurrency += 10 * state.CurrentLoginStreak;
         }
 
-        private static void EnsureTaskLists(DotArenaMetaState state)
-        {
-            if (state.DailyTasks.Count == 0)
-            {
-                state.DailyTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "daily_play_matches",
-                    Title = "Play 3 matches",
-                    Target = 3,
-                    RewardCurrency = 60,
-                    RewardExperience = 30,
-                    IsDaily = true
-                });
-                state.DailyTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "daily_get_win",
-                    Title = "Win 1 match",
-                    Target = 1,
-                    RewardCurrency = 80,
-                    RewardExperience = 40,
-                    IsDaily = true
-                });
-                state.DailyTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "daily_collect_score",
-                    Title = "Earn 10 score",
-                    Target = 10,
-                    RewardCurrency = 70,
-                    RewardExperience = 35,
-                    IsDaily = true
-                });
-            }
-
-            if (state.NewPlayerTasks.Count == 0)
-            {
-                state.NewPlayerTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "newbie_play_match",
-                    Title = "Play your first match",
-                    Target = 1,
-                    RewardCurrency = 50,
-                    RewardExperience = 40
-                });
-                state.NewPlayerTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "newbie_first_win",
-                    Title = "Get your first win",
-                    Target = 1,
-                    RewardCurrency = 100,
-                    RewardExperience = 60
-                });
-                state.NewPlayerTasks.Add(new DotArenaTaskProgress
-                {
-                    TaskId = "newbie_score_points",
-                    Title = "Earn 15 total score",
-                    Target = 15,
-                    RewardCurrency = 80,
-                    RewardExperience = 50
-                });
-            }
-        }
-
         private static DotArenaMetaState? TryLoadState(string path)
         {
             try
@@ -184,7 +122,8 @@ namespace SampleClient.Gameplay
                 state.EquippedCosmeticId = "skin_default";
             }
 
-            EnsureTaskLists(state);
+            state.DailyTasks.Clear();
+            state.NewPlayerTasks.Clear();
         }
 
         private static string ResolvePlayerId(string playerId)

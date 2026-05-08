@@ -1,6 +1,8 @@
 #nullable enable
 
+using System.Collections.Generic;
 using UnityEngine;
+using static SampleClient.Gameplay.DotArenaTuning;
 
 namespace SampleClient.Gameplay
 {
@@ -16,7 +18,7 @@ namespace SampleClient.Gameplay
             var showSettlement = snapshot.FlowState == FrontendFlowState.Settlement;
             var showMatchmaking = snapshot.FlowState == FrontendFlowState.Matchmaking;
             var showHud = snapshot.HasSession && snapshot.FlowState == FrontendFlowState.InMatch;
-            var showDebug = showHud && snapshot.DebugPanelVisible;
+            const bool showDebug = false;
             var showLobby = !showSettlement &&
                             !showMatchmaking &&
                             !snapshot.HasSession &&
@@ -26,6 +28,7 @@ namespace SampleClient.Gameplay
 
             if (_menuBackground != null) _menuBackground.SetActive(showMenuBackground);
             if (_hudPanel != null) _hudPanel.SetActive(showHud);
+            if (_matchRankingPanel != null) _matchRankingPanel.SetActive(showHud);
             if (_debugPanel != null) _debugPanel.SetActive(showDebug);
             if (_entryPanel != null) _entryPanel.SetActive(showEntry);
             if (_matchmakingPanel != null) _matchmakingPanel.SetActive(showMatchmaking);
@@ -34,26 +37,29 @@ namespace SampleClient.Gameplay
             if (_modeSelectPanel != null) _modeSelectPanel.SetActive(showEntry && snapshot.EntryMenuState == EntryMenuState.ModeSelect);
             if (_multiplayerPanel != null) _multiplayerPanel.SetActive(showEntry && snapshot.EntryMenuState == EntryMenuState.MultiplayerAuth);
 
-            SetText(_hudStatusText, $"State: {snapshot.LocalPlayerBuffText}");
-            SetText(_hudPlayerText, $"玩家: {(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   分数/质量: {snapshot.LocalPlayerScoreText}   胜场: {snapshot.LocalWinCount}");
+            SetText(_hudStatusText, "状态：对局中");
+            SetText(_hudPlayerText, $"玩家：{(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   分数/质量：{snapshot.LocalPlayerScoreText}   胜场：{snapshot.LocalWinCount}");
             SetText(_hudTickText, string.Empty);
             SetText(_hudTitleText, string.Empty);
             SetText(_hudModeText, string.Empty);
             SetText(_hudHintText, string.Empty);
             SetText(_hudEventText, string.Empty);
-            SetText(_debugTitleText, "Debug");
-            SetText(_debugDetailText, snapshot.DebugPanelDetail);
+            SetText(_matchRankingTitleText, "实时排名");
+            SetText(_matchRankingHeaderText, "名次    玩家        质量   分数");
+            RefreshMatchRankingRows(snapshot.MatchRankingEntries, showHud);
+            SetText(_debugTitleText, string.Empty);
+            SetText(_debugDetailText, string.Empty);
             if (snapshot.HasSession && snapshot.SessionMode == SessionMode.Multiplayer)
             {
                 if (snapshot.LastRoundRemainingSeconds > 0)
                 {
                     var minutes = snapshot.LastRoundRemainingSeconds / 60;
                     var seconds = snapshot.LastRoundRemainingSeconds % 60;
-                    SetText(_hudCountdownText, $"Time: {minutes:D2}:{seconds:D2}");
+                    SetText(_hudCountdownText, $"剩余 {minutes:D2}:{seconds:D2}");
                 }
                 else
                 {
-                    SetText(_hudCountdownText, "Time: --:--");
+                    SetText(_hudCountdownText, "剩余 --:--");
                 }
             }
             else
@@ -63,7 +69,7 @@ namespace SampleClient.Gameplay
 
             SetText(_entryTitleText, "点阵竞技场");
             SetText(_entryStatusText, snapshot.EntryMenuState == EntryMenuState.MultiplayerAuth ? string.Empty : snapshot.Status);
-            SetText(_matchmakingTitleText, snapshot.MatchmakingTitle);
+            SetText(_matchmakingTitleText, snapshot.SessionMode == SessionMode.SinglePlayer ? "准备本地对局" : snapshot.MatchmakingTitle);
             SetText(_matchmakingDetailText, snapshot.MatchmakingDetail);
             SetText(_matchmakingCancelButtonText, "取消匹配");
             SetText(_lobbyTitleText, _lobbyUi.GetLobbyTabTitle(snapshot));
@@ -96,9 +102,9 @@ namespace SampleClient.Gameplay
             if (_backButton != null) _backButton.interactable = !snapshot.IsBusy;
             if (_matchmakingCancelButton != null) _matchmakingCancelButton.interactable = !snapshot.IsBusy;
             if (_lobbyProfileButton != null) _lobbyProfileButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Lobby);
-            if (_lobbyTasksButton != null) _lobbyTasksButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Tasks);
-            if (_lobbyShopButton != null) _lobbyShopButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Shop);
-            if (_lobbyRecordsButton != null) _lobbyRecordsButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Records);
+            if (_lobbyTasksButton != null) _lobbyTasksButton.gameObject.SetActive(false);
+            if (_lobbyShopButton != null) _lobbyShopButton.gameObject.SetActive(false);
+            if (_lobbyRecordsButton != null) _lobbyRecordsButton.gameObject.SetActive(false);
             if (_lobbyLeaderboardButton != null) _lobbyLeaderboardButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Leaderboard);
             if (_lobbySettingsButton != null) _lobbySettingsButton.interactable = !snapshot.IsBusy && !_lobbyUi.IsSelected(MetaTab.Settings);
             if (_lobbyPrimaryActionButton != null) _lobbyPrimaryActionButton.gameObject.SetActive(_lobbyUi.HasLobbyPrimaryAction());
@@ -114,13 +120,48 @@ namespace SampleClient.Gameplay
             if (_passwordInputField != null) _passwordInputField.interactable = !snapshot.IsBusy;
 
             SyncSceneUiInputs(snapshot.Account, snapshot.Password);
-            SetText(_settlementTitleText, snapshot.SettlementTitle);
+            SetText(_settlementTitleText, snapshot.SessionMode == SessionMode.Multiplayer ? "联机结算" : "单机结算");
             SetText(_settlementDetailText, snapshot.SettlementDetail);
             SetText(_settlementRewardText, snapshot.SettlementRewardSummary);
-            SetText(_settlementTaskText, snapshot.SettlementTaskSummary);
+            SetText(_settlementTaskText, string.Empty);
+            if (_settlementTaskText != null) _settlementTaskText.gameObject.SetActive(false);
             SetText(_settlementNextStepText, snapshot.SettlementNextStepSummary);
             SetText(_settlementPrimaryButtonText, snapshot.SettlementPrimaryActionText);
-            SetText(_settlementSecondaryButtonText, "Return to Lobby");
+            SetText(_settlementSecondaryButtonText, "返回大厅");
+        }
+
+        private void RefreshMatchRankingRows(IReadOnlyList<DotArenaMatchRankingEntry>? entries, bool showHud)
+        {
+            for (var i = 0; i < _matchRankingRows.Count; i++)
+            {
+                var row = _matchRankingRows[i];
+                var showRow = showHud && entries != null && i < entries.Count;
+                row.Root.SetActive(showRow);
+                if (!showRow || entries == null)
+                {
+                    continue;
+                }
+
+                var entry = entries[i];
+                SetText(row.RankText, $"#{entry.Rank}");
+                SetText(row.NameText, entry.PlayerId);
+                SetText(row.MassText, DotArenaPresentation.FormatMass(entry.Mass));
+                SetText(row.ScoreText, DotArenaPresentation.FormatScore(entry.Score));
+
+                var rowBackground = (i & 1) == 0
+                    ? new Color(0.08f, 0.12f, 0.16f, 0.58f)
+                    : new Color(0.04f, 0.07f, 0.1f, 0.42f);
+                row.Background.color = entry.IsLocalPlayer
+                    ? new Color(0.16f, 0.36f, 0.38f, 0.92f)
+                    : rowBackground;
+
+                var nameColor = entry.IsLocalPlayer ? UiAccentTextColor : UiPrimaryTextColor;
+                var valueColor = entry.IsLocalPlayer ? UiAccentTextColor : UiSecondaryTextColor;
+                row.RankText.color = valueColor;
+                row.NameText.color = nameColor;
+                row.MassText.color = valueColor;
+                row.ScoreText.color = valueColor;
+            }
         }
 
         private void SyncSceneUiInputs(string account, string password)
