@@ -13,6 +13,22 @@
 
 小改动可以让设计说明和计划说明保持简短，但只要行为或架构发生变化，就应该同步更新这两个核心文档。
 
+共享协议变更时，先改 `Shared` 合同，再从 `samples/Agar.Unity` 目录重新生成 RPC 代码：
+
+```powershell
+dotnet tool run ulinkrpc-codegen -- --mode unity --contracts Shared --output Client/Assets/Scripts/Rpc/Generated --namespace Rpc
+dotnet tool run ulinkrpc-codegen -- --mode server --contracts Shared --server-output Server/Server/Generated --server-namespace Server.Generated
+```
+
+常规验证基线：
+
+```powershell
+dotnet build Shared/Shared.csproj -f net10.0
+dotnet build Server/Silo/Silo.csproj
+dotnet build Server/Server/Server.csproj
+dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
+```
+
 ## 当前基线
 
 仓库已经不再是最早的单进程场地样例，当前基线包括：
@@ -40,7 +56,6 @@
 - 排行榜周期重置已按榜单当地时间周一 00:00 计算，旧 `PeriodStartUtc` 字段仅作为兼容字段保留。
 - `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，AI 玩家不获得积分。
 - 自动化测试当前为 20 个（`ArenaSimulationRulesTests` 16 个，`MatchmakingQueuePolicyTests` 4 个）。
-- `samples/Agar.Unity/CLAUDE.md` 已记录入口文件、生成命令和开发工作流。
 - `samples/Agar.Unity/docs/ART_DIRECTION.md` 已定义整体美术、UI 设计、素材生成、Unity 接入和验收标准。
 
 已经从当前计划中移除的方向：
@@ -250,7 +265,7 @@
 - 每轮触碰业务逻辑后，运行已有自动化测试和新增测试。
 - 每轮触碰 Unity 客户端脚本或资源后，触发 Unity 资源刷新/脚本编译并检查控制台错误。
 - 每轮发布前，手动冒烟测试单机和联机流程。
-- 当命令、端口或架构事实变化时，同步 README 和 `CLAUDE.md`。
+- 当命令、端口或架构事实变化时，同步 README。
 
 验收标准：
 
@@ -291,8 +306,6 @@
 - 已从 `ArenaSimulationOptions.EnabledPickupTypes` 默认值和 `PickupType` 枚举中移除旧强化拾取物，只保留 `ScorePoint`。
 - 已从 `PlayerState` 中移除旧强化剩余时间字段。
 - Unity 脚本刷新通过，KCP factory 引用保持正常。
-- 已创建 `samples/Agar.Unity/CLAUDE.md`，记录项目入口、关键文件路径和开发工作流规则。
-
 ### 阶段 2：客户端拆分
 
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
@@ -326,4 +339,4 @@
 - 本轮已通过 `Server/Server/Server.csproj` 构建。
 - 本轮已通过已有自动化测试，20/20。
 - Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍需按待办执行。
-- README 和 `CLAUDE.md` 已同步到当时的命令、端口和架构事实。
+- README 已同步到当时的命令、端口和架构事实。

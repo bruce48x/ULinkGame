@@ -42,12 +42,14 @@ samples/Agar.Unity
  │  │  └─ Services
  │  │     └─ PlayerService.cs
  │  └─ Silo
- │     └─ Leaderboard
+ │     ├─ Leaderboard
+ │     └─ Users
  ├─ Client
  │  └─ Assets
  │     └─ Scripts
  │        ├─ Gameplay
- │        │  └─ DotArenaGame.cs
+ │        │  ├─ DotArenaGame.cs
+ │        │  └─ DotArenaNetworkSession.cs
  │        └─ Rpc
  ├─ docker-compose.yml
  └─ infra
@@ -57,9 +59,13 @@ samples/Agar.Unity
 
 - `Shared/Gameplay/ArenaSimulation.cs`：玩法规则内核，单机和联机共用。
 - `Shared/Interfaces/IPlayerService.cs`：客户端和服务端共用的 RPC 协议。
+- `Server/Server/Services/PlayerService.cs`：控制面 RPC 网关服务。
 - `Server/Server/Realtime/RoomRuntime.cs`：服务端房间模拟和世界状态广播。
+- `Server/Silo/Program.cs`：Orleans Silo 启动入口。
+- `Server/Silo/Users/UserGrain.cs`：用户登录、资料和胜利积分持久化。
 - `Server/Silo/Leaderboard/LeaderboardGrain.cs`：胜利积分排行榜周期、排序和归档。
 - `Client/Assets/Scripts/Gameplay/DotArenaGame.cs`：客户端主流程、输入、渲染、模式切换和网络会话编排。
+- `Client/Assets/Scripts/Gameplay/DotArenaNetworkSession.cs`：客户端控制连接、实时连接和重连参数封装。
 
 相关单元测试位于 `samples/Agar.Unity/tests/BusinessLogic.Tests`。仓库根目录 `Tests` 目录只包含 ULinkGame 框架测试。
 
@@ -99,6 +105,24 @@ DELETE FROM OrleansMembershipTable WHERE DeploymentId = 'dev';
 DELETE FROM OrleansMembershipVersionTable WHERE DeploymentId = 'dev';
 ```
 
+## 开发命令
+
+共享协议变更后，从 `samples/Agar.Unity` 目录重新生成客户端和服务端 RPC 代码：
+
+```powershell
+dotnet tool run ulinkrpc-codegen -- --mode unity --contracts Shared --output Client/Assets/Scripts/Rpc/Generated --namespace Rpc
+dotnet tool run ulinkrpc-codegen -- --mode server --contracts Shared --server-output Server/Server/Generated --server-namespace Server.Generated
+```
+
+常用构建和测试命令：
+
+```powershell
+dotnet build Shared/Shared.csproj -f net10.0
+dotnet build Server/Silo/Silo.csproj
+dotnet build Server/Server/Server.csproj
+dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
+```
+
 ## 当前状态
 
 已完成：
@@ -110,7 +134,6 @@ DELETE FROM OrleansMembershipVersionTable WHERE DeploymentId = 'dev';
 - 登录重连参数、可靠业务推送和玩家碰撞表现。
 - 旧 dash / buff 协议清理，输入只保留移动方向和 tick。
 - 服务端胜利积分、周榜查询、最近两周归档和客户端真实排行榜展示。
-- `samples/Agar.Unity/CLAUDE.md` 开发入口与工作流说明。
 - 自动化测试 20 个，覆盖模拟规则、匹配队列和胜利积分基础规则。
 
 仍需继续验证：
