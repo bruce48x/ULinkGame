@@ -63,6 +63,13 @@ namespace SampleClient.Gameplay
         public static readonly Color KnockbackPickupColor = new(1f, 0.22f, 0.22f, 0.95f);
         public static readonly ArenaConfig GameplayConfig = ArenaConfig.CreateDefault();
 
+        public static readonly Color[] LocalDefaultPlayerPalette =
+        {
+            new(0.3f, 0.78f, 0.96f, 1f),
+            new(1f, 0.58f, 0.18f, 1f),
+            new(0.2f, 0.96f, 0.55f, 1f)
+        };
+
         public static readonly Color[] RemotePalette =
         {
             new(0.2f, 0.96f, 0.67f, 1f),

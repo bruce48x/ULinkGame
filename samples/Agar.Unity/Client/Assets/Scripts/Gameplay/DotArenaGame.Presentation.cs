@@ -147,6 +147,12 @@ namespace SampleClient.Gameplay
 
         private Sprite ResolvePlayerSkinSprite(string playerId, string? cosmeticId, out bool usesAuthoredSkin)
         {
+            if (IsRandomDefaultSkin(cosmeticId))
+            {
+                usesAuthoredSkin = false;
+                return _playerSprite;
+            }
+
             if (!string.IsNullOrWhiteSpace(cosmeticId) && _playerSkinSprites.TryGetValue(cosmeticId, out var cosmeticSprite))
             {
                 usesAuthoredSkin = true;
@@ -167,6 +173,39 @@ namespace SampleClient.Gameplay
 
             usesAuthoredSkin = false;
             return _playerSprite;
+        }
+
+        private string? GetLocalPresentationCosmeticId()
+        {
+            var equippedCosmeticId = _metaState?.EquippedCosmeticId;
+            if (!string.Equals(equippedCosmeticId, "skin_default", StringComparison.Ordinal))
+            {
+                return equippedCosmeticId;
+            }
+
+            if (_localPlayerDefaultColorIndex < 0 || _localPlayerDefaultColorIndex >= LocalDefaultPlayerPalette.Length)
+            {
+                _localPlayerDefaultColorIndex = UnityEngine.Random.Range(0, LocalDefaultPlayerPalette.Length);
+            }
+
+            return _localPlayerDefaultColorIndex switch
+            {
+                1 => "skin_default_orange",
+                2 => "skin_default_green",
+                _ => "skin_default_blue"
+            };
+        }
+
+        private void RerollLocalDefaultPlayerColor()
+        {
+            _localPlayerDefaultColorIndex = UnityEngine.Random.Range(0, LocalDefaultPlayerPalette.Length);
+        }
+
+        private static bool IsRandomDefaultSkin(string? cosmeticId)
+        {
+            return string.Equals(cosmeticId, "skin_default_blue", StringComparison.Ordinal) ||
+                string.Equals(cosmeticId, "skin_default_orange", StringComparison.Ordinal) ||
+                string.Equals(cosmeticId, "skin_default_green", StringComparison.Ordinal);
         }
 
         private static int GetStableSkinIndex(string playerId)

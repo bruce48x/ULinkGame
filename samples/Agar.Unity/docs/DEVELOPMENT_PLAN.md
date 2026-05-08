@@ -95,6 +95,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 ### 当前优先级
 
+0. 本轮小功能：默认本地玩家小球在每局开始时从蓝色、橙色、绿色中随机选择一种；先更新玩法/客户端功能文档和本计划，再做 Unity 客户端表现层实现。
 1. 阶段 2：完成启动/登录/匹配/结算 UI 的人工视觉回归，确认裁切后的 UI sprite、实时排名面板和运行时布局在 1200x600、960x540 下不再出现视觉边界错位。
 2. 阶段 4：完成第一轮基础美术资产的 Unity 实机验收，确认玩家球、拾取物、背景、UI 基础件、图标、吸收环和出生波纹是否继续沿用或需要重做。
 3. 阶段 5：完成单机和联机全流程手动回归。
@@ -123,6 +124,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 待办：
 
+- 为默认本地玩家小球接入蓝、橙、绿三色随机表现，要求每局开始时选色，同一局内保持稳定；不改共享协议和服务端权威状态。
 - 对第一轮基础美术资产做 Unity 实机验收：
   - `Skin_Jelly_Cyan.png`
   - `Skin_Jelly_Crimson.png`
@@ -144,6 +146,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - `ART_DIRECTION.md` 作为后续资产生成、UI 设计、AI 生成提示词、Unity 接入和验收的唯一风格标准。
 - 第一轮基础资产在 Unity 游戏视图中通过手动验收。
+- 默认本地玩家小球在多次开始对局时可以出现蓝、橙、绿三种颜色之一，且单局内不会跳色。
 - 所有正式 UI sprite 的透明外边距符合文档约束。
 - UI 文字不溢出，按钮状态清楚，图标 32x32 可识别。
 - 九宫格拉伸后边框不变形。

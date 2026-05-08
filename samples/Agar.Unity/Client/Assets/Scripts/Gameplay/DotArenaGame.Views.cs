@@ -113,7 +113,7 @@ namespace SampleClient.Gameplay
             Debug.Log($"[DotArena] CreateView root={viewRoot.name} parent={viewRoot.transform.parent?.name}");
 
             var renderer = viewRoot.AddComponent<SpriteRenderer>();
-            var cosmeticId = playerId == _localPlayerId ? _metaState?.EquippedCosmeticId : null;
+            var cosmeticId = playerId == _localPlayerId ? GetLocalPresentationCosmeticId() : null;
             var baseColor = DotArenaPresentation.ResolvePlayerColor(playerId, cosmeticId);
             var skinSprite = ResolvePlayerSkinSprite(playerId, cosmeticId, out var usesAuthoredSkin);
             renderer.sprite = skinSprite;

@@ -86,6 +86,7 @@ namespace SampleClient.Gameplay
         private int _singlePlayerPlaylistIndex = -1;
         private ArenaMapVariant _currentArenaMapVariant = ArenaMapVariant.ClassicSquare;
         private ArenaRuleVariant _currentArenaRuleVariant = ArenaRuleVariant.ClassicElimination;
+        private int _localPlayerDefaultColorIndex = -1;
         private RealtimeConnectionInfo? _lastRealtimeConnection;
 #if UNITY_EDITOR
         private Vector2 _editorMoveOverride;
@@ -114,7 +115,7 @@ namespace SampleClient.Gameplay
             message => PushEvent(message),
             (message, duration) => PushEvent(message, duration),
             message => _eventMessage = message,
-            () => _metaState?.EquippedCosmeticId);
+            GetLocalPresentationCosmeticId);
 
         private void Start()
         {

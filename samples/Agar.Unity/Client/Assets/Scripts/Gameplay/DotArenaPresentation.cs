@@ -73,10 +73,14 @@ namespace SampleClient.Gameplay
         {
             return cosmeticId switch
             {
+                "skin_default_blue" => LocalDefaultPlayerPalette[0],
+                "skin_default_orange" => LocalDefaultPlayerPalette[1],
+                "skin_default_green" => LocalDefaultPlayerPalette[2],
+                "skin_default" => LocalDefaultPlayerPalette[0],
                 "skin_crimson" => new Color(0.92f, 0.22f, 0.28f, 1f),
                 "skin_glacier" => new Color(0.42f, 0.78f, 1f, 1f),
                 "skin_sunburst" => new Color(1f, 0.74f, 0.18f, 1f),
-                _ => new Color(0.3f, 0.78f, 0.96f, 1f)
+                _ => LocalDefaultPlayerPalette[0]
             };
         }
     }

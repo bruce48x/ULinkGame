@@ -160,7 +160,8 @@ namespace SampleClient.Gameplay
             if (_views.TryGetValue(deadEvent.PlayerId, out var view))
             {
                 var radius = renderState?.Radius ?? GameplayConfig.PlayerVisualRadius;
-                view.ApplyPresentation(DotArenaPresentation.ResolvePlayerColor(deadEvent.PlayerId), PlayerLifeState.Dead, false, radius);
+                var cosmeticId = deadEvent.PlayerId == _localPlayerId ? GetLocalPresentationCosmeticId() : null;
+                view.ApplyPresentation(DotArenaPresentation.ResolvePlayerColor(deadEvent.PlayerId, cosmeticId), PlayerLifeState.Dead, false, radius);
             }
 
             PushEvent(deadEvent.PlayerId == _localPlayerId

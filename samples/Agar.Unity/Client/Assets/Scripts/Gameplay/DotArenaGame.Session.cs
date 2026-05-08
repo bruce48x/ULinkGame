@@ -556,6 +556,7 @@ namespace SampleClient.Gameplay
 
             _sessionMode = SessionMode.Multiplayer;
             _localPlayerId = _authenticatedPlayerId;
+            RerollLocalDefaultPlayerColor();
             _localMatch = null;
             _flowState = FrontendFlowState.Matchmaking;
             _entryMenuState = EntryMenuState.Hidden;

@@ -32,6 +32,7 @@ namespace SampleClient.Gameplay
             _flowState = FrontendFlowState.Matchmaking;
             _localPlayerId = "Player";
             EnsureMetaState(_localPlayerId);
+            RerollLocalDefaultPlayerColor();
             _currentArenaMapVariant = preset.MapVariant;
             _currentArenaRuleVariant = preset.RuleVariant;
             _localMatch = new ArenaSimulation(options);
