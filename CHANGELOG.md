@@ -17,3 +17,14 @@
 - Limited Godot server logging to console output to avoid Windows EventLog permission failures in non-elevated runs.
 - Updated Godot client generation in `ULinkGame.Tool` to preserve generated RPC clients and create a real networked Ping example.
 - Updated `ULinkGame.Tool` project scaffolding to expose the generated client-facing server as `Server/Edge/Edge.csproj` instead of `Server/Server/Server.csproj`, while keeping `Server/Silo/Silo.csproj` for Orleans grains.
+
+## 2026-05-08
+
+### Released
+
+- `ULinkGame.Tool` `0.1.10`
+
+### Changed
+
+- Updated generated local `ulinkrpc.starter` tool manifests to use `0.2.53`.
+- Suppressed delegated `ulinkrpc-starter` next-step output during `ulinkgame-tool new` so the command only prints the final ULinkGame next steps.

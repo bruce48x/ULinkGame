@@ -162,7 +162,7 @@ pack_local_package "$ROOT_DIR/src/ULinkGame.Server/ULinkGame.Server.csproj"
 pack_local_package "$ROOT_DIR/src/ULinkGame.Tool/ULinkGame.Tool.csproj"
 
 echo "Installing ulinkrpc-starter into $TOOLS_DIR"
-dotnet tool install ulinkrpc.starter --version 0.2.52 --tool-path "$TOOLS_DIR"
+dotnet tool install ulinkrpc.starter --version 0.2.53 --tool-path "$TOOLS_DIR"
 export PATH="$TOOLS_DIR:$PATH"
 export ULINKRPC_GODOT_NUPKGS="$GODOT_NUPKGS"
 

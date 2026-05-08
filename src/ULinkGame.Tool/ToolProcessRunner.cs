@@ -12,7 +12,8 @@ internal sealed class ToolProcessRunner
             "--client-engine", options.ClientEngine,
             "--transport", options.Transport,
             "--serializer", options.Serializer,
-            "--nugetforunity-source", options.NuGetForUnitySource
+            "--nugetforunity-source", options.NuGetForUnitySource,
+            "--no-next-steps"
         };
 
         foreach (var invocation in EnumerateStarterInvocations(arguments))

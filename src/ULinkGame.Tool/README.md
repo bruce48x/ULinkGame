@@ -21,7 +21,7 @@
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施：
+该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施，并只输出 ULinkGame 项目的最终 Next steps：
 
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
