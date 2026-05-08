@@ -110,8 +110,7 @@ DELETE FROM OrleansMembershipVersionTable WHERE DeploymentId = 'dev';
 共享协议变更后，从 `samples/Agar.Unity` 目录重新生成客户端和服务端 RPC 代码：
 
 ```powershell
-dotnet tool run ulinkrpc-codegen -- --mode unity --contracts Shared --output Client/Assets/Scripts/Rpc/Generated --namespace Rpc
-dotnet tool run ulinkrpc-codegen -- --mode server --contracts Shared --server-output Server/Server/Generated --server-namespace Server.Generated
+ulinkgame-tool codegen
 ```
 
 常用构建和测试命令：
