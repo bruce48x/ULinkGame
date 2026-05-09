@@ -230,6 +230,49 @@ Sample-specific tests live with their sample, for example `samples/Agar.Unity/te
 
 The Unity project may generate local `Library`, `Temp`, `obj`, and restored NuGet package folders. These are ignored and should not be committed.
 
+## NuGet Release
+
+Framework packages are published to nuget.org by the `Publish NuGet` GitHub Actions workflow:
+
+```txt
+.github/workflows/publish-nuget.yml
+```
+
+The workflow runs automatically on pushes to `main` when one of these paths changes:
+
+- `.github/workflows/publish-nuget.yml`
+- `Directory.Build.props`
+- `NuGet.config`
+- `src/**`
+- `Tests/**`
+
+The workflow uses .NET `10.0.x`, restores all test and package projects, runs the client and server package tests, packs every project under `src/*/*.csproj`, then pushes all generated `.nupkg` files to nuget.org with `--skip-duplicate`.
+
+The packages currently published by this workflow are:
+
+- `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
+- `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
+- `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
+
+Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
+
+To release a new package version:
+
+1. Update the `<Version>` in the owning `.csproj`.
+2. Update `CHANGELOG.md` with the released package id and version.
+3. Update generated template constants or sample package references if the released package is consumed by scaffolding or samples.
+4. Run the relevant local tests before merging.
+5. Merge or push to `main`; the GitHub Actions workflow publishes the packages.
+
+Useful local checks:
+
+```powershell
+dotnet test Tests/tests.slnx
+dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
+```
+
 ## Design Boundary
 
 ULinkGame should not become a full game business framework. Keep the boundary narrow:
