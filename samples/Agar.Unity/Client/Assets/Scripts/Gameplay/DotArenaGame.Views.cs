@@ -166,32 +166,32 @@ namespace SampleClient.Gameplay
             nameText.color = new Color(0.98f, 0.99f, 1f, 1f);
             DotArenaSpriteFactory.ConfigureTextRenderer(nameText.GetComponent<MeshRenderer>(), PlayerTextSortingOrder);
 
-            var scoreBackdrop = new GameObject("ScoreBackdrop");
-            scoreBackdrop.transform.SetParent(viewRoot.transform, false);
-            scoreBackdrop.transform.localPosition = new Vector3(0f, PlayerScoreOffsetY, PlayerTextDepth + 0.01f);
-            scoreBackdrop.transform.localScale = new Vector3(PlayerScoreBackdropWidth, PlayerScoreBackdropHeight, 1f);
-            var scoreBackdropRenderer = scoreBackdrop.AddComponent<SpriteRenderer>();
-            scoreBackdropRenderer.sprite = _pixelSprite;
-            scoreBackdropRenderer.color = PlayerTextBackdropColor;
-            scoreBackdropRenderer.sortingOrder = PlayerTextBackdropSortingOrder;
+            var massBackdrop = new GameObject("MassBackdrop");
+            massBackdrop.transform.SetParent(viewRoot.transform, false);
+            massBackdrop.transform.localPosition = new Vector3(0f, PlayerMassOffsetY, PlayerTextDepth + 0.01f);
+            massBackdrop.transform.localScale = new Vector3(PlayerMassBackdropWidth, PlayerMassBackdropHeight, 1f);
+            var massBackdropRenderer = massBackdrop.AddComponent<SpriteRenderer>();
+            massBackdropRenderer.sprite = _pixelSprite;
+            massBackdropRenderer.color = PlayerTextBackdropColor;
+            massBackdropRenderer.sortingOrder = PlayerTextBackdropSortingOrder;
 
-            var scoreLabel = new GameObject("ScoreLabel");
-            scoreLabel.transform.SetParent(viewRoot.transform, false);
-            scoreLabel.transform.localPosition = new Vector3(0f, PlayerScoreOffsetY, PlayerTextDepth);
-            scoreLabel.transform.localScale = Vector3.one * PlayerScoreScale;
+            var massLabel = new GameObject("MassLabel");
+            massLabel.transform.SetParent(viewRoot.transform, false);
+            massLabel.transform.localPosition = new Vector3(0f, PlayerMassOffsetY, PlayerTextDepth);
+            massLabel.transform.localScale = Vector3.one * PlayerMassScale;
 
-            var scoreText = scoreLabel.AddComponent<TextMesh>();
-            scoreText.text = "0";
-            scoreText.fontSize = 44;
-            scoreText.characterSize = PlayerTextCharacterSize;
-            scoreText.anchor = TextAnchor.MiddleCenter;
-            scoreText.alignment = TextAlignment.Center;
-            scoreText.fontStyle = FontStyle.Bold;
-            scoreText.color = new Color(1f, 0.97f, 0.72f, 1f);
-            DotArenaSpriteFactory.ConfigureTextRenderer(scoreText.GetComponent<MeshRenderer>(), PlayerTextSortingOrder);
+            var massText = massLabel.AddComponent<TextMesh>();
+            massText.text = "0";
+            massText.fontSize = 44;
+            massText.characterSize = PlayerTextCharacterSize;
+            massText.anchor = TextAnchor.MiddleCenter;
+            massText.alignment = TextAlignment.Center;
+            massText.fontStyle = FontStyle.Bold;
+            massText.color = new Color(1f, 0.97f, 0.72f, 1f);
+            DotArenaSpriteFactory.ConfigureTextRenderer(massText.GetComponent<MeshRenderer>(), PlayerTextSortingOrder);
 
-            var view = new DotView(viewRoot, renderer, outlineRenderer, spawnWaveRenderer, nameText, scoreText, usesAuthoredSkin);
-            view.SetIdentity(playerId, 0);
+            var view = new DotView(viewRoot, renderer, outlineRenderer, spawnWaveRenderer, nameText, massText, usesAuthoredSkin);
+            view.SetIdentity(playerId, 0f);
             view.ApplyPresentation(baseColor, PlayerLifeState.Idle, true, GameplayConfig.PlayerVisualRadius);
             return view;
         }
@@ -202,10 +202,10 @@ namespace SampleClient.Gameplay
             pickupRoot.transform.SetParent(transform, false);
 
             var pickupColor = DotArenaPresentation.GetPickupColor(pickupType);
-            var scorePickupSprite = ResolveScorePickupSprite();
-            var usesAuthoredPickupSprite = pickupType == PickupType.ScorePoint && scorePickupSprite != null;
+            var massPickupSprite = ResolveMassPickupSprite();
+            var usesAuthoredPickupSprite = pickupType == PickupType.MassPoint && massPickupSprite != null;
             var renderer = pickupRoot.AddComponent<SpriteRenderer>();
-            renderer.sprite = usesAuthoredPickupSprite ? scorePickupSprite : _playerSprite;
+            renderer.sprite = usesAuthoredPickupSprite ? massPickupSprite : _playerSprite;
             renderer.color = usesAuthoredPickupSprite ? Color.white : pickupColor;
             renderer.sortingOrder = PickupSortingOrder;
             renderer.material = CreatePickupAbsorbMaterial(pickupColor);
@@ -240,19 +240,19 @@ namespace SampleClient.Gameplay
             return new PickupView(pickupRoot, renderer, glowRenderer, labelText);
         }
 
-        private Sprite? ResolveScorePickupSprite()
+        private Sprite? ResolveMassPickupSprite()
         {
-            if (_scorePickupSprite == null)
+            if (_massPickupSprite == null)
             {
                 return _goldPickupSprite;
             }
 
             if (_goldPickupSprite == null)
             {
-                return _scorePickupSprite;
+                return _massPickupSprite;
             }
 
-            return (_pickupViews.Count & 1) == 0 ? _scorePickupSprite : _goldPickupSprite;
+            return (_pickupViews.Count & 1) == 0 ? _massPickupSprite : _goldPickupSprite;
         }
 
         private Material CreatePickupAbsorbMaterial(Color baseColor)

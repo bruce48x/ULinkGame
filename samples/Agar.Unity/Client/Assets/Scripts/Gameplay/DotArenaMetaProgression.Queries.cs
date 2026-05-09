@@ -80,7 +80,7 @@ namespace SampleClient.Gameplay
                 HasRecord = true,
                 Mode = record.Mode,
                 Result = record.Result,
-                Score = record.Score,
+                Mass = record.Mass,
                 WinnerPlayerId = record.WinnerPlayerId,
                 PlayedAtUtcIso = record.PlayedAtUtcIso
             };
@@ -103,8 +103,8 @@ namespace SampleClient.Gameplay
             var historyCount = Math.Min(sampleCount, state.MatchHistory.Count);
             var wins = 0;
             var losses = 0;
-            var scoreSum = 0;
-            var bestScore = int.MinValue;
+            var massSum = 0;
+            var bestMass = int.MinValue;
             var form = new List<string>(historyCount);
 
             for (var i = 0; i < historyCount; i++)
@@ -121,10 +121,10 @@ namespace SampleClient.Gameplay
                     losses += 1;
                 }
 
-                scoreSum += record.Score;
-                if (record.Score > bestScore)
+                massSum += record.Mass;
+                if (record.Mass > bestMass)
                 {
-                    bestScore = record.Score;
+                    bestMass = record.Mass;
                 }
             }
 
@@ -162,8 +162,8 @@ namespace SampleClient.Gameplay
                 WinCount = wins,
                 LossCount = losses,
                 WinRate = historyCount == 0 ? 0f : wins / (float)historyCount,
-                AverageScore = historyCount == 0 ? 0 : Mathf.RoundToInt(scoreSum / (float)historyCount),
-                BestScore = bestScore < 0 ? 0 : bestScore,
+                AverageMass = historyCount == 0 ? 0 : Mathf.RoundToInt(massSum / (float)historyCount),
+                BestMass = bestMass < 0 ? 0 : bestMass,
                 CurrentStreak = currentStreak,
                 CurrentStreakType = currentStreakType,
                 TrendLabel = trendLabel,
@@ -201,10 +201,10 @@ namespace SampleClient.Gameplay
                 PlayerLine = $"Player: {state.PlayerId} | Wins: {state.TotalWins} | Matches: {state.TotalMatches} | Win rate: {winRate:P0}",
                 RankLine = rankLine,
                 TrendLine = trend.HasHistory
-                    ? $"Recent form: {trend.FormStrip} | {trend.CurrentStreakType} streak: {trend.CurrentStreak} | Avg score: {trend.AverageScore}"
+                    ? $"Recent form: {trend.FormStrip} | {trend.CurrentStreakType} streak: {trend.CurrentStreak} | Avg mass: {trend.AverageMass}"
                     : "Recent form: No history",
                 FormLine = resetLine + " | " + (trend.HasHistory
-                    ? $"Last {trend.SampleCount}: {trend.WinCount}W / {trend.LossCount}L | Best score: {trend.BestScore}"
+                    ? $"Last {trend.SampleCount}: {trend.WinCount}W / {trend.LossCount}L | Best mass: {trend.BestMass}"
                     : "Last 0: no matches yet"),
                 Entries = entries
             };

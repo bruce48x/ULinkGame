@@ -242,7 +242,6 @@ public sealed class RoomGrain : Grain, IRoomGrain
         {
             var player = FindOrCreatePlayer(result.UserId);
             player.Rank = result.Rank;
-            player.Score += result.ScoreDelta;
             player.IsReady = false;
             player.IsConnected = false;
             player.LastSeenAtUtc = finishedAtUtc;
@@ -368,7 +367,6 @@ public sealed class RoomGrain : Grain, IRoomGrain
                 LastSeenAtUtc = player.LastSeenAtUtc,
                 LeftAtUtc = player.LeftAtUtc,
                 LeaveReason = player.LeaveReason,
-                Score = player.Score,
                 Rank = player.Rank
             }).ToList()
             : [];

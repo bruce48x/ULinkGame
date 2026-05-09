@@ -47,7 +47,6 @@ internal sealed class RoomRuntime : IAsyncDisposable
             _simulation.UpsertPlayer(new ArenaPlayerRegistration
             {
                 PlayerId = player.UserId,
-                Score = Math.Max(0, player.Score),
                 PreferredSpawnIndex = player.SeatIndex,
                 IsBot = false
             });
@@ -65,7 +64,6 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 _simulation.UpsertPlayer(new ArenaPlayerRegistration
                 {
                     PlayerId = playerId,
-                    Score = 0,
                     PreferredSpawnIndex = -1,
                     IsBot = false
                 });
@@ -128,10 +126,9 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 if (result.MatchEnd is null && ShouldForceRoundEnd(result.WorldState))
                 {
                     result = new ArenaStepResult(
-                        result.WorldState,
-                        result.Deaths,
-                        CreateMatchEnd(result.WorldState),
-                        result.ScoreUpdates);
+                    result.WorldState,
+                    result.Deaths,
+                    CreateMatchEnd(result.WorldState));
                 }
 
                 PublishWorldState(result);
@@ -158,8 +155,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
     private static MatchEnd CreateMatchEnd(WorldState worldState)
     {
         var winnerPlayerId = worldState.Players
-            .OrderByDescending(static player => player.Score)
-            .ThenByDescending(static player => player.Mass)
+            .OrderByDescending(static player => player.Mass)
             .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
             .FirstOrDefault()?.PlayerId ?? string.Empty;
 
@@ -212,17 +208,9 @@ internal sealed class RoomRuntime : IAsyncDisposable
     private async Task PersistMatchEndAsync(ArenaStepResult result)
     {
         var rankedPlayers = result.WorldState.Players
-            .OrderByDescending(static player => player.Score)
-            .ThenByDescending(static player => player.Mass)
+            .OrderByDescending(static player => player.Mass)
             .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
             .ToArray();
-
-        foreach (var player in result.WorldState.Players.Where(static player => !VictoryPointAwards.IsBotPlayer(player.PlayerId)))
-        {
-            await _clusterClient.GetGrain<IUserGrain>(player.PlayerId)
-                .AddScoreAsync(player.Score)
-                .ConfigureAwait(false);
-        }
 
         var winnerPlayerId = result.MatchEnd?.WinnerPlayerId ?? "";
         await _clusterClient.GetGrain<IRoomGrain>(_roomId)
@@ -237,7 +225,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 {
                     UserId = player.PlayerId,
                     Rank = index + 1,
-                    ScoreDelta = player.Score,
+                    Mass = NormalizeRankingMass(player.Mass),
                     IsWinner = string.Equals(player.PlayerId, winnerPlayerId, StringComparison.Ordinal)
                 }).ToList()
             })
@@ -296,5 +284,12 @@ internal sealed class RoomRuntime : IAsyncDisposable
         {
             _logger.LogWarning(ex, "Failed to push room event in room {RoomId}.", _roomId);
         }
+    }
+
+    private static int NormalizeRankingMass(float mass)
+    {
+        return float.IsNaN(mass) || float.IsInfinity(mass)
+            ? 0
+            : Math.Max(0, (int)MathF.Round(mass, MidpointRounding.AwayFromZero));
     }
 }

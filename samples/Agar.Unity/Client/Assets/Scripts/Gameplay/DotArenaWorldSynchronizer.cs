@@ -105,7 +105,6 @@ namespace SampleClient.Gameplay
                     isNewRenderState = true;
                 }
 
-                var previousScore = renderState.Score;
                 var previousMass = renderState.Mass;
 
                 var currentPosition = view.GetPosition();
@@ -119,16 +118,15 @@ namespace SampleClient.Gameplay
                 renderState.ReceivedAt = Time.time;
                 renderState.Alive = player.Alive;
                 renderState.State = player.State;
-                renderState.Score = player.Score;
                 renderState.Mass = player.Mass;
                 renderState.Radius = player.Radius;
                 renderState.MoveSpeed = player.MoveSpeed;
 
-                view.SetIdentity(player.PlayerId, player.Score);
+                view.SetIdentity(player.PlayerId, player.Mass);
                 if (_playerOverlayViews.TryGetValue(player.PlayerId, out var overlay))
                 {
                     overlay.NameText.text = player.PlayerId;
-                    overlay.ScoreText.text = $"mass {DotArenaPresentation.FormatMass(player.Mass)}";
+                    overlay.MassText.text = $"mass {DotArenaPresentation.FormatMass(player.Mass)}";
                 }
 
                 if (player.Mass > previousMass + 0.9f && player.PlayerId == localPlayerId)
@@ -148,7 +146,7 @@ namespace SampleClient.Gameplay
 
                 if (player.PlayerId == localPlayerId)
                 {
-                    if (player.Mass > previousMass + 0.05f || player.Score > previousScore)
+                    if (player.Mass > previousMass + 0.05f)
                     {
                         _pushEvent($"Mass {DotArenaPresentation.FormatMass(player.Mass)}");
                     }

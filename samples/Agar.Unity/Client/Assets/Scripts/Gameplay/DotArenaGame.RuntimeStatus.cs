@@ -10,7 +10,7 @@ namespace SampleClient.Gameplay
 {
     public sealed partial class DotArenaGame
     {
-        private string GetLocalPlayerScoreText()
+        private string GetLocalPlayerMassText()
         {
             if (_localPlayerId.Length == 0)
             {
@@ -18,18 +18,18 @@ namespace SampleClient.Gameplay
             }
 
             return _renderStates.TryGetValue(_localPlayerId, out var renderState)
-                ? $"{DotArenaPresentation.FormatScore(renderState.Score)} / {DotArenaPresentation.FormatMass(renderState.Mass)}"
+                ? DotArenaPresentation.FormatMass(renderState.Mass)
                 : "0";
         }
 
-        private int GetLocalPlayerScoreValue()
+        private float GetLocalPlayerMassValue()
         {
             if (_localPlayerId.Length == 0)
             {
-                return 0;
+                return 0f;
             }
 
-            return _renderStates.TryGetValue(_localPlayerId, out var renderState) ? renderState.Score : 0;
+            return _renderStates.TryGetValue(_localPlayerId, out var renderState) ? renderState.Mass : 0f;
         }
 
         private string GetLocalPlayerBuffText()

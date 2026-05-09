@@ -12,7 +12,7 @@ namespace SampleClient.Gameplay
         public string Status { get; set; }
         public string LocalPlayerId { get; set; }
         public string Account { get; set; }
-        public string LocalPlayerScoreText { get; set; }
+        public string LocalPlayerMassText { get; set; }
         public int LocalWinCount { get; set; }
         public int LastWorldTick { get; set; }
         public string LocalPlayerBuffText { get; set; }
@@ -57,7 +57,7 @@ namespace SampleClient.Gameplay
             GUI.Label(new Rect(contentRect.x, contentRect.y, contentRect.width, 24f), "点阵竞技场", titleStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 24f, contentRect.width, 18f), $"状态: {snapshot.Status}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 44f, contentRect.width, 18f),
-                $"玩家: {(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   分数/质量: {snapshot.LocalPlayerScoreText}   胜场: {snapshot.LocalWinCount}", bodyStyle);
+                $"玩家: {(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   质量: {snapshot.LocalPlayerMassText}   胜场: {snapshot.LocalWinCount}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 64f, contentRect.width, 18f),
                 $"场上人数: {views.Count}   状态: {snapshot.LocalPlayerBuffText}", bodyStyle);
             GUI.Label(new Rect(contentRect.x, contentRect.y + 84f, contentRect.width, 18f),
@@ -102,7 +102,7 @@ namespace SampleClient.Gameplay
                 var diameterPixels = serverRadius * 2f * pixelsPerWorldUnit;
                 var labelWidth = Mathf.Max(96f, diameterPixels * 2f);
                 var nameHeight = Mathf.Max(18f, diameterPixels * 0.36f);
-                var scoreHeight = Mathf.Max(16f, diameterPixels * 0.3f);
+                var massHeight = Mathf.Max(16f, diameterPixels * 0.3f);
 
                 var nameStyle = new GUIStyle(GUI.skin.label)
                 {
@@ -113,7 +113,7 @@ namespace SampleClient.Gameplay
                     normal = { textColor = new Color(0.94f, 0.97f, 1f, 1f) }
                 };
 
-                var scoreStyle = new GUIStyle(GUI.skin.label)
+                var massStyle = new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.MiddleCenter,
                     fontStyle = FontStyle.Bold,
@@ -125,10 +125,10 @@ namespace SampleClient.Gameplay
                 var centerX = screenPosition.x;
                 var centerY = Screen.height - screenPosition.y;
                 var nameRect = new Rect(centerX - (labelWidth * 0.5f), centerY - (nameHeight * 1.05f), labelWidth, nameHeight);
-                var scoreRect = new Rect(centerX - (labelWidth * 0.5f), centerY + (scoreHeight * 0.05f), labelWidth, scoreHeight);
+                var massRect = new Rect(centerX - (labelWidth * 0.5f), centerY + (massHeight * 0.05f), labelWidth, massHeight);
 
                 GUI.Label(nameRect, entry.Key, nameStyle);
-                GUI.Label(scoreRect, $"质量: {DotArenaPresentation.FormatMass(renderState.Mass)}", scoreStyle);
+                GUI.Label(massRect, $"质量: {DotArenaPresentation.FormatMass(renderState.Mass)}", massStyle);
             }
         }
     }

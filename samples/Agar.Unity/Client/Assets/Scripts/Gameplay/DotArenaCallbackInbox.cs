@@ -142,7 +142,6 @@ namespace SampleClient.Gameplay
                     State = player.State,
                     Alive = player.Alive,
                     RespawnRemainingSeconds = player.RespawnRemainingSeconds,
-                    Score = player.Score,
                     Mass = player.Mass,
                     Radius = player.Radius,
                     MoveSpeed = player.MoveSpeed

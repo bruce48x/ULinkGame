@@ -8,11 +8,6 @@ namespace SampleClient.Gameplay
 {
     internal static class DotArenaPresentation
     {
-        public static string FormatScore(int score)
-        {
-            return score.ToString();
-        }
-
         public static string FormatMass(float mass)
         {
             return mass >= 100f ? mass.ToString("0") : mass.ToString("0.0");
@@ -33,7 +28,7 @@ namespace SampleClient.Gameplay
         {
             return pickupType switch
             {
-                PickupType.ScorePoint => ScorePickupColor,
+                PickupType.MassPoint => MassPickupColor,
                 _ => Color.white
             };
         }
@@ -42,7 +37,7 @@ namespace SampleClient.Gameplay
         {
             return pickupType switch
             {
-                PickupType.ScorePoint => "Mass",
+                PickupType.MassPoint => "Mass",
                 _ => "Food"
             };
         }

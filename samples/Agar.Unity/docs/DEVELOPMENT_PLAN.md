@@ -49,9 +49,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
 - 客户端排行榜 UI 已通过 `IPlayerService.GetLeaderboardAsync` 连接服务端真实排行榜数据。
 - `InputMessage` 只包含玩家、移动方向和 tick，不再包含 dash。
-- `PickupType` 当前只保留 `ScorePoint`，食物行为统一为质量成长；名称中的 `Score` 属于后续协议清理项。
-- 局内质量就是分数。战斗内 HUD、实时排名和结算中的局内成绩应展示整型质量，不再展示独立分数。
-- `PlayerState` 应只发布位置、速度、生死、整型质量、半径和移动速度；旧 `Score` 字段如果仍存在，只作为兼容字段或由质量派生。
+- 旧食物协议命名已删除，食物行为统一为 `PickupType.MassPoint` 质量成长。
+- 战斗内 HUD、实时排名和结算只展示整型质量；玩家可见的实时排名只有质量列，不再出现“分数”或分数列。
+- `PlayerState` 应只发布位置、速度、生死、整型质量、半径和移动速度；旧分数字段已从共享协议、服务端快照和客户端读取路径中彻底删除。
 - `IUserGrain` 已持久化 `VictoryPoints`，`ILeaderboardGrain` 已提供周榜查询、周期重置和最近两周归档。
 - 排行榜周期重置已按榜单当地时间周一 00:00 计算，旧 `PeriodStartUtc` 字段仅作为兼容字段保留。
 - `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，AI 玩家不获得积分。
@@ -77,7 +77,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - `ArenaMapVariant` 和 `ArenaRuleVariant` 枚举各有多个值；当前代码已有多个单机预设，但联机仍只走默认共享规则。后续如果不会继续扩展联机规则变体，可以把联机侧字段收敛为简单常量。
 - RPC 生成代码需要在共享协议变更后重新生成，Unity 客户端命名空间必须保持为 `Rpc`，否则会遮蔽手写的 `WebSocketRpcClientFactory` / `KcpRpcClientFactory`。
-- 局内 `Score` 与 `Mass` 语义重复。后续应把质量改为整型，并让战斗内实时排名、HUD 和结算只使用质量；旧 `Score` 字段要么移除，要么明确由质量派生以兼容旧协议。
+- 旧局内分数字段与质量语义重复。后续应继续让战斗内实时排名、HUD 和结算只使用质量；旧分数字段需要从共享协议、模拟状态、服务端快照、客户端模型和玩家可见路径中保持删除状态。
 
 ### 客户端结构
 
@@ -162,11 +162,12 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
 - 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
 - 验证联机大厅不展示 DEBUG 信息，不保留调试面板、连接端点、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
-- 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量，不展示独立分数。
+- 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量；表头、行内容和排序都不出现“分数”。
 - 验证右侧实时排名面板背景已改为低遮挡半透明，不再因为背景框过深或过实影响游戏画面可读性。
 - 验证战斗内 HUD 不展示 DEBUG 信息：不出现 tick、endpoint、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
 - 将局内质量改为整型展示和排序口径；如果共享协议仍使用浮点质量，先明确取整规则，再安排协议清理。
-- 清理或兼容 `Score` 字段，让局内成绩统一由质量派生；玩家可见文案不再出现独立“分数”。
+- 删除旧分数字段和相关读取路径；玩家可见文案、HUD、结算和单机/联机实时排名不再出现“分数”，统一使用“质量”。
+- 将旧食物协议命名改为 `PickupType.MassPoint`。
 - 决定是否继续保留 `ArenaMapVariant` / `ArenaRuleVariant` 的联机扩展点；如果短期不扩展联机规则变体，将联机侧字段收敛为简单常量。
 
 验收标准：
@@ -356,8 +357,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 已在对局中增加右侧当前对局排名面板，非对局界面隐藏。
 - 排名数据来自 `DotArenaGame` 的当前 `PlayerRenderState` 集合，单机和联机共用同一套展示逻辑。
-- 排序规则需要按新口径调整为整型质量降序、玩家标识升序；旧分数不再参与战斗内实时排名。
-- 面板应展示名次、玩家名和整型质量，本地玩家行使用高亮背景和文字颜色；旧分数列应移除。
+- 排序规则需要按新口径调整为整型质量降序、玩家标识升序；旧分数不再参与单机或联机战斗内实时排名。
+- 面板应展示名次、玩家名和整型质量，本地玩家行使用高亮背景和文字颜色；旧分数列、表头和行文本应彻底移除。
 - 面板背景需要按新视觉要求改为低遮挡半透明；当前背景框遮挡游戏画面，影响用户体验，应作为后续 UI 修复项处理。
 - 已为右侧实时排名面板生成并接入专用低遮挡背景 `UI_HUD_Rank_Panel_Translucent_01.png`；中心 alpha 约 9%，边缘 alpha 约 33%，角落透明，并在 UI 侧再乘 72% 整体透明度。
 - 已降低排名行背景透明度：普通行约 6% 到 10%，本地玩家行约 20%，避免行底色继续遮挡游戏画面。
@@ -390,7 +391,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 已完成 HUD 文案扫描和清理，可见 UI 路径不再引用冲刺、强化、眩晕等旧玩法语义。
 - 已从 `InputMessage` 中移除 `Dash` 字段。
 - 已从 `PlayerLifeState` 中移除 `Dash` 和 `Stunned`。
-- 已从 `ArenaSimulationOptions.EnabledPickupTypes` 默认值和 `PickupType` 枚举中移除旧强化拾取物，只保留 `ScorePoint`。
+- 已从 `ArenaSimulationOptions.EnabledPickupTypes` 默认值和 `PickupType` 枚举中移除旧强化拾取物，并将质量拾取物命名改为 `MassPoint`。
 - 已从 `PlayerState` 中移除旧强化剩余时间字段。
 - Unity 脚本刷新通过，KCP factory 引用保持正常。
 ### 阶段 6：客户端拆分

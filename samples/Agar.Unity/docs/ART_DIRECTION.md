@@ -123,7 +123,7 @@ clean neon cellular arena style, dark sci-fi arcade palette, soft glow, jelly-li
 
 ### 食物与拾取物
 
-当前 `PickupType` 只保留 `ScorePoint`，第一阶段只需要质量拾取物；名称里的 `Score` 是旧协议遗留，玩家界面只表达质量。
+当前协议使用 `PickupType.MassPoint` 表示质量拾取物；玩家界面只表达质量。
 
 - 小型发光颗粒或圆润碎片。
 - 不使用复杂图案。

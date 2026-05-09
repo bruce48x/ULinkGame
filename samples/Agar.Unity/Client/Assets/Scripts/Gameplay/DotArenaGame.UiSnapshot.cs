@@ -29,7 +29,7 @@ namespace SampleClient.Gameplay
                     LocalPlayerId = _owner._localPlayerId,
                     Account = _owner._account,
                     Password = _owner._password,
-                    LocalPlayerScoreText = _owner.GetLocalPlayerScoreText(),
+                    LocalPlayerMassText = _owner.GetLocalPlayerMassText(),
                     LocalWinCount = _owner._localWinCount,
                     LastWorldTick = _owner._lastWorldTick,
                     ViewCount = _owner._views.Count,
@@ -103,10 +103,7 @@ namespace SampleClient.Gameplay
                         return massCompare;
                     }
 
-                    var scoreCompare = right.Value.Score.CompareTo(left.Value.Score);
-                    return scoreCompare != 0
-                        ? scoreCompare
-                        : StringComparer.Ordinal.Compare(left.Key, right.Key);
+                    return StringComparer.Ordinal.Compare(left.Key, right.Key);
                 });
 
                 var entries = new List<DotArenaMatchRankingEntry>(rankedStates.Count);
@@ -118,7 +115,6 @@ namespace SampleClient.Gameplay
                         i + 1,
                         playerId,
                         NormalizeRankingMass(renderState.Mass),
-                        renderState.Score,
                         string.Equals(playerId, _owner._localPlayerId, StringComparison.Ordinal)));
                 }
 

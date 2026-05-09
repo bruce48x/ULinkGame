@@ -13,7 +13,6 @@ namespace SampleClient.Gameplay
         public float ReceivedAt { get; set; }
         public PlayerLifeState State { get; set; }
         public bool Alive { get; set; }
-        public int Score { get; set; }
         public float Mass { get; set; }
         public float Radius { get; set; }
         public float MoveSpeed { get; set; }
@@ -21,18 +20,18 @@ namespace SampleClient.Gameplay
 
     internal sealed class PlayerOverlayView
     {
-        public PlayerOverlayView(GameObject root, RectTransform rootRect, TextMeshProUGUI nameText, TextMeshProUGUI scoreText)
+        public PlayerOverlayView(GameObject root, RectTransform rootRect, TextMeshProUGUI nameText, TextMeshProUGUI massText)
         {
             Root = root;
             RootRect = rootRect;
             NameText = nameText;
-            ScoreText = scoreText;
+            MassText = massText;
         }
 
         public GameObject Root { get; }
         public RectTransform RootRect { get; }
         public TextMeshProUGUI NameText { get; }
-        public TextMeshProUGUI ScoreText { get; }
+        public TextMeshProUGUI MassText { get; }
     }
 
     internal enum EntryMenuState
@@ -72,7 +71,7 @@ namespace SampleClient.Gameplay
         public string TaskSummary { get; set; } = string.Empty;
         public string NextStepSummary { get; set; } = string.Empty;
         public string WinnerPlayerId { get; set; } = string.Empty;
-        public int LocalPlayerScore { get; set; }
+        public float LocalPlayerMass { get; set; }
         public int LocalWinCount { get; set; }
         public bool LocalPlayerWon { get; set; }
         public SessionMode SessionMode { get; set; }
@@ -88,7 +87,7 @@ namespace SampleClient.Gameplay
     internal enum ArenaRuleVariant
     {
         ClassicElimination = 0,
-        ScoreRush = 1,
+        MassRush = 1,
         ArenaCollapse = 2
     }
 

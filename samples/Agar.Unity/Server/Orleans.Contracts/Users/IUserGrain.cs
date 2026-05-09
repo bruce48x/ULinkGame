@@ -8,8 +8,6 @@ public interface IUserGrain : IGrainWithStringKey
     Task<UserLoginResult> LoginAsync(string password, bool reconnect);
     Task<UserProfileSnapshot> GetProfileAsync();
     Task SetOnlineAsync(bool isOnline);
-    Task SetScoreAsync(int score);
-    Task AddScoreAsync(int delta);
     Task AddWinAsync();
     Task AddVictoryPointsAsync(int points);
     Task ResetVictoryPointsAsync();
@@ -31,10 +29,8 @@ public sealed class UserLoginResult
     public DateTime LastLoginAtUtc { get; set; }
 
     [Id(4)]
-    public int Score { get; set; }
-    [Id(5)]
     public int WinCount { get; set; }
-    [Id(6)]
+    [Id(5)]
     public int VictoryPoints { get; set; }
 }
 
@@ -57,10 +53,9 @@ public sealed class UserProfileSnapshot
     public bool IsOnline { get; set; }
 
     [Id(5)]
-    public int Score { get; set; }
-    [Id(6)]
     public int WinCount { get; set; }
-    [Id(7)]
+
+    [Id(6)]
     public int VictoryPoints { get; set; }
 }
 

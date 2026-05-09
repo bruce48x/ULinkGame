@@ -17,9 +17,9 @@ namespace Shared.Gameplay
         public bool EnableBots { get; set; } = true;
         public int RestartDelayTicks { get; set; } = 60;
         public float MaxRoundSeconds { get; set; } = 120f;
-        public int InitialScore { get; set; } = 1;
+        public float InitialPlayerMass { get; set; } = 24f;
         public string? FixedRespawnPlayerId { get; set; }
-        public int FixedRespawnScore { get; set; }
+        public float FixedRespawnMass { get; set; }
         public string? MoveSpeedMultiplierPlayerId { get; set; }
         public float MoveSpeedMultiplier { get; set; } = 1f;
         public string? InvertedMoveSpeedPlayerId { get; set; }
@@ -43,14 +43,14 @@ namespace Shared.Gameplay
         public Vector2 FinalArenaHalfExtents { get; set; } = new(18f, 18f);
         public PickupType[] EnabledPickupTypes { get; set; } =
         {
-            PickupType.ScorePoint
+            PickupType.MassPoint
         };
     }
 
     public sealed class ArenaPlayerRegistration
     {
         public string PlayerId { get; set; } = string.Empty;
-        public int Score { get; set; }
+        public float Mass { get; set; }
         public int PreferredSpawnIndex { get; set; } = -1;
         public bool IsBot { get; set; }
         public int BotNumber { get; set; }
@@ -59,33 +59,24 @@ namespace Shared.Gameplay
     public sealed class ArenaPlayerSnapshot
     {
         public string PlayerId { get; set; } = string.Empty;
-        public int Score { get; set; }
+        public float Mass { get; set; }
         public int SpawnIndex { get; set; }
         public bool IsBot { get; set; }
         public int BotNumber { get; set; }
     }
 
-    public sealed class ArenaScoreUpdate
-    {
-        public string PlayerId { get; set; } = string.Empty;
-        public int Score { get; set; }
-        public bool IsBot { get; set; }
-    }
-
     public sealed class ArenaStepResult
     {
-        public ArenaStepResult(WorldState worldState, PlayerDead[] deaths, MatchEnd? matchEnd, ArenaScoreUpdate[] scoreUpdates)
+        public ArenaStepResult(WorldState worldState, PlayerDead[] deaths, MatchEnd? matchEnd)
         {
             WorldState = worldState;
             Deaths = deaths;
             MatchEnd = matchEnd;
-            ScoreUpdates = scoreUpdates;
         }
 
         public WorldState WorldState { get; }
         public PlayerDead[] Deaths { get; }
         public MatchEnd? MatchEnd { get; }
-        public ArenaScoreUpdate[] ScoreUpdates { get; }
     }
 
     public sealed class ArenaSimulation
@@ -93,7 +84,6 @@ namespace Shared.Gameplay
         private static readonly Vector2 Zero = new(0f, 0f);
 
         private readonly List<PlayerDead> _pendingDeaths = new();
-        private readonly List<ArenaScoreUpdate> _pendingScoreUpdates = new();
         private readonly Dictionary<string, ArenaPlayer> _players = new(StringComparer.Ordinal);
         private readonly List<ArenaFood> _foods = new();
         private readonly ArenaSimulationOptions _options;
@@ -126,7 +116,7 @@ namespace Shared.Gameplay
 
             if (_players.TryGetValue(registration.PlayerId, out var existing))
             {
-                SetScore(existing, Math.Max(existing.Score, GetInitialScore()));
+                SetMass(existing, Math.Max(existing.Mass, GetInitialMass()));
                 return;
             }
 
@@ -134,13 +124,13 @@ namespace Shared.Gameplay
             var player = new ArenaPlayer(
                 registration.PlayerId,
                 spawnIndex,
-                Math.Max(NormalizeScore(registration.Score), GetInitialScore()),
+                Math.Max(NormalizeMass(registration.Mass), GetInitialMass()),
                 registration.IsBot,
                 registration.BotNumber)
             {
                 Position = GetRandomSpawnPosition()
             };
-            RefreshPlayerBodyFromScore(player);
+            RefreshPlayerBodyFromMass(player);
             _players.Add(registration.PlayerId, player);
 
             if (!registration.IsBot)
@@ -233,10 +223,8 @@ namespace Shared.Gameplay
             var result = new ArenaStepResult(
                 CreateWorldState(),
                 _pendingDeaths.ToArray(),
-                _pendingMatchEnd,
-                _pendingScoreUpdates.ToArray());
+                _pendingMatchEnd);
             _pendingMatchEnd = null;
-            _pendingScoreUpdates.Clear();
             return result;
         }
 
@@ -266,7 +254,6 @@ namespace Shared.Gameplay
                     State = GetLifeState(player),
                     Alive = player.Alive,
                     RespawnRemainingSeconds = player.Alive ? 0 : (int)MathF.Ceiling(player.RespawnRemaining),
-                    Score = player.Score,
                     Mass = player.Mass,
                     Radius = player.Radius,
                     MoveSpeed = moveSpeed
@@ -291,7 +278,6 @@ namespace Shared.Gameplay
             _players.Clear();
             _foods.Clear();
             _pendingDeaths.Clear();
-            _pendingScoreUpdates.Clear();
             _pendingMatchEnd = null;
             _restartAtTick = null;
             _winnerPlayerId = null;
@@ -460,14 +446,14 @@ namespace Shared.Gameplay
 
         private void ConsumeFood(ArenaPlayer player, ArenaFood food)
         {
-            AdjustScore(player, 1);
+            AdjustMass(player, _options.FoodMassGain);
         }
 
         private void ConsumePlayer(ArenaPlayer eater, ArenaPlayer victim)
         {
-            var scoreGain = Math.Max(2, (int)MathF.Round(GetScoreMass(victim) * _options.PlayerConsumeMassGainFactor / _options.FoodMassGain));
-            AdjustScore(eater, scoreGain);
-            SetScore(victim, 0);
+            var massGain = MathF.Max(_options.FoodMassGain * 2f, GetConsumableMass(victim) * _options.PlayerConsumeMassGainFactor);
+            AdjustMass(eater, massGain);
+            SetMass(victim, 0f);
 
             victim.Alive = false;
             victim.Velocity = Zero;
@@ -500,7 +486,6 @@ namespace Shared.Gameplay
 
             var winner = _players.Values
                 .OrderByDescending(static player => player.Mass)
-                .ThenByDescending(static player => player.Score)
                 .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
                 .FirstOrDefault();
             if (winner is null)
@@ -534,19 +519,12 @@ namespace Shared.Gameplay
             foreach (var player in _players.Values.OrderBy(static p => p.PlayerId, StringComparer.Ordinal))
             {
                 player.Position = GetRandomSpawnPosition(player.PlayerId);
-                player.Score = GetRespawnScore(player);
-                RefreshPlayerBodyFromScore(player);
+                player.Mass = GetRespawnMass(player);
+                RefreshPlayerBodyFromMass(player);
                 player.Velocity = Zero;
                 player.Input = Zero;
                 player.Alive = true;
                 player.RespawnRemaining = 0f;
-                _pendingScoreUpdates.RemoveAll(update => string.Equals(update.PlayerId, player.PlayerId, StringComparison.Ordinal));
-                _pendingScoreUpdates.Add(new ArenaScoreUpdate
-                {
-                    PlayerId = player.PlayerId,
-                    Score = player.Score,
-                    IsBot = player.IsBot
-                });
             }
         }
 
@@ -581,38 +559,30 @@ namespace Shared.Gameplay
             return index;
         }
 
-        private void AdjustScore(ArenaPlayer player, int delta)
+        private void AdjustMass(ArenaPlayer player, float delta)
         {
-            SetScore(player, player.Score + delta);
+            SetMass(player, player.Mass + delta);
         }
 
-        private void SetScore(ArenaPlayer player, int score)
+        private void SetMass(ArenaPlayer player, float mass)
         {
-            player.Score = NormalizeScore(score);
-            RefreshPlayerBodyFromScore(player);
-            _pendingScoreUpdates.RemoveAll(update => string.Equals(update.PlayerId, player.PlayerId, StringComparison.Ordinal));
-            _pendingScoreUpdates.Add(new ArenaScoreUpdate
-            {
-                PlayerId = player.PlayerId,
-                Score = player.Score,
-                IsBot = player.IsBot
-            });
+            player.Mass = NormalizeMass(mass);
+            RefreshPlayerBodyFromMass(player);
         }
 
         private void RespawnPlayer(ArenaPlayer player)
         {
             player.Position = GetRandomSpawnPosition(player.PlayerId);
-            player.Score = GetRespawnScore(player);
-            RefreshPlayerBodyFromScore(player);
+            player.Mass = GetRespawnMass(player);
+            RefreshPlayerBodyFromMass(player);
             player.Velocity = Zero;
             player.Input = Zero;
             player.Alive = true;
             player.RespawnRemaining = 0f;
         }
 
-        private void RefreshPlayerBodyFromScore(ArenaPlayer player)
+        private void RefreshPlayerBodyFromMass(ArenaPlayer player)
         {
-            player.Mass = GetMassForScore(player.Score);
             player.Radius = GetRadiusForMass(player.Mass);
         }
 
@@ -626,9 +596,9 @@ namespace Shared.Gameplay
             return LengthSquared(player.Input) > 0.001f ? PlayerLifeState.Move : PlayerLifeState.Idle;
         }
 
-        private static int NormalizeScore(int score)
+        private static float NormalizeMass(float mass)
         {
-            return Math.Max(0, score);
+            return float.IsNaN(mass) || float.IsInfinity(mass) ? 0f : MathF.Max(0f, mass);
         }
 
         private float GetMoveSpeed(float mass)
@@ -660,35 +630,25 @@ namespace Shared.Gameplay
             return speed;
         }
 
-        private float GetMassForScore(int score)
-        {
-            return MathF.Max(1f, _options.InitialMass + (GetScoreGrowth(score) * _options.FoodMassGain));
-        }
-
-        private float GetScoreMass(ArenaPlayer player)
+        private float GetConsumableMass(ArenaPlayer player)
         {
             return MathF.Max(0f, player.Mass - _options.InitialMass);
         }
 
-        private int GetInitialScore()
+        private float GetInitialMass()
         {
-            return Math.Max(1, _options.InitialScore);
+            return MathF.Max(1f, _options.InitialPlayerMass > 0f ? _options.InitialPlayerMass : _options.InitialMass);
         }
 
-        private int GetRespawnScore(ArenaPlayer player)
+        private float GetRespawnMass(ArenaPlayer player)
         {
             if (!string.IsNullOrWhiteSpace(_options.FixedRespawnPlayerId) &&
                 string.Equals(player.PlayerId, _options.FixedRespawnPlayerId, StringComparison.Ordinal))
             {
-                return Math.Max(GetInitialScore(), NormalizeScore(_options.FixedRespawnScore));
+                return MathF.Max(GetInitialMass(), NormalizeMass(_options.FixedRespawnMass));
             }
 
-            return GetInitialScore();
-        }
-
-        private int GetScoreGrowth(int score)
-        {
-            return Math.Max(0, NormalizeScore(score) - GetInitialScore());
+            return MathF.Max(1f, _options.RespawnMass > 0f ? _options.RespawnMass : GetInitialMass());
         }
 
         private static bool IsConfiguredPlayer(ArenaPlayer player, string? configuredPlayerId)
@@ -768,7 +728,7 @@ namespace Shared.Gameplay
         private ArenaFood CreateFood()
         {
             var enabledTypes = _options.EnabledPickupTypes.Length == 0
-                ? new[] { PickupType.ScorePoint }
+                ? new[] { PickupType.MassPoint }
                 : _options.EnabledPickupTypes;
             return new ArenaFood
             {
@@ -954,7 +914,6 @@ namespace Shared.Gameplay
             UpsertPlayer(new ArenaPlayerRegistration
             {
                 PlayerId = botName,
-                Score = 0,
                 PreferredSpawnIndex = GetNextSpawnIndex(),
                 IsBot = true,
                 BotNumber = botNumber
@@ -991,7 +950,7 @@ namespace Shared.Gameplay
             return new ArenaPlayerSnapshot
             {
                 PlayerId = player.PlayerId,
-                Score = player.Score,
+                Mass = player.Mass,
                 SpawnIndex = player.SpawnIndex,
                 IsBot = player.IsBot,
                 BotNumber = player.BotNumber
@@ -1006,12 +965,12 @@ namespace Shared.Gameplay
 
         private sealed class ArenaPlayer
         {
-            public ArenaPlayer(string playerId, int spawnIndex, int score, bool isBot, int botNumber)
+            public ArenaPlayer(string playerId, int spawnIndex, float mass, bool isBot, int botNumber)
             {
                 PlayerId = playerId;
                 SpawnIndex = spawnIndex;
                 Position = Zero;
-                Score = NormalizeScore(score);
+                Mass = NormalizeMass(mass);
                 Alive = true;
                 IsBot = isBot;
                 BotNumber = botNumber;
@@ -1027,7 +986,6 @@ namespace Shared.Gameplay
             public bool Alive { get; set; }
             public float RespawnRemaining { get; set; }
             public int LastInputTick { get; set; }
-            public int Score { get; set; }
             public float Mass { get; set; }
             public float Radius { get; set; }
         }

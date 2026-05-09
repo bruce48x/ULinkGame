@@ -15,9 +15,9 @@ namespace SampleClient.Gameplay
         public const float FollowCameraRadiusMultiplier = 3.6f;
         public const float CameraFollowSharpness = 7f;
         public const float CameraZoomSharpness = 5f;
-        public const int InvincibleSinglePlayerInitialScore = 1000;
+        public const float InvincibleSinglePlayerInitialMass = 1000f;
         public const float PlayerNameOffsetY = 0.11f;
-        public const float PlayerScoreOffsetY = -0.13f;
+        public const float PlayerMassOffsetY = -0.13f;
         public const float PickupPulseAmplitude = 0.08f;
         public const float PickupPulseFrequency = 3.2f;
         public const float PickupAbsorbDurationSeconds = 0.26f;
@@ -31,13 +31,13 @@ namespace SampleClient.Gameplay
         public const int PickupLabelSortingOrder = 14;
         public const float PlayerTextDepth = -0.2f;
         public const float PlayerNameScale = 0.16f;
-        public const float PlayerScoreScale = 0.13f;
+        public const float PlayerMassScale = 0.13f;
         public const float PickupLabelScale = 0.45f;
         public const float PlayerTextCharacterSize = 0.4f;
         public const float PlayerNameBackdropWidth = 1.1f;
         public const float PlayerNameBackdropHeight = 0.24f;
-        public const float PlayerScoreBackdropWidth = 0.8f;
-        public const float PlayerScoreBackdropHeight = 0.2f;
+        public const float PlayerMassBackdropWidth = 0.8f;
+        public const float PlayerMassBackdropHeight = 0.2f;
         public const float InputSendIntervalSeconds = 0.05f;
         public const float SinglePlayerTickSeconds = 0.05f;
         public const int MaxSinglePlayerCatchUpTicks = 4;
@@ -58,7 +58,7 @@ namespace SampleClient.Gameplay
         public static readonly Color UiSecondaryTextColor = new(0.84f, 0.9f, 0.96f, 1f);
         public static readonly Color UiMutedTextColor = new(0.73f, 0.8f, 0.88f, 1f);
         public static readonly Color UiAccentTextColor = new(1f, 0.92f, 0.7f, 1f);
-        public static readonly Color ScorePickupColor = new(0.22f, 0.9f, 1f, 0.95f);
+        public static readonly Color MassPickupColor = new(0.22f, 0.9f, 1f, 0.95f);
         public static readonly Color SpeedPickupColor = new(1f, 0.86f, 0.22f, 0.95f);
         public static readonly Color KnockbackPickupColor = new(1f, 0.22f, 0.22f, 0.95f);
         public static readonly ArenaConfig GameplayConfig = ArenaConfig.CreateDefault();

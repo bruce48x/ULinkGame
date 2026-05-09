@@ -23,8 +23,7 @@ public sealed class ArenaSimulationRulesTests
 
         simulation.UpsertPlayer(new ArenaPlayerRegistration
         {
-            PlayerId = "Player",
-            Score = 1
+            PlayerId = "Player"
         });
 
         ArenaStepResult result = null!;
@@ -38,7 +37,7 @@ public sealed class ArenaSimulationRulesTests
     }
 
     [Fact]
-    public void HighStartingScoreControlsStartingScoreAndMass()
+    public void HighStartingMassControlsStartingMass()
     {
         var simulation = new ArenaSimulation(new ArenaSimulationOptions
         {
@@ -52,19 +51,18 @@ public sealed class ArenaSimulationRulesTests
         simulation.UpsertPlayer(new ArenaPlayerRegistration
         {
             PlayerId = "Player",
-            Score = 1000
+            Mass = 1000f
         });
 
         var player = Assert.Single(simulation.CreateWorldState().Players);
-        Assert.Equal(1000, player.Score);
-        Assert.True(player.Mass > 24f);
+        Assert.Equal(1000f, player.Mass);
     }
 
     [Fact]
     public void InvertedMoveSpeedPlayerGetsFasterAsMassGrows()
     {
-        var small = CreateSinglePlayerState(score: 1, invertedSpeed: true);
-        var large = CreateSinglePlayerState(score: 1000, invertedSpeed: true);
+        var small = CreateSinglePlayerState(mass: 24f, invertedSpeed: true);
+        var large = CreateSinglePlayerState(mass: 1000f, invertedSpeed: true);
 
         Assert.True(large.MoveSpeed > small.MoveSpeed);
     }
@@ -72,8 +70,8 @@ public sealed class ArenaSimulationRulesTests
     [Fact]
     public void NormalMoveSpeedPlayerGetsSlowerAsMassGrows()
     {
-        var small = CreateSinglePlayerState(score: 1, invertedSpeed: false);
-        var large = CreateSinglePlayerState(score: 1000, invertedSpeed: false);
+        var small = CreateSinglePlayerState(mass: 24f, invertedSpeed: false);
+        var large = CreateSinglePlayerState(mass: 1000f, invertedSpeed: false);
 
         Assert.True(large.MoveSpeed < small.MoveSpeed);
     }
@@ -92,8 +90,8 @@ public sealed class ArenaSimulationRulesTests
             MoveSpeedMultiplier = 2f
         });
 
-        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Boosted", Score = 1 });
-        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Normal", Score = 1 });
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Boosted" });
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Normal" });
 
         var players = simulation.CreateWorldState().Players;
         var boosted = players.Single(player => player.PlayerId == "Boosted");
@@ -103,16 +101,16 @@ public sealed class ArenaSimulationRulesTests
     }
 
     [Fact]
-    public void DefaultPickupTypesOnlyContainScorePoint()
+    public void DefaultPickupTypesOnlyContainMassPoint()
     {
         var options = new ArenaSimulationOptions();
 
         var pickupType = Assert.Single(options.EnabledPickupTypes);
-        Assert.Equal(PickupType.ScorePoint, pickupType);
+        Assert.Equal(PickupType.MassPoint, pickupType);
     }
 
     [Fact]
-    public void GeneratedFoodUsesOnlyScorePoint()
+    public void GeneratedFoodUsesOnlyMassPoint()
     {
         var simulation = new ArenaSimulation(new ArenaSimulationOptions
         {
@@ -125,7 +123,7 @@ public sealed class ArenaSimulationRulesTests
 
         var world = simulation.CreateWorldState();
 
-        Assert.All(world.Pickups, pickup => Assert.Equal(PickupType.ScorePoint, pickup.Type));
+        Assert.All(world.Pickups, pickup => Assert.Equal(PickupType.MassPoint, pickup.Type));
     }
 
     [Fact]
@@ -140,10 +138,10 @@ public sealed class ArenaSimulationRulesTests
             EatMassRatio = 1.15f
         });
 
-        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Player", Score = 1 });
-        SetPlayerState(simulation, "Player", score: 1, position: new Vector2(0f, -8f));
-        SetPlayerState(simulation, "AI01", score: 4, position: new Vector2(0f, 8f));
-        SetPlayerState(simulation, "AI02", score: 1, position: new Vector2(10f, 8f));
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "Player" });
+        SetPlayerState(simulation, "Player", mass: 24f, position: new Vector2(0f, -8f));
+        SetPlayerState(simulation, "AI01", mass: 64f, position: new Vector2(0f, 8f));
+        SetPlayerState(simulation, "AI02", mass: 24f, position: new Vector2(10f, 8f));
 
         var result = simulation.Tick(0.1f);
         var hunter = result.WorldState.Players.Single(player => player.PlayerId == "AI01");
@@ -172,7 +170,7 @@ public sealed class ArenaSimulationRulesTests
         Assert.Equal(expected, VictoryPointAwards.IsBotPlayer(playerId));
     }
 
-    private static PlayerState CreateSinglePlayerState(int score, bool invertedSpeed)
+    private static PlayerState CreateSinglePlayerState(float mass, bool invertedSpeed)
     {
         var simulation = new ArenaSimulation(new ArenaSimulationOptions
         {
@@ -187,21 +185,21 @@ public sealed class ArenaSimulationRulesTests
         simulation.UpsertPlayer(new ArenaPlayerRegistration
         {
             PlayerId = "Player",
-            Score = score
+            Mass = mass
         });
 
         return Assert.Single(simulation.CreateWorldState().Players);
     }
 
-    private static void SetPlayerState(ArenaSimulation simulation, string playerId, int score, Vector2 position)
+    private static void SetPlayerState(ArenaSimulation simulation, string playerId, float mass, Vector2 position)
     {
         var playersField = typeof(ArenaSimulation).GetField("_players", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var players = (IDictionary)playersField.GetValue(simulation)!;
         var player = players[playerId]!;
 
         typeof(ArenaSimulation)
-            .GetMethod("SetScore", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(simulation, new[] { player, score });
+            .GetMethod("SetMass", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(simulation, new object[] { player, mass });
 
         player.GetType().GetProperty("Position")!.SetValue(player, position);
         player.GetType().GetProperty("Velocity")!.SetValue(player, new Vector2(0f, 0f));

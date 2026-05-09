@@ -21,13 +21,13 @@ namespace SampleClient.Gameplay
         {
             var preset = DotArenaSinglePlayerCatalog.GetNextPreset(ref playlistIndex);
             var options = DotArenaSinglePlayerCatalog.CreateOptions(preset);
-            var initialScore = 1;
+            var initialMass = options.InitialPlayerMass;
 
             if (mode == SinglePlayerMode.Invincible)
             {
-                initialScore = InvincibleSinglePlayerInitialScore;
+                initialMass = InvincibleSinglePlayerInitialMass;
                 options.FixedRespawnPlayerId = LocalPlayerId;
-                options.FixedRespawnScore = InvincibleSinglePlayerInitialScore;
+                options.FixedRespawnMass = InvincibleSinglePlayerInitialMass;
                 options.MoveSpeedMultiplierPlayerId = LocalPlayerId;
                 options.MoveSpeedMultiplier = 2f;
                 options.InvertedMoveSpeedPlayerId = LocalPlayerId;
@@ -37,7 +37,7 @@ namespace SampleClient.Gameplay
             _match.UpsertPlayer(new ArenaPlayerRegistration
             {
                 PlayerId = LocalPlayerId,
-                Score = initialScore
+                Mass = initialMass
             });
 
             _tickAccumulator = 0f;

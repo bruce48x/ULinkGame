@@ -195,8 +195,7 @@ namespace SampleClient.Gameplay
         private static string SelectWinnerFromWorldState(WorldState worldState)
         {
             return worldState.Players
-                .OrderByDescending(static player => player.Score)
-                .ThenByDescending(static player => player.Mass)
+                .OrderByDescending(static player => player.Mass)
                 .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
                 .FirstOrDefault()?.PlayerId ?? string.Empty;
         }

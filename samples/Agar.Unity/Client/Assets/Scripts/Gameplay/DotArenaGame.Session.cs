@@ -270,7 +270,7 @@ namespace SampleClient.Gameplay
         private Task ReturnToMainMenuAfterMatchAsync(bool preserveLoginState, string winnerPlayerId, bool localPlayerWon)
         {
             var sessionMode = _sessionMode;
-            var localScore = GetLocalPlayerScoreValue();
+            var localMass = GetLocalPlayerMassValue();
             var authenticatedProfile = _multiplayerState.CaptureAuthenticatedProfile();
 
             if (_sessionMode == SessionMode.Multiplayer)
@@ -312,12 +312,12 @@ namespace SampleClient.Gameplay
             _settlementSummary = new MatchSettlementSummary
             {
                 Title = preserveLoginState ? "联机结算" : "单机结算",
-                Detail = DotArenaUiTextComposer.BuildSettlementDetail(sessionMode, localScore, _localWinCount, winnerPlayerId, localPlayerWon, _currentArenaMapVariant, _currentArenaRuleVariant),
+                Detail = DotArenaUiTextComposer.BuildSettlementDetail(sessionMode, localMass, _localWinCount, winnerPlayerId, localPlayerWon, _currentArenaMapVariant, _currentArenaRuleVariant),
                 RewardSummary = DotArenaUiTextComposer.BuildSettlementRewardSummary(sessionMode, _lastRewardSummary),
                 TaskSummary = DotArenaUiTextComposer.BuildSettlementTaskSummary(_metaState),
                 NextStepSummary = DotArenaUiTextComposer.BuildSettlementNextStepSummary(sessionMode, _currentArenaMapVariant, _currentArenaRuleVariant),
                 WinnerPlayerId = winnerPlayerId,
-                LocalPlayerScore = localScore,
+                LocalPlayerMass = localMass,
                 LocalWinCount = _localWinCount,
                 LocalPlayerWon = localPlayerWon,
                 SessionMode = sessionMode
@@ -335,7 +335,7 @@ namespace SampleClient.Gameplay
                     sessionMode,
                     winnerPlayerId,
                     preserveLoginState ? authenticatedProfile.PlayerId : "Player",
-                    localScore);
+                    localMass);
                 _settlementSummary.RewardSummary = DotArenaUiTextComposer.BuildSettlementRewardSummary(sessionMode, _lastRewardSummary);
                 _settlementSummary.TaskSummary = DotArenaUiTextComposer.BuildSettlementTaskSummary(_metaState);
             }

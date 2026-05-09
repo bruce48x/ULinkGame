@@ -69,7 +69,6 @@ namespace SampleClient.Gameplay
                 StyleText(row.RankText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Left, TextOverflowModes.Ellipsis);
                 StyleText(row.NameText, UiPrimaryTextColor, 12f, false, TextAlignmentOptions.Left, TextOverflowModes.Ellipsis);
                 StyleText(row.MassText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Right, TextOverflowModes.Ellipsis);
-                StyleText(row.ScoreText, UiSecondaryTextColor, 12f, false, TextAlignmentOptions.Right, TextOverflowModes.Ellipsis);
             }
 
             StyleText(_debugTitleText, UiAccentTextColor, 16f, false, TextAlignmentOptions.TopLeft, TextOverflowModes.Ellipsis);

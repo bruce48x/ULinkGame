@@ -31,12 +31,9 @@ public sealed class UserState
     public bool IsOnline { get; set; }
 
     [Id(7)]
-    public float Score { get; set; }
-
-    [Id(8)]
     public int WinCount { get; set; }
 
-    [Id(9)]
+    [Id(8)]
     public int VictoryPoints { get; set; }
 }
 
@@ -66,8 +63,7 @@ public sealed class UserGrain : Grain, IUserGrain
             {
                 UserId = userId,
                 PasswordHash = passwordHash,
-                CreatedAtUtc = now,
-                Score = 0f
+                CreatedAtUtc = now
             };
         }
         else if (!string.Equals(_state.State.PasswordHash, passwordHash, StringComparison.Ordinal))
@@ -83,7 +79,6 @@ public sealed class UserGrain : Grain, IUserGrain
         _state.State.LoginCount += 1;
         _state.State.LastLoginAtUtc = now;
         _state.State.IsOnline = true;
-        _state.State.Score = NormalizeScore(_state.State.Score);
         await _state.WriteStateAsync();
 
         return new UserLoginResult
@@ -92,7 +87,6 @@ public sealed class UserGrain : Grain, IUserGrain
             SessionToken = _state.State.SessionToken,
             LoginCount = _state.State.LoginCount,
             LastLoginAtUtc = _state.State.LastLoginAtUtc,
-            Score = NormalizeScore(_state.State.Score),
             WinCount = Math.Max(0, _state.State.WinCount),
             VictoryPoints = Math.Max(0, _state.State.VictoryPoints)
         };
@@ -107,7 +101,6 @@ public sealed class UserGrain : Grain, IUserGrain
             CreatedAtUtc = _state.State.CreatedAtUtc,
             LastLoginAtUtc = _state.State.LastLoginAtUtc,
             IsOnline = _state.State.IsOnline,
-            Score = NormalizeScore(_state.State.Score),
             WinCount = Math.Max(0, _state.State.WinCount),
             VictoryPoints = Math.Max(0, _state.State.VictoryPoints)
         };
@@ -122,28 +115,6 @@ public sealed class UserGrain : Grain, IUserGrain
         }
 
         _state.State.IsOnline = isOnline;
-        await _state.WriteStateAsync();
-    }
-
-    public async Task SetScoreAsync(int score)
-    {
-        if (!_state.RecordExists)
-        {
-            return;
-        }
-
-        _state.State.Score = NormalizeScore(score);
-        await _state.WriteStateAsync();
-    }
-
-    public async Task AddScoreAsync(int delta)
-    {
-        if (!_state.RecordExists)
-        {
-            return;
-        }
-
-        _state.State.Score = Math.Max(0f, _state.State.Score + delta);
         await _state.WriteStateAsync();
     }
 
@@ -178,11 +149,6 @@ public sealed class UserGrain : Grain, IUserGrain
 
         _state.State.VictoryPoints = 0;
         await _state.WriteStateAsync();
-    }
-
-    private static int NormalizeScore(float score)
-    {
-        return Math.Max(0, (int)Math.Round(score, MidpointRounding.AwayFromZero));
     }
 
     private static string ComputePasswordHash(string password)

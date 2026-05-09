@@ -38,14 +38,14 @@ namespace SampleClient.Gameplay
             if (_multiplayerPanel != null) _multiplayerPanel.SetActive(showEntry && snapshot.EntryMenuState == EntryMenuState.MultiplayerAuth);
 
             SetText(_hudStatusText, "状态：对局中");
-            SetText(_hudPlayerText, $"玩家：{(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   分数/质量：{snapshot.LocalPlayerScoreText}   胜场：{snapshot.LocalWinCount}");
+            SetText(_hudPlayerText, $"玩家：{(snapshot.LocalPlayerId.Length > 0 ? snapshot.LocalPlayerId : snapshot.Account)}   质量：{snapshot.LocalPlayerMassText}   胜场：{snapshot.LocalWinCount}");
             SetText(_hudTickText, string.Empty);
             SetText(_hudTitleText, string.Empty);
             SetText(_hudModeText, string.Empty);
             SetText(_hudHintText, string.Empty);
             SetText(_hudEventText, string.Empty);
             SetText(_matchRankingTitleText, "实时排名");
-            SetText(_matchRankingHeaderText, "名次    玩家        质量   分数");
+            SetText(_matchRankingHeaderText, "名次    玩家              质量");
             RefreshMatchRankingRows(snapshot.MatchRankingEntries, showHud);
             SetText(_debugTitleText, string.Empty);
             SetText(_debugDetailText, string.Empty);
@@ -146,7 +146,6 @@ namespace SampleClient.Gameplay
                 SetText(row.RankText, $"#{entry.Rank}");
                 SetText(row.NameText, entry.PlayerId);
                 SetText(row.MassText, DotArenaPresentation.FormatMass(entry.Mass));
-                SetText(row.ScoreText, DotArenaPresentation.FormatScore(entry.Score));
 
                 var rowBackground = (i & 1) == 0
                     ? new Color(0.08f, 0.12f, 0.16f, 0.10f)
@@ -160,7 +159,6 @@ namespace SampleClient.Gameplay
                 row.RankText.color = valueColor;
                 row.NameText.color = nameColor;
                 row.MassText.color = valueColor;
-                row.ScoreText.color = valueColor;
             }
         }
 

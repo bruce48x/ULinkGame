@@ -117,7 +117,7 @@ public sealed class RoomSettlementEntry
     public int Rank { get; set; }
 
     [Id(2)]
-    public int ScoreDelta { get; set; }
+    public int Mass { get; set; }
 
     [Id(3)]
     public bool IsWinner { get; set; }
@@ -243,9 +243,6 @@ public sealed class RoomPlayerSnapshot
     public string LeaveReason { get; set; } = "";
 
     [Id(10)]
-    public int Score { get; set; }
-
-    [Id(11)]
     public int Rank { get; set; }
 }
 
@@ -329,9 +326,6 @@ public sealed class RoomPlayerState
     public string LeaveReason { get; set; } = "";
 
     [Id(10)]
-    public int Score { get; set; }
-
-    [Id(11)]
     public int Rank { get; set; }
 }
 

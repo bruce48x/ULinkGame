@@ -110,10 +110,9 @@ namespace SampleClient.Gameplay
             background.raycastTarget = false;
 
             var rankText = EnsureMatchRankingRowText(rowObject.transform, "RankText", 0f, 34f, TextAlignmentOptions.Left);
-            var nameText = EnsureMatchRankingRowText(rowObject.transform, "NameText", 36f, 92f, TextAlignmentOptions.Left);
-            var massText = EnsureMatchRankingRowText(rowObject.transform, "MassText", 130f, 50f, TextAlignmentOptions.Right);
-            var scoreText = EnsureMatchRankingRowText(rowObject.transform, "ScoreText", 184f, 38f, TextAlignmentOptions.Right);
-            return new MatchRankingRowUi(rowObject, background, rankText, nameText, massText, scoreText);
+            var nameText = EnsureMatchRankingRowText(rowObject.transform, "NameText", 36f, 118f, TextAlignmentOptions.Left);
+            var massText = EnsureMatchRankingRowText(rowObject.transform, "MassText", 164f, 56f, TextAlignmentOptions.Right);
+            return new MatchRankingRowUi(rowObject, background, rankText, nameText, massText);
         }
 
         private TMP_Text EnsureMatchRankingRowText(Transform parent, string name, float x, float width, TextAlignmentOptions alignment)

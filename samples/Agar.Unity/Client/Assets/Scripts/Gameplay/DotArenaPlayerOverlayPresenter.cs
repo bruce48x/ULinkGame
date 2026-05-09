@@ -49,25 +49,25 @@ namespace SampleClient.Gameplay
             nameText.overflowMode = TextOverflowModes.Ellipsis;
             nameText.color = UiPrimaryTextColor;
 
-            var scoreObject = new GameObject("ScoreText", typeof(RectTransform), typeof(TextMeshProUGUI));
-            scoreObject.transform.SetParent(root.transform, false);
-            var scoreRect = (RectTransform)scoreObject.transform;
-            scoreRect.anchorMin = new Vector2(0.5f, 0.5f);
-            scoreRect.anchorMax = new Vector2(0.5f, 0.5f);
-            scoreRect.pivot = new Vector2(0.5f, 0.5f);
-            scoreRect.anchoredPosition = new Vector2(0f, 8f);
-            scoreRect.sizeDelta = new Vector2(140f, 18f);
+            var massObject = new GameObject("MassText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            massObject.transform.SetParent(root.transform, false);
+            var massRect = (RectTransform)massObject.transform;
+            massRect.anchorMin = new Vector2(0.5f, 0.5f);
+            massRect.anchorMax = new Vector2(0.5f, 0.5f);
+            massRect.pivot = new Vector2(0.5f, 0.5f);
+            massRect.anchoredPosition = new Vector2(0f, 8f);
+            massRect.sizeDelta = new Vector2(140f, 18f);
 
-            var scoreText = scoreObject.GetComponent<TextMeshProUGUI>();
-            scoreText.font = ResolveOverlayFontAsset();
-            scoreText.fontSize = 14;
-            scoreText.fontStyle = FontStyles.Bold;
-            scoreText.alignment = TextAlignmentOptions.Center;
-            scoreText.enableWordWrapping = false;
-            scoreText.overflowMode = TextOverflowModes.Ellipsis;
-            scoreText.color = UiAccentTextColor;
+            var massText = massObject.GetComponent<TextMeshProUGUI>();
+            massText.font = ResolveOverlayFontAsset();
+            massText.fontSize = 14;
+            massText.fontStyle = FontStyles.Bold;
+            massText.alignment = TextAlignmentOptions.Center;
+            massText.enableWordWrapping = false;
+            massText.overflowMode = TextOverflowModes.Ellipsis;
+            massText.color = UiAccentTextColor;
 
-            _views.Add(playerId, new PlayerOverlayView(root, rootRect, nameText, scoreText));
+            _views.Add(playerId, new PlayerOverlayView(root, rootRect, nameText, massText));
         }
 
         public void UpdateOverlayViews(
@@ -116,20 +116,20 @@ namespace SampleClient.Gameplay
                 var diameterPixels = serverRadius * 2f * pixelsPerWorldUnit;
                 var labelWidth = Mathf.Max(96f, diameterPixels * 2f);
                 var nameHeight = Mathf.Max(18f, diameterPixels * 0.36f);
-                var scoreHeight = Mathf.Max(16f, diameterPixels * 0.3f);
+                var massHeight = Mathf.Max(16f, diameterPixels * 0.3f);
 
                 entry.Value.RootRect.anchoredPosition = new Vector2(screenPosition.x, screenPosition.y);
-                entry.Value.RootRect.sizeDelta = new Vector2(labelWidth, nameHeight + scoreHeight + 4f);
+                entry.Value.RootRect.sizeDelta = new Vector2(labelWidth, nameHeight + massHeight + 4f);
 
                 var nameRect = entry.Value.NameText.rectTransform;
                 nameRect.sizeDelta = new Vector2(labelWidth, nameHeight);
                 nameRect.anchoredPosition = new Vector2(0f, nameHeight * 0.55f);
                 entry.Value.NameText.fontSize = Mathf.RoundToInt(Mathf.Clamp(diameterPixels * 0.24f, 14f, 22f));
 
-                var scoreRect = entry.Value.ScoreText.rectTransform;
-                scoreRect.sizeDelta = new Vector2(labelWidth, scoreHeight);
-                scoreRect.anchoredPosition = new Vector2(0f, -(scoreHeight * 0.55f));
-                entry.Value.ScoreText.fontSize = Mathf.RoundToInt(Mathf.Clamp(diameterPixels * 0.22f, 13f, 20f));
+                var massRect = entry.Value.MassText.rectTransform;
+                massRect.sizeDelta = new Vector2(labelWidth, massHeight);
+                massRect.anchoredPosition = new Vector2(0f, -(massHeight * 0.55f));
+                entry.Value.MassText.fontSize = Mathf.RoundToInt(Mathf.Clamp(diameterPixels * 0.22f, 13f, 20f));
             }
         }
 

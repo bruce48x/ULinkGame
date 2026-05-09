@@ -43,7 +43,7 @@ namespace SampleClient.Gameplay
         private Sprite _pixelSprite = null!;
         private Sprite _playerSprite = null!;
         private Sprite _playerOutlineSprite = null!;
-        private Sprite? _scorePickupSprite;
+        private Sprite? _massPickupSprite;
         private Sprite? _goldPickupSprite;
         private Sprite? _arenaBackgroundSprite;
         private Sprite? _pickupGlowSprite;

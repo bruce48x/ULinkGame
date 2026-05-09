@@ -12,7 +12,7 @@ namespace SampleClient.Gameplay
         private static readonly SinglePlayerMatchPreset[] Playlist =
         {
             new(ArenaMapVariant.ClassicSquare, ArenaRuleVariant.ClassicElimination),
-            new(ArenaMapVariant.NarrowBridge, ArenaRuleVariant.ScoreRush),
+            new(ArenaMapVariant.NarrowBridge, ArenaRuleVariant.MassRush),
             new(ArenaMapVariant.FinalRing, ArenaRuleVariant.ArenaCollapse)
         };
 
@@ -58,7 +58,7 @@ namespace SampleClient.Gameplay
         {
             return ruleVariant switch
             {
-                ArenaRuleVariant.ScoreRush => "Score Rush",
+                ArenaRuleVariant.MassRush => "Mass Rush",
                 ArenaRuleVariant.ArenaCollapse => "Arena Collapse",
                 _ => "Classic Elimination"
             };
@@ -73,13 +73,14 @@ namespace SampleClient.Gameplay
                 RespawnDelaySeconds = 5f,
                 FoodTargetCount = 96,
                 InitialMass = 24f,
+                InitialPlayerMass = 24f,
                 RespawnMass = 24f,
-                EnabledPickupTypes = new[] { PickupType.ScorePoint }
+                EnabledPickupTypes = new[] { PickupType.MassPoint }
             };
 
             switch (preset.RuleVariant)
             {
-                case ArenaRuleVariant.ScoreRush:
+                case ArenaRuleVariant.MassRush:
                     options.RespawnDelaySeconds = 3f;
                     options.FoodTargetCount = 132;
                     options.FoodMassGain = 1.45f;

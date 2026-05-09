@@ -146,7 +146,7 @@ namespace SampleClient.Gameplay
             SessionMode mode,
             string winnerPlayerId,
             string localPlayerId,
-            int score)
+            float mass)
         {
             if (state == null)
             {
@@ -155,14 +155,15 @@ namespace SampleClient.Gameplay
 
             NormalizeState(state, state.PlayerId);
             var won = string.Equals(winnerPlayerId, localPlayerId, StringComparison.Ordinal);
+            var roundedMass = Mathf.Max(0, Mathf.RoundToInt(mass));
             state.TotalMatches += 1;
             if (won)
             {
                 state.TotalWins += 1;
             }
 
-            var exp = 20 + Math.Max(0, score * 5) + (won ? 30 : 0);
-            var currency = 15 + Math.Max(0, score * 2) + (won ? 20 : 0);
+            var exp = 20 + Math.Max(0, roundedMass * 5) + (won ? 30 : 0);
+            var currency = 15 + Math.Max(0, roundedMass * 2) + (won ? 20 : 0);
             var claimedFirstWin = false;
             var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
             if (won && !string.Equals(state.LastFirstWinClaimDateIso, today, StringComparison.Ordinal))
@@ -185,7 +186,7 @@ namespace SampleClient.Gameplay
             {
                 Mode = mode == SessionMode.SinglePlayer ? "Single-player" : "Multiplayer",
                 Result = won ? "Win" : "Loss",
-                Score = score,
+                Mass = roundedMass,
                 WinnerPlayerId = winnerPlayerId,
                 PlayedAtUtcIso = DateTime.UtcNow.ToString("O")
             });

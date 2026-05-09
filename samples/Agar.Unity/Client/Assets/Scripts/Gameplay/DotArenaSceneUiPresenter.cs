@@ -20,7 +20,7 @@ namespace SampleClient.Gameplay
         public string LocalPlayerId { get; set; }
         public string Account { get; set; }
         public string Password { get; set; }
-        public string LocalPlayerScoreText { get; set; }
+        public string LocalPlayerMassText { get; set; }
         public int LocalWinCount { get; set; }
         public int LastWorldTick { get; set; }
         public int ViewCount { get; set; }
@@ -58,19 +58,17 @@ namespace SampleClient.Gameplay
 
     internal readonly struct DotArenaMatchRankingEntry
     {
-        public DotArenaMatchRankingEntry(int rank, string playerId, float mass, int score, bool isLocalPlayer)
+        public DotArenaMatchRankingEntry(int rank, string playerId, float mass, bool isLocalPlayer)
         {
             Rank = rank;
             PlayerId = playerId;
             Mass = mass;
-            Score = score;
             IsLocalPlayer = isLocalPlayer;
         }
 
         public int Rank { get; }
         public string PlayerId { get; }
         public float Mass { get; }
-        public int Score { get; }
         public bool IsLocalPlayer { get; }
     }
 
@@ -402,14 +400,13 @@ namespace SampleClient.Gameplay
 
         private sealed class MatchRankingRowUi
         {
-            public MatchRankingRowUi(GameObject root, Image background, TMP_Text rankText, TMP_Text nameText, TMP_Text massText, TMP_Text scoreText)
+            public MatchRankingRowUi(GameObject root, Image background, TMP_Text rankText, TMP_Text nameText, TMP_Text massText)
             {
                 Root = root;
                 Background = background;
                 RankText = rankText;
                 NameText = nameText;
                 MassText = massText;
-                ScoreText = scoreText;
             }
 
             public GameObject Root { get; }
@@ -417,7 +414,6 @@ namespace SampleClient.Gameplay
             public TMP_Text RankText { get; }
             public TMP_Text NameText { get; }
             public TMP_Text MassText { get; }
-            public TMP_Text ScoreText { get; }
         }
     }
 }

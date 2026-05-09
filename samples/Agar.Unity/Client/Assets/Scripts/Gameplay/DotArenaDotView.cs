@@ -12,19 +12,19 @@ namespace SampleClient.Gameplay
         private readonly SpriteRenderer _outlineRenderer;
         private readonly SpriteRenderer? _spawnWaveRenderer;
         private readonly TextMesh _nameText;
-        private readonly TextMesh _scoreText;
+        private readonly TextMesh _massText;
         private readonly bool _usesAuthoredSkin;
         private readonly float _createdAt;
         private float _impactUntil;
 
-        public DotView(GameObject root, SpriteRenderer renderer, SpriteRenderer outlineRenderer, SpriteRenderer? spawnWaveRenderer, TextMesh nameText, TextMesh scoreText, bool usesAuthoredSkin)
+        public DotView(GameObject root, SpriteRenderer renderer, SpriteRenderer outlineRenderer, SpriteRenderer? spawnWaveRenderer, TextMesh nameText, TextMesh massText, bool usesAuthoredSkin)
         {
             Root = root;
             _renderer = renderer;
             _outlineRenderer = outlineRenderer;
             _spawnWaveRenderer = spawnWaveRenderer;
             _nameText = nameText;
-            _scoreText = scoreText;
+            _massText = massText;
             _usesAuthoredSkin = usesAuthoredSkin;
             _createdAt = Time.time;
         }
@@ -55,10 +55,10 @@ namespace SampleClient.Gameplay
             UpdateSpawnWave(time);
         }
 
-        public void SetIdentity(string playerId, int score)
+        public void SetIdentity(string playerId, float mass)
         {
             _nameText.text = playerId;
-            _scoreText.text = DotArenaPresentation.FormatScore(score);
+            _massText.text = DotArenaPresentation.FormatMass(mass);
         }
 
         public void ApplyPresentation(Color baseColor, PlayerLifeState state, bool alive, float radius)

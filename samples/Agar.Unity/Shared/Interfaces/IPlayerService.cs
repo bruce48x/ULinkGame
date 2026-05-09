@@ -269,12 +269,10 @@ namespace Shared.Interfaces
         [MemoryPackOrder(7)]
         public int RespawnRemainingSeconds { get; set; }
         [MemoryPackOrder(8)]
-        public int Score { get; set; }
-        [MemoryPackOrder(9)]
         public float Mass { get; set; }
-        [MemoryPackOrder(10)]
+        [MemoryPackOrder(9)]
         public float Radius { get; set; }
-        [MemoryPackOrder(11)]
+        [MemoryPackOrder(10)]
         public float MoveSpeed { get; set; }
     }
 
@@ -351,7 +349,7 @@ namespace Shared.Interfaces
 
     public enum PickupType
     {
-        ScorePoint = 0
+        MassPoint = 0
     }
 
     public enum MatchmakingState

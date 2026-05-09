@@ -49,7 +49,7 @@ namespace SampleClient.Gameplay
     {
         public string Mode = string.Empty;
         public string Result = string.Empty;
-        public int Score;
+        public int Mass;
         public string WinnerPlayerId = string.Empty;
         public string PlayedAtUtcIso = string.Empty;
     }
@@ -92,7 +92,7 @@ namespace SampleClient.Gameplay
         public bool HasRecord { get; set; }
         public string Mode { get; set; } = string.Empty;
         public string Result { get; set; } = string.Empty;
-        public int Score { get; set; }
+        public int Mass { get; set; }
         public string WinnerPlayerId { get; set; } = string.Empty;
         public string PlayedAtUtcIso { get; set; } = string.Empty;
     }
@@ -104,8 +104,8 @@ namespace SampleClient.Gameplay
         public int WinCount { get; set; }
         public int LossCount { get; set; }
         public float WinRate { get; set; }
-        public int AverageScore { get; set; }
-        public int BestScore { get; set; }
+        public int AverageMass { get; set; }
+        public int BestMass { get; set; }
         public int CurrentStreak { get; set; }
         public string CurrentStreakType { get; set; } = string.Empty;
         public string TrendLabel { get; set; } = string.Empty;

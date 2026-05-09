@@ -17,13 +17,13 @@ namespace SampleClient.Gameplay
             return $"已登录：{authenticatedPlayerId}   胜场：{localWinCount}";
         }
 
-        public static string BuildSettlementDetail(SessionMode sessionMode, int localScore, int localWinCount, string winnerPlayerId, bool localPlayerWon, ArenaMapVariant mapVariant, ArenaRuleVariant ruleVariant)
+        public static string BuildSettlementDetail(SessionMode sessionMode, float localMass, int localWinCount, string winnerPlayerId, bool localPlayerWon, ArenaMapVariant mapVariant, ArenaRuleVariant ruleVariant)
         {
             var modeText = sessionMode == SessionMode.SinglePlayer ? "单机" : "联机";
             var resultText = localPlayerWon ? "胜利" : "失败";
             var presetLabel = DotArenaSinglePlayerCatalog.GetPresetLabel(mapVariant, ruleVariant);
             var presetLine = sessionMode == SessionMode.SinglePlayer ? $"\n预设：{presetLabel}" : string.Empty;
-            return $"模式：{modeText}{presetLine}\n结果：{resultText}\n胜者：{winnerPlayerId}\n得分：{localScore}\n胜场：{localWinCount}";
+            return $"模式：{modeText}{presetLine}\n结果：{resultText}\n胜者：{winnerPlayerId}\n质量：{DotArenaPresentation.FormatMass(localMass)}\n胜场：{localWinCount}";
         }
 
         public static string BuildSettlementRewardSummary(SessionMode sessionMode, DotArenaRewardSummary? lastRewardSummary)
