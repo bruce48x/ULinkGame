@@ -61,19 +61,57 @@ Shared -> ULinkRPC.Generated -> SampleClient.Rpc -> SampleClient.Gameplay
 - 玩家 View 根节点、Pickup View 根节点和固定子节点组合。
 - 常用 FX 组合、九宫格 UI 基础件和需要编辑器调参的视觉结构。
 
-阶段 2 客户端拆分时，可以优先从 `DotArenaSceneUiPresenter` 中抽出重复 UI 构建逻辑，先把稳定控件模板资源化，再保留现有代码作为状态绑定和刷新入口。目标不是把客户端改成全 prefab，而是减少运行时控件构建代码，让 prefab 承担稳定视觉结构，代码承担动态状态和网络行为。
+阶段 6 客户端拆分时，可以优先从 `DotArenaSceneUiPresenter` 中抽出重复 UI 构建逻辑，先用小型 UI 工厂或面板 presenter 收敛重复代码；当结构稳定且需要可视化调参时，再把稳定控件模板资源化。目标不是把客户端改成全 prefab，而是减少运行时控件构建代码，让 prefab 或工厂承担稳定视觉结构，代码承担动态状态和网络行为。
 
 ## 已知重构目标
 
-- `DotArenaGame.cs` 有 93 个实例字段，分散在 12 个 partial 文件中。`UiSurface`、`UiActions`、`Presentation`、`Views` 之间的职责边界不清晰。
-- `DotArenaSceneUiPresenter` 仍偏大，负责运行时控件构建（`Layout.cs`、`Layout2.cs`）、刷新（`Refresh.cs`）、样式（`Styling.cs`）、大厅（`Lobby.cs`）。
+- `DotArenaGame.cs` 有 93 个实例字段，分散在 12 个 partial 文件中。当前 partial 文件只是物理分文件，没有形成真正的模块边界；`UiSurface`、`UiActions`、`Presentation`、`Views`、`Session` 和 `Callbacks` 之间仍会共享大量状态。
+- `DotArenaSceneUiPresenter` 仍偏大，负责运行时控件构建（`Layout.cs`、`Layout2.cs`）、刷新（`Refresh.cs`）、样式（`Styling.cs`）、大厅（`Lobby.cs`）以及多数 UI 控件字段。
+- 后续拆分的目标是让 `DotArenaGame` 退回 Unity 场景组合根，让会话流程、单机模拟、输入、世界表现、UI 快照、资源/皮肤和本地元进度分别拥有清晰所有者。
+- `DotArenaSceneUiPresenter` 应退回 UI 根协调器；入口/模式选择、登录、匹配中、大厅、HUD、对局排名和结算应由独立 presenter、稳定 prefab 或小型工厂承载。调试面板不作为玩家 UI 保留。
 - `DotArenaMetaProgression` 已拆分完成（Models、Catalog、Persistence、Queries、Rules）。本地 mock 排行榜已淘汰，`GetLeaderboardSummary` 现在展示服务端 RPC 刷新后的缓存数据。
-- 计划中的拆分工作见 `DEVELOPMENT_PLAN.md` 阶段 2。
+- 计划中的拆分工作见 `DEVELOPMENT_PLAN.md` 阶段 6。
+
+建议的目标结构：
+
+```txt
+DotArenaGame
+  Unity 生命周期入口、组件装配、跨组件调度
+
+DotArenaClientFlowState
+  当前模式、前端流程、入口菜单、忙碌状态、匹配计时和待处理 UI 请求
+
+DotArenaMultiplayerFlow
+  登录、游客登录、匹配、取消匹配、实时绑定、断线恢复、可靠推送确认
+
+DotArenaSinglePlayerController
+  本地模拟创建、tick 推进、结算和重开
+
+DotArenaViewRegistry / DotArenaPresentationCatalog
+  玩家视图、拾取物视图、渲染状态、sprite、shader 和皮肤选择
+
+DotArenaUiSnapshotBuilder / DotArenaUiCommandRouter
+  从状态构建 UI 快照，把按钮和输入框请求转成明确命令
+
+DotArenaSceneUiPresenter
+  UI 根对象绑定和面板 presenter 调度
+
+DotArenaEntryMenuPresenter / DotArenaLoginPresenter / DotArenaMatchmakingPresenter
+DotArenaLobbyPresenter / DotArenaHudPresenter / DotArenaSettlementPresenter
+DotArenaMatchRankingPresenter
+  各面板字段、布局、刷新和按钮绑定
+
+DotArenaUiFactory / DotArenaUiStyleCatalog
+  重复文本、按钮、面板、九宫格和字体样式创建
+```
 
 ## 表现原则
 
 - 玩家显示大小跟随 `Radius`。
 - HUD 强调名字、质量、排名和存活状态。
+- 战斗内实时排名只展示整型质量，不展示独立分数；质量就是当前局内成绩。
+- 战斗内实时排名面板使用低遮挡半透明背景，不能用不透明或过深的背景框遮挡玩法画面；本地玩家行高亮也必须保持半透明。
+- 联机大厅和战斗内 HUD 不显示 DEBUG 信息。`tick`、连接端点、连接状态细节、内部状态枚举、同步视图数、快捷键提示和开发诊断文本只能进入 Unity Console、服务端日志或客户端日志，不能出现在玩家界面，也不保留调试面板入口。
 - 食物要小且数量多。
 - 界面文案使用质量、排名、成长和存活语义，不使用冲刺或技能强化作为核心表达。
 - 玩家碰撞和成长可以有果冻感表现，但眩晕、击退不应被当作当前核心玩法。

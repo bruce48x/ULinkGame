@@ -49,14 +49,15 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
 - 客户端排行榜 UI 已通过 `IPlayerService.GetLeaderboardAsync` 连接服务端真实排行榜数据。
 - `InputMessage` 只包含玩家、移动方向和 tick，不再包含 dash。
-- `PickupType` 当前只保留 `ScorePoint`，食物行为统一为加分和质量成长。
-- `PlayerState` 只发布位置、速度、生死、分数、质量、半径和移动速度，不再发布旧强化剩余时间。
+- `PickupType` 当前只保留 `ScorePoint`，食物行为统一为质量成长；名称中的 `Score` 属于后续协议清理项。
+- 局内质量就是分数。战斗内 HUD、实时排名和结算中的局内成绩应展示整型质量，不再展示独立分数。
+- `PlayerState` 应只发布位置、速度、生死、整型质量、半径和移动速度；旧 `Score` 字段如果仍存在，只作为兼容字段或由质量派生。
 - `IUserGrain` 已持久化 `VictoryPoints`，`ILeaderboardGrain` 已提供周榜查询、周期重置和最近两周归档。
 - 排行榜周期重置已按榜单当地时间周一 00:00 计算，旧 `PeriodStartUtc` 字段仅作为兼容字段保留。
 - `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，AI 玩家不获得积分。
 - 游戏暂不包含任务、商店和记录功能；大厅不应展示或跳转到 Tasks / Shop / Records 页面。
-- 面向玩家的 Unity 界面应使用中文文案，不显示调试面板、连接细节、内部状态枚举或快捷键提示。
-- 战斗中需要实时显示当前对局玩家排名，排名框固定在画面右侧，使用半透明背景避免遮挡玩法画面。
+- 面向玩家的 Unity 界面应使用中文文案；联机大厅和战斗内 HUD 不显示 DEBUG 信息、调试面板、tick、连接细节、内部状态枚举、同步视图数或快捷键提示。将来需要排查问题时只通过 Unity Console、服务端日志或客户端日志打印，不在玩家 UI 中保留。
+- 战斗中需要实时显示当前对局玩家排名，排名框固定在画面右侧，背景必须低遮挡半透明，避免遮挡游戏画面和影响玩家判断。
 - 自动化测试当前为 20 个（`ArenaSimulationRulesTests` 16 个，`MatchmakingQueuePolicyTests` 4 个）。
 - `samples/Agar.Unity/docs/ART_DIRECTION.md` 已定义整体美术、UI 设计、素材生成、Unity 接入和验收标准。
 
@@ -76,13 +77,14 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - `ArenaMapVariant` 和 `ArenaRuleVariant` 枚举各有多个值；当前代码已有多个单机预设，但联机仍只走默认共享规则。后续如果不会继续扩展联机规则变体，可以把联机侧字段收敛为简单常量。
 - RPC 生成代码需要在共享协议变更后重新生成，Unity 客户端命名空间必须保持为 `Rpc`，否则会遮蔽手写的 `WebSocketRpcClientFactory` / `KcpRpcClientFactory`。
+- 局内 `Score` 与 `Mass` 语义重复。后续应把质量改为整型，并让战斗内实时排名、HUD 和结算只使用质量；旧 `Score` 字段要么移除，要么明确由质量派生以兼容旧协议。
 
 ### 客户端结构
 
 - `DotArenaGame.cs` 有 93 个实例字段，分散在 12 个 partial 文件中。`UiSurface`、`UiActions`、`Presentation`、`Views` 之间的职责边界不清晰。
 - `DotArenaSceneUiPresenter` 仍偏大，负责运行时控件构建（`Layout.cs`、`Layout2.cs`）、刷新（`Refresh.cs`）、样式（`Styling.cs`）、大厅（`Lobby.cs`）。
 - 联机大厅的任务、商店和记录入口已从玩家可见路径移除；旧场景对象仅作为兼容占位隐藏，不再绑定玩家导航动作。
-- 玩家可见 UI 已收敛为中文，并隐藏 debug 面板、连接端点、内部状态枚举和快捷键提示；后续只保留常规文案打磨。
+- 玩家可见 UI 已收敛为中文，并隐藏 debug 面板、连接端点、内部状态枚举和快捷键提示；后续继续确保联机大厅和战斗内 HUD 不展示任何 DEBUG 信息。
 - `DotArenaMetaProgression` 的拆分已完成（Models、Catalog、Persistence、Queries、Rules），本计划不再对其安排额外拆分工作。
 
 ### 测试缺口
@@ -95,11 +97,11 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 ### 当前优先级
 
-0. 本轮小功能：默认本地玩家小球在每局开始时从蓝色、橙色、绿色中随机选择一种；先更新玩法/客户端功能文档和本计划，再做 Unity 客户端表现层实现。
+0. 阶段 6：优先整理并执行客户端巨型类拆分。当前 partial 文件只是把大类切成多个文件，没有形成真正的职责边界，后续功能会继续增加维护成本。
 1. 阶段 2：完成启动/登录/匹配/结算 UI 的人工视觉回归，确认裁切后的 UI sprite、实时排名面板和运行时布局在 1200x600、960x540 下不再出现视觉边界错位。
 2. 阶段 4：完成第一轮基础美术资产的 Unity 实机验收，确认玩家球、拾取物、背景、UI 基础件、图标、吸收环和出生波纹是否继续沿用或需要重做。
 3. 阶段 5：完成单机和联机全流程手动回归。
-4. 后续进入阶段 6 及之后的结构拆分、清理语义、跨网关路由和测试扩展。
+4. 后续进入阶段 7 及之后的清理语义、跨网关路由和测试扩展。
 
 ### 阶段 2：启动界面视觉修复
 
@@ -107,6 +109,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 在 Unity 游戏视图手动检查入口/模式选择、联机登录、匹配中、大厅和结算界面。
 - 在 Unity 游戏视图手动检查对局中的右侧实时排名面板。
+- 调整右侧实时排名面板背景为低遮挡半透明，避免当前背景框遮挡游戏画面。
 - 覆盖 1200x600 和 960x540，重点看文本、按钮、输入框与可见面板边框是否对齐。
 - 确认裁切后的 `UI_Panel_Dark_01.png`、`UI_Button_Primary_Normal.png`、`UI_Button_Primary_Pressed.png` 不再造成 `RectTransform` 逻辑尺寸和视觉边界错位。
 - 如果现有 UI 面板或按钮风格仍不达标，按 `ART_DIRECTION.md` 的透明边缘规范重新生成或重做最小 UI 基础件。
@@ -117,7 +120,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 三个模式按钮在同一中轴线上，尺寸一致，垂直间距一致，文字居中且不溢出。
 - 联机登录界面的账号/密码标签与输入框形成居中窄列，登录/返回按钮等宽对齐，游客登录按钮居中且不压到底部边框。
 - 非对局 UI 背景不覆盖实际对局画面。
-- 对局中的右侧排名面板使用半透明背景，不遮挡核心玩法区域。
+- 对局中的右侧排名面板使用低遮挡半透明背景；透过面板仍能看清玩家球、食物、边界和移动方向，不遮挡核心玩法区域。
 - UI sprite 的 alpha 包围盒贴合肉眼可见边框，不再用大透明 padding 充当布局留白。
 
 ### 阶段 4：AI 生成美术资产
@@ -138,7 +141,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
   - `Icon_Leaderboard_01.png`
   - `FX_Absorb_Ring_01.png`
   - `FX_Spawn_Wave_01.png`
-- 验证玩家球、拾取物、背景和特效不会降低玩法判断效率，不遮挡玩家名、分数、HUD 和排行榜信息。
+- 验证玩家球、拾取物、背景和特效不会降低玩法判断效率，不遮挡玩家名、质量、HUD 和排行榜信息。
 - 如用户确认第一轮资产方向成立，再生成下一批 UI 基础件：Secondary/Danger 按钮、输入框状态、排行榜/设置等图标、HUD 背板和列表行。
 - 先接入入口/模式选择、匹配中、结算三个关键界面；通过后再扩展大厅、排行榜和设置。
 
@@ -157,32 +160,66 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
 - 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
-- 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新。
+- 验证联机大厅不展示 DEBUG 信息，不保留调试面板、连接端点、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
+- 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量，不展示独立分数。
+- 验证右侧实时排名面板背景已改为低遮挡半透明，不再因为背景框过深或过实影响游戏画面可读性。
+- 验证战斗内 HUD 不展示 DEBUG 信息：不出现 tick、endpoint、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
+- 将局内质量改为整型展示和排序口径；如果共享协议仍使用浮点质量，先明确取整规则，再安排协议清理。
+- 清理或兼容 `Score` 字段，让局内成绩统一由质量派生；玩家可见文案不再出现独立“分数”。
 - 决定是否继续保留 `ArenaMapVariant` / `ArenaRuleVariant` 的联机扩展点；如果短期不扩展联机规则变体，将联机侧字段收敛为简单常量。
 
 验收标准：
 
 - 本地单机对局可以完整游玩到结束。
 - 联机对局可以通过匹配开始，并持续收到实时世界快照。
-- 单机和联机对局中的实时排名与当前玩家质量、分数和生死状态一致。
+- 单机和联机对局中的实时排名与当前玩家整型质量和生死状态一致。
+- 单机和联机对局中的实时排名面板背景半透明且低遮挡，不影响玩家观察场地和移动。
+- 战斗内 HUD 只显示玩家决策需要的信息，不显示 DEBUG 信息。
+- 联机大厅只显示玩家决策需要的信息，不显示 DEBUG 信息；开发诊断只允许进 console/log。
 - 可见 UI 路径不再依赖已移除的旧玩法概念。
 - 生成的 RPC 代码与协议变更一致。
 
 ### 阶段 6：客户端拆分
 
+目标：
+
+- 把 `DotArenaGame` 收敛为 Unity 场景级组合根，只负责生命周期入口、组件装配和高层调度。
+- 把 `DotArenaSceneUiPresenter` 收敛为 UI 根协调器，不再直接拥有所有面板字段、控件创建、样式和刷新细节。
+- 用小类边界替代继续增加 partial 文件。partial 只允许作为短期迁移手段，不能作为最终架构。
+- 保持样例易读：拆分后的类名、文件名和职责应能直接对应玩家流程，而不是把逻辑隐藏到过度抽象的工具层。
+
+拆分原则：
+
+- 单一职责优先于按 Unity 事件函数分文件。`Update`、按钮回调、网络回调和 UI 刷新都应流向明确的流程对象。
+- 网络生命周期继续由 `DotArenaNetworkSession` 管理，不能把 RPC 连接细节散回 UI 或场景脚本。
+- 服务端回调缓存和主线程消化继续由 `DotArenaCallbackInbox` 管理，Unity 对象只在主线程被修改。
+- `SampleClient.Rpc` 不能依赖 `SampleClient.Gameplay`，生成的 RPC 代码不能手写修改。
+- 新增类优先放在 `Client/Assets/Scripts/Gameplay`；只有传输或生成代码辅助才放到 `Client/Assets/Scripts/Rpc`。
+
 待办：
 
-- 从 `DotArenaGame` 中拆出对局流程职责，将 `UiSurface` / `UiActions` 中的状态切换逻辑收敛到显式的状态机或流程编排方法中。
-- 保持 RPC 生命周期由 `DotArenaNetworkSession` 管理。
-- 保持回调缓存和主线程消化由 `DotArenaCallbackInbox` 管理。
-- 将 `DotArenaSceneUiPresenter` 中重复的 UI 构建逻辑（`Layout.cs`、`Layout2.cs`、`Styling.cs`）移动到更小的辅助类或 Unity 预制件/资源中。
+- 盘点 `DotArenaGame*.cs` 中的字段和方法，按所有权分成会话、单机模拟、输入、世界表现、UI 快照、资源/皮肤、本地元进度七组；每组记录迁移目标类。
+- 新增轻量状态模型，集中描述 `SessionMode`、`FrontendFlowState`、`EntryMenuState`、待处理 UI 请求和匹配计时等流程状态，避免多个 partial 文件直接读写同一组字段。
+- 从 `DotArenaGame.Session.cs` / `DotArenaGame.Callbacks.cs` 中抽出联机流程编排，优先复用并扩展现有 `DotArenaMultiplayerFlow`，让登录、游客登录、匹配、取消匹配、实时绑定、断线恢复和可靠推送确认有单一入口。
+- 从 `DotArenaGame.SinglePlayer.cs` 中抽出单机对局控制器，负责创建本地模拟、推进 tick、处理结算和重开；`DotArenaGame` 只转发输入意图和接收渲染状态。
+- 从 `DotArenaGame.Views.cs` / `DotArenaGame.Presentation.cs` 中抽出视图注册表和表现资源目录，减少 `_views`、`_renderStates`、`_pickupViews`、sprite、shader、皮肤列表等字段直接挂在 `MonoBehaviour` 上。
+- 从 `DotArenaGame.UiSurface.cs` / `DotArenaGame.UiActions.cs` 中抽出 UI 快照构建器和 UI 命令处理器。UI 快照只表达要显示什么，UI 命令只表达玩家请求什么，避免 UI 代码直接改网络或模拟状态。
+- 将 `DotArenaSceneUiPresenter` 拆成根协调器和面板 presenter：入口/模式选择、登录、匹配中、大厅、HUD、对局排名、结算分别拥有自己的字段和刷新方法；不再保留调试面板 presenter。
+- 将 `DotArenaSceneUiPresenter.Layout.cs`、`Layout2.cs`、`Styling.cs` 中重复的运行时 UI 构建逻辑移动到 `DotArenaUiFactory`、`DotArenaUiStyleCatalog` 或稳定 prefab/资源中；短期先用工厂类，后续需要可视化调参时再资源化。
+- 删除拆分后不再需要的 partial 文件，避免留下空壳文件或只转发一行方法的文件。
+- 每一小步拆分后都做 Unity 脚本编译检查；触碰共享协议时才重新运行 `ulinkgame-tool codegen`。
 
 验收标准：
 
-- 模式入口、匹配、对局中和结算状态切换更容易推理。
+- `DotArenaGame` 只保留场景生命周期、组件装配和少量跨组件协调字段；实例字段数量从当前 93 个降到 25 个以内。
+- `DotArenaGame` 不再需要 12 个 partial 文件；保留的 partial 文件不超过 4 个，且每个文件都有明确职责。
+- 模式入口、登录、匹配、对局中、结算和返回大厅状态切换都能从一个流程对象或状态模型中追踪，不需要跨多个 partial 文件查找同一状态的写入点。
+- `DotArenaSceneUiPresenter` 不再直接持有所有面板控件字段；每个主要面板有独立 presenter 或稳定 prefab 作为边界。
+- `DotArenaSceneUiPresenter` 的运行时控件构建逻辑减少至少 30%（以行数计），并且重复按钮、文本、面板样式创建集中在一个工厂或样式目录中。
 - 不引入 `SampleClient.Rpc` 和 `SampleClient.Gameplay` 之间的循环依赖。
 - 生成的 RPC 代码保持不被手写修改。
-- `DotArenaSceneUiPresenter` 的运行时控件构建逻辑减少至少 30%（以行数计）。
+- 单机开始、联机登录、匹配、取消匹配、实时绑定、世界刷新、断线返回和结算按钮路径都能通过手动回归。
+- Unity 脚本编译无错误；受影响的服务端和共享项目在本阶段未改动时不强制重建。
 
 ### 阶段 7：网关清理语义
 
@@ -298,18 +335,18 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 | --- | --- | --- | --- |
 | 1 | 移除 Tasks / Shop / Records 的玩家可见入口、页签、快捷按钮和跳转映射 | 完成 | 大厅只保留资料、排行榜、设置；旧按钮隐藏且不再绑定动作。 |
 | 2 | 移除任务、商店、记录页面内容、按钮文案、状态提示和事件提示 | 完成 | 玩家可见 UI 不再展示任务、商店、记录相关页面或提示。 |
-| 3 | 清理结算界面的任务摘要 | 完成 | 结算只展示结果、分数、奖励、下一步、再来一局和返回大厅。 |
+| 3 | 清理结算界面的任务摘要 | 完成 | 结算只展示结果、质量、奖励、下一步、再来一局和返回大厅。 |
 | 4 | 清理商店/记录相关图标加载和挂载路径 | 完成 | 运行时不再加载或挂载 `Icon_Shop_01.png`。 |
-| 5 | 隐藏 debug 面板、连接端点、内部状态、tick、同步视图数和快捷键提示 | 完成 | 玩家界面不再展示这些内部信息；开发日志仍保留。 |
+| 5 | 删除 debug 面板、连接端点、内部状态、tick、同步视图数和快捷键提示 | 完成 | 玩家界面、联机大厅和战斗内 HUD 不再展示这些内部信息；开发诊断只进 console/log。 |
 | 6 | 将玩家可见文案收敛为中文 | 完成 | 入口、登录、匹配、大厅、HUD、结算、排行榜、设置和错误状态已中文化；后续仅保留常规措辞打磨。 |
 | 7 | 评估并清理 `DotArenaMetaProgression` 中任务、商店、记录相关模型 | 部分完成 | 任务进度不再生成或推进，旧任务存档会清空；皮肤、历史和排行榜趋势仍依赖部分本地进度字段，未强删。 |
 | 8 | 同步 `ART_DIRECTION.md` 和客户端架构文档 | 完成 | 文档已明确当前 UI 验收范围暂不包含任务、商店和记录，玩家 UI 使用中文。 |
 
 - 已从大厅玩家可见导航中移除任务、商店和记录入口；保留资料、排行榜和设置。
 - 已禁用大厅快捷按钮到任务、商店和记录页面的跳转，旧场景按钮会被隐藏且不再绑定动作。
-- 已从结算界面移除任务摘要；结算只展示结果、分数、奖励、下一步、再来一局和返回大厅。
+- 已从结算界面移除任务摘要；结算只展示结果、质量、奖励、下一步、再来一局和返回大厅。
 - 已停止运行时 UI 加载和挂载 `Icon_Shop_01.png`。
-- 已隐藏玩家界面上的 debug 面板，并清理备用 HUD 中的 endpoint、tick、同步视图数、快捷键提示等内部信息。
+- 已删除玩家界面上的 debug 面板，并清理联机大厅和备用 HUD 中的 endpoint、tick、同步视图数、快捷键提示等内部信息；联机大厅和战斗内 HUD 不应显示 DEBUG 信息。
 - 已将入口、登录、匹配、大厅、对局 HUD、结算、排行榜、设置和错误状态的玩家可见文案收敛为中文。
 - `DotArenaMetaProgression` 不再为任务生成新进度或推进任务计数；旧本地存档中的任务字段会被清空以保持兼容加载。
 - `ART_DIRECTION.md` 和 `docs/features/client-architecture.md` 已同步当前 UI 验收范围：暂不包含任务、商店和记录，玩家 UI 使用中文。
@@ -318,8 +355,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 已在对局中增加右侧当前对局排名面板，非对局界面隐藏。
 - 排名数据来自 `DotArenaGame` 的当前 `PlayerRenderState` 集合，单机和联机共用同一套展示逻辑。
-- 排序规则为质量降序、分数降序、玩家标识升序，和当前对局排名规则一致。
-- 面板展示名次、玩家名、质量和分数，本地玩家行使用高亮背景和文字颜色。
+- 排序规则需要按新口径调整为整型质量降序、玩家标识升序；旧分数不再参与战斗内实时排名。
+- 面板应展示名次、玩家名和整型质量，本地玩家行使用高亮背景和文字颜色；旧分数列应移除。
+- 面板背景需要按新视觉要求改为低遮挡半透明；当前背景框遮挡游戏画面，影响用户体验，应作为后续 UI 修复项处理。
 - 面板文案为中文，不展示 tick、连接状态、端点等内部字段。
 - Unity 脚本刷新通过，控制台无编译错误；人工视觉回归仍在阶段 2/5 继续覆盖。
 
