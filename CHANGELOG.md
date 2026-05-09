@@ -6,11 +6,14 @@
 
 - `ULinkGame.Tool` `0.1.11`
 - `ULinkGame.Tool` `0.1.12`
+- `ULinkGame.Tool` `0.1.13`
 
 ### Changed
 
 - Updated generated local `ulinkrpc.starter` tool manifests and Godot verification to use `0.2.57`.
 - Updated generated local `ulinkrpc.starter` tool manifests and Godot verification to use `0.2.58`.
+- Preserved `ULinkRPC.*` package references from starter-generated projects instead of rewriting their versions in ULinkGame templates.
+- Documented the `ulinkrpc-starter` ownership boundary for ULinkGame contributors.
 
 ## 2026-05-07
 

@@ -66,11 +66,6 @@ internal sealed class CliApplication(
             return 1;
         }
 
-        if (ProjectConventions.IsGodot(options.ClientEngine))
-        {
-            await projectScaffolder.ReplaceGeneratedClientWithGodotClientAsync(projectRoot, projectName, options).ConfigureAwait(false);
-        }
-
         await projectScaffolder.AugmentProjectWithULinkGameServerAsync(projectRoot, options).ConfigureAwait(false);
 
         var configPath = Path.Combine(projectRoot, ProjectConventions.ConfigFileName);

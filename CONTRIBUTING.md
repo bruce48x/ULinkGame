@@ -56,6 +56,30 @@ ulinkgame-tool
 
 It is separate from runtime packages. Runtime code belongs in `ULinkGame.Server` or `ULinkGame.Client`; project scaffolding and maintenance commands belong in the tool.
 
+Package README files under `src/ULinkGame.Tool`, `src/ULinkGame.Server`, and `src/ULinkGame.Client` are user-facing package documentation. Keep contributor-only implementation policy, maintenance boundaries, release process, and design decisions in this `CONTRIBUTING.md` file instead of package README files.
+
+#### ULinkGame.Tool Starter Boundary
+
+In this repository's tool documentation, `starter` means `ulinkrpc-starter`, not `ULinkGame.Tool` or any internal ULinkGame scaffolding phase.
+
+`ULinkGame.Tool` delegates the base project shape to `ulinkrpc-starter`. Treat `ulinkrpc-starter` generated ULinkRPC content as owned by `ulinkrpc-starter`, not by ULinkGame.
+
+`ULinkGame.Tool` must not rewrite, replace, or version-pin starter-owned content:
+
+- `ULinkRPC.*` package references and versions
+- Unity, Tuanjie, Godot, or plain .NET client project structure
+- generated RPC binding output locations, except through `ulinkgame.tool.json` codegen settings
+- serializer and transport package selection beyond forwarding the user's `new` command options to `ulinkrpc-starter`
+
+When `ulinkgame-tool new` augments a generated project, it should preserve starter output and add only ULinkGame-owned infrastructure:
+
+- `ULinkGame.Server` and `ULinkGame.Client` package references when needed
+- Orleans silo/edge hosting projects and configuration
+- ULinkGame-specific server startup, gateway, and tool configuration
+- project maintenance commands that delegate code generation back to the starter toolchain
+
+If a generated project needs a different `ULinkRPC.*` package version or client layout, fix `ulinkrpc-starter` first and then update the `ulinkrpc-starter` version consumed by `ULinkGame.Tool`.
+
 ## Package Decision
 
 ### Background

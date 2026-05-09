@@ -1,286 +1,5 @@
 internal static class ToolTemplates
 {
-    public static string RenderGodotProject(string projectName, NewCommandOptions options)
-    {
-        var (serializerPackage, _) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
-        var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
-        var rootNamespace = TemplateText.SanitizeCSharpIdentifier(projectName.Replace('.', '_'));
-
-        return $"""
-        <Project Sdk="Godot.NET.Sdk/4.6.1">
-          <PropertyGroup>
-            <TargetFramework>net8.0</TargetFramework>
-            <RootNamespace>{rootNamespace}</RootNamespace>
-            <Nullable>enable</Nullable>
-            <ImplicitUsings>enable</ImplicitUsings>
-            <EnableDynamicLoading>true</EnableDynamicLoading>
-            <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-            <NuGetAudit>false</NuGetAudit>
-            <BuildInParallel>false</BuildInParallel>
-            <RestoreBuildInParallel>false</RestoreBuildInParallel>
-          </PropertyGroup>
-
-          <ItemGroup>
-            <ProjectReference Include="..\Shared\Shared.csproj" TargetFramework="net8.0">
-              <SetTargetFramework>TargetFramework=net8.0</SetTargetFramework>
-            </ProjectReference>
-          </ItemGroup>
-
-          <ItemGroup>
-            <PackageReference Include="ULinkGame.Client" Version="{ToolPackageVersions.ULinkGameClient}" />
-            <PackageReference Include="ULinkRPC.Client" Version="0.11.1" />
-            <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
-            <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
-          </ItemGroup>
-        </Project>
-        """;
-    }
-
-    public static string RenderGodotProjectSettings(string projectName)
-    {
-        return $$"""
-        ; Engine configuration file.
-
-        config_version=5
-
-        [application]
-
-        config/name="{{TemplateText.SanitizeStringLiteral(projectName)}}"
-        run/main_scene="res://Scenes/Main.tscn"
-        config/features=PackedStringArray("4.3", "C#", "Forward Plus")
-
-        [dotnet]
-
-        project/assembly_name="{{TemplateText.SanitizeStringLiteral(projectName)}}"
-        """;
-    }
-
-    public static string RenderGodotMainScene()
-    {
-        return """
-        [gd_scene load_steps=2 format=3 uid="uid://ulinkgame_starter_main"]
-
-        [ext_resource type="Script" path="res://Scripts/Main.cs" id="1_main"]
-
-        [node name="Main" type="Node2D"]
-        script = ExtResource("1_main")
-        """;
-    }
-
-    public static string RenderGodotMainScript(string projectName, NewCommandOptions options)
-    {
-        var namespaceName = TemplateText.SanitizeCSharpIdentifier(projectName.Replace('.', '_'));
-        var defaultPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
-
-        return $$"""
-        #nullable enable
-
-        using System;
-        using System.Threading;
-        using System.Threading.Tasks;
-        using Godot;
-        using Rpc;
-        using Shared.Interfaces;
-        using ULinkRPC.Client;
-
-        namespace {{namespaceName}}.Scripts;
-
-        public partial class Main : Node2D
-        {
-            private readonly CancellationTokenSource _cts = new();
-            private RpcClient? _client;
-            private string _status = "Ready";
-            private string _reply = "";
-            private bool _requestInFlight;
-
-            [Export]
-            public string Host { get; set; } = "127.0.0.1";
-
-            [Export]
-            public int Port { get; set; } = 20000;
-
-            [Export]
-            public string Path { get; set; } = "{{TemplateText.SanitizeStringLiteral(defaultPath)}}";
-
-            [Export]
-            public bool AutoConnect { get; set; } = true;
-
-            public override void _Ready()
-            {
-                if (AutoConnect)
-                {
-                    _ = ConnectAndPingAsync();
-                }
-            }
-
-            public override void _Process(double delta)
-            {
-                if (Input.IsActionJustPressed("ui_accept") && !_requestInFlight)
-                {
-                    _ = ConnectAndPingAsync();
-                }
-
-                QueueRedraw();
-            }
-
-            public override void _ExitTree()
-            {
-                _cts.Cancel();
-                _ = DisposeClientAsync();
-                _cts.Dispose();
-            }
-
-            public override void _Draw()
-            {
-                DrawString(ThemeDB.FallbackFont, new Vector2(24, 40), $"ULinkGame Godot client | {_status}");
-                DrawString(ThemeDB.FallbackFont, new Vector2(24, 68), $"Endpoint: {RpcClientFactory.DescribeEndpoint(Host, Port, Path)}");
-                DrawString(ThemeDB.FallbackFont, new Vector2(24, 96), string.IsNullOrWhiteSpace(_reply) ? "Press Enter to ping the server." : _reply);
-            }
-
-            private async Task ConnectAndPingAsync()
-            {
-                if (_requestInFlight)
-                {
-                    return;
-                }
-
-                _requestInFlight = true;
-                try
-                {
-                    _status = $"Connecting to {RpcClientFactory.DescribeEndpoint(Host, Port, Path)}";
-                    QueueRedraw();
-
-                    await DisposeClientAsync().ConfigureAwait(false);
-                    _client = RpcClientFactory.Create(Host, Port, Path);
-                    await _client.ConnectAsync(_cts.Token).ConfigureAwait(false);
-
-                    _status = "Connected, sending PingAsync";
-                    var reply = await _client.Api.Shared.Ping.PingAsync(new PingRequest
-                    {
-                        Message = $"Hello from Godot at {DateTime.UtcNow:O}"
-                    }).ConfigureAwait(false);
-
-                    _status = "Ping ok";
-                    _reply = $"Reply: {reply.Message} | Server UTC: {reply.ServerTimeUtc}";
-                    GD.Print($"Ping ok: message={reply.Message}, serverTimeUtc={reply.ServerTimeUtc}");
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch (Exception ex)
-                {
-                    _status = $"Request failed: {ex.Message}";
-                    GD.PushError(ex.ToString());
-                }
-                finally
-                {
-                    _requestInFlight = false;
-                }
-            }
-
-            private async Task DisposeClientAsync()
-            {
-                if (_client == null)
-                {
-                    return;
-                }
-
-                try
-                {
-                    await _client.DisposeAsync().ConfigureAwait(false);
-                }
-                catch
-                {
-                }
-                finally
-                {
-                    _client = null;
-                }
-            }
-        }
-        """;
-    }
-
-    public static string RenderGodotRpcClientFactory(NewCommandOptions options)
-    {
-        var (_, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
-        var serializerNamespace = PackageCatalog.GetSerializerArtifacts(options.Serializer).PackageId.Namespace;
-        var transport = options.Transport.ToLowerInvariant();
-
-        var transportUsing = transport switch
-        {
-            "tcp" => "using ULinkRPC.Transport.Tcp;",
-            "websocket" => "using ULinkRPC.Transport.WebSocket;",
-            _ => "using ULinkRPC.Transport.Kcp;"
-        };
-
-        var transportExpression = transport switch
-        {
-            "tcp" => "new TcpTransport(host, port)",
-            "websocket" => "new WsTransport(BuildWebSocketUrl(host, port, path))",
-            _ => "new KcpTransport(host, port)"
-        };
-
-        return $$"""
-        #nullable enable
-
-        using System;
-        using ULinkRPC.Client;
-        using ULinkRPC.Core;
-        using {{serializerNamespace}};
-        {{transportUsing}}
-
-        namespace Rpc;
-
-        public static class RpcClientFactory
-        {
-            public static RpcClient Create(string host, int port, string path)
-            {
-                return new RpcClient(
-                    new RpcClientOptions(
-                        {{transportExpression}},
-                        new {{serializerType}}())
-                    {
-                        KeepAlive = new RpcKeepAliveOptions
-                        {
-                            Enabled = true,
-                            Interval = TimeSpan.FromSeconds(5),
-                            Timeout = TimeSpan.FromSeconds(15)
-                        }
-                    });
-            }
-
-            public static string DescribeEndpoint(string host, int port, string path)
-            {
-                var normalizedPath = NormalizePath(path);
-                return string.IsNullOrEmpty(normalizedPath) ? $"{host}:{port}" : $"{host}:{port}{normalizedPath}";
-            }
-
-            private static string NormalizePath(string path)
-            {
-                if (string.IsNullOrWhiteSpace(path))
-                {
-                    return string.Empty;
-                }
-
-                return path.StartsWith("/", StringComparison.Ordinal) ? path : "/" + path;
-            }
-
-            private static string BuildWebSocketUrl(string host, int port, string path)
-            {
-                var normalizedPath = string.IsNullOrWhiteSpace(path) ? "/ws" : NormalizePath(path);
-                if (host.StartsWith("ws://", StringComparison.OrdinalIgnoreCase) ||
-                    host.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
-                {
-                    return $"{host.TrimEnd('/')}{normalizedPath}";
-                }
-
-                return $"ws://{host}:{port}{normalizedPath}";
-            }
-        }
-        """;
-    }
-
     public static string RenderDotNetToolManifest()
     {
         return $$"""
@@ -350,12 +69,9 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeProject(NewCommandOptions options)
+    public static string RenderEdgeProject()
     {
-        var (serializerPackage, _) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
-        var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
-
-        return $"""
+        return $$"""
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
             <OutputType>Exe</OutputType>
@@ -374,9 +90,7 @@ internal static class ToolTemplates
           </ItemGroup>
 
           <ItemGroup>
-            <PackageReference Include="ULinkGame.Server" Version="{ToolPackageVersions.ULinkGameServer}" />
-            <PackageReference Include="{transportPackage.PackageId}" Version="{transportPackage.Version}" />
-            <PackageReference Include="{serializerPackage.PackageId}" Version="{serializerPackage.Version}" />
+            <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
           </ItemGroup>
 
           <ItemGroup>
@@ -671,8 +385,8 @@ internal static class PackageCatalog
     {
         return serializer switch
         {
-            "json" => (new PackageArtifact("ULinkRPC.Serializer.Json", "0.11.0", "ULinkRPC.Serializer.Json"), "JsonRpcSerializer"),
-            _ => (new PackageArtifact("ULinkRPC.Serializer.MemoryPack", "0.11.0", "ULinkRPC.Serializer.MemoryPack"), "MemoryPackRpcSerializer")
+            "json" => (new PackageArtifact("ULinkRPC.Serializer.Json", "", "ULinkRPC.Serializer.Json"), "JsonRpcSerializer"),
+            _ => (new PackageArtifact("ULinkRPC.Serializer.MemoryPack", "", "ULinkRPC.Serializer.MemoryPack"), "MemoryPackRpcSerializer")
         };
     }
 
@@ -680,9 +394,9 @@ internal static class PackageCatalog
     {
         return transport switch
         {
-            "tcp" => (new PackageArtifact("ULinkRPC.Transport.Tcp", "0.11.2", "ULinkRPC.Transport.Tcp"), "TcpConnectionAcceptor"),
-            "websocket" => (new PackageArtifact("ULinkRPC.Transport.WebSocket", "0.11.3", "ULinkRPC.Transport.WebSocket"), "WsConnectionAcceptor"),
-            _ => (new PackageArtifact("ULinkRPC.Transport.Kcp", "0.11.8", "ULinkRPC.Transport.Kcp"), "KcpConnectionAcceptor")
+            "tcp" => (new PackageArtifact("ULinkRPC.Transport.Tcp", "", "ULinkRPC.Transport.Tcp"), "TcpConnectionAcceptor"),
+            "websocket" => (new PackageArtifact("ULinkRPC.Transport.WebSocket", "", "ULinkRPC.Transport.WebSocket"), "WsConnectionAcceptor"),
+            _ => (new PackageArtifact("ULinkRPC.Transport.Kcp", "", "ULinkRPC.Transport.Kcp"), "KcpConnectionAcceptor")
         };
     }
 }
@@ -707,8 +421,14 @@ internal static class TemplateText
 
     public static string IndentBlock(string block, int level)
     {
+        if (string.IsNullOrWhiteSpace(block))
+        {
+            return string.Empty;
+        }
+
         var indent = new string(' ', level * 4);
         var lines = block.Replace("\r\n", "\n").Split('\n');
         return string.Join(Environment.NewLine, lines.Select(line => string.IsNullOrWhiteSpace(line) ? string.Empty : indent + line));
     }
+
 }
