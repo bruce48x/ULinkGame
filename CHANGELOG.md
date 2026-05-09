@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-09
+
+### Released
+
+- `ULinkGame.Tool` `0.1.11`
+
+### Changed
+
+- Updated generated local `ulinkrpc.starter` tool manifests and Godot verification to use `0.2.57`.
+
 ## 2026-05-07
 
 ### Released
