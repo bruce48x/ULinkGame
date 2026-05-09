@@ -86,7 +86,6 @@ namespace SampleClient.Gameplay
         private int _singlePlayerPlaylistIndex = -1;
         private ArenaMapVariant _currentArenaMapVariant = ArenaMapVariant.ClassicSquare;
         private ArenaRuleVariant _currentArenaRuleVariant = ArenaRuleVariant.ClassicElimination;
-        private int _localPlayerDefaultColorIndex = -1;
         private RealtimeConnectionInfo? _lastRealtimeConnection;
 #if UNITY_EDITOR
         private Vector2 _editorMoveOverride;
