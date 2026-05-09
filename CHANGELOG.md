@@ -5,10 +5,12 @@
 ### Released
 
 - `ULinkGame.Tool` `0.1.11`
+- `ULinkGame.Tool` `0.1.12`
 
 ### Changed
 
 - Updated generated local `ulinkrpc.starter` tool manifests and Godot verification to use `0.2.57`.
+- Updated generated local `ulinkrpc.starter` tool manifests and Godot verification to use `0.2.58`.
 
 ## 2026-05-07
 

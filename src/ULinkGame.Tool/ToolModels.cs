@@ -26,7 +26,7 @@ internal static class ToolPackageVersions
 {
     public const string ULinkGameClient = "0.1.3";
     public const string ULinkGameServer = "0.1.3";
-    public const string ULinkRpcStarter = "0.2.57";
+    public const string ULinkRpcStarter = "0.2.58";
     public const string Orleans = "10.0.0";
 }
 
