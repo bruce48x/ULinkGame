@@ -65,8 +65,8 @@ Shared -> ULinkRPC.Generated -> SampleClient.Rpc -> SampleClient.Gameplay
 
 ## 已知重构目标
 
-- `DotArenaGame.cs` 有 93 个实例字段，分散在 12 个 partial 文件中。当前 partial 文件只是物理分文件，没有形成真正的模块边界；`UiSurface`、`UiActions`、`Presentation`、`Views`、`Session` 和 `Callbacks` 之间仍会共享大量状态。
-- `DotArenaSceneUiPresenter` 仍偏大，负责运行时控件构建（`Layout.cs`、`Layout2.cs`）、刷新（`Refresh.cs`）、样式（`Styling.cs`）、大厅（`Lobby.cs`）以及多数 UI 控件字段。
+- `DotArenaGame.cs` 的第一轮拆分已把联机身份/请求状态收敛到 `DotArenaMultiplayerState`，把本地模拟推进收敛到 `DotArenaSinglePlayerController`，并把 UI 快照构建移动到独立 partial。`DotArenaGame` 仍分散在多份 partial 文件中，后续还需要继续收敛输入、世界表现、资源/皮肤和 UI 命令边界。
+- `DotArenaSceneUiPresenter` 的第一轮拆分已引入 `DotArenaUiFactory` 和 `DotArenaUiStyleCatalog`，把重复文本、按钮、面板和输入框创建/样式逻辑从 Layout/Styling 文件中抽出。Presenter 仍偏大，后续需要继续把入口、登录、匹配中、大厅、HUD、对局排名和结算拆成独立面板 presenter 或稳定 prefab。
 - 后续拆分的目标是让 `DotArenaGame` 退回 Unity 场景组合根，让会话流程、单机模拟、输入、世界表现、UI 快照、资源/皮肤和本地元进度分别拥有清晰所有者。
 - `DotArenaSceneUiPresenter` 应退回 UI 根协调器；入口/模式选择、登录、匹配中、大厅、HUD、对局排名和结算应由独立 presenter、稳定 prefab 或小型工厂承载。调试面板不作为玩家 UI 保留。
 - `DotArenaMetaProgression` 已拆分完成（Models、Catalog、Persistence、Queries、Rules）。本地 mock 排行榜已淘汰，`GetLeaderboardSummary` 现在展示服务端 RPC 刷新后的缓存数据。
@@ -81,7 +81,7 @@ DotArenaGame
 DotArenaClientFlowState
   当前模式、前端流程、入口菜单、忙碌状态、匹配计时和待处理 UI 请求
 
-DotArenaMultiplayerFlow
+DotArenaMultiplayerState / DotArenaMultiplayerFlow
   登录、游客登录、匹配、取消匹配、实时绑定、断线恢复、可靠推送确认
 
 DotArenaSinglePlayerController

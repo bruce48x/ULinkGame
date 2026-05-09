@@ -18,8 +18,7 @@ namespace SampleClient.Gameplay
             _menuBackground = FindSceneUiObject("SceneUI/MenuBackground");
             if (_menuBackground == null)
             {
-                _menuBackground = new GameObject("MenuBackground", typeof(RectTransform), typeof(Image));
-                _menuBackground.transform.SetParent(_sceneUiRoot.transform, false);
+                _menuBackground = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "MenuBackground");
             }
 
             _menuBackground.transform.SetAsFirstSibling();
@@ -298,28 +297,16 @@ namespace SampleClient.Gameplay
 
         private void CreateLobbyText(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyles, TextAlignmentOptions alignment)
         {
-            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)textObject.transform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-
-            var text = textObject.GetComponent<TextMeshProUGUI>();
-            text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            text.fontSize = fontSize;
-            text.fontStyle = fontStyles;
-            text.alignment = alignment;
-            text.enableWordWrapping = true;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.richText = false;
+            UiFactory.CreateText(
+                parent,
+                name,
+                DotArenaUiRect.TopCenter(anchoredPosition, size),
+                DotArenaUiStyleCatalog.LobbyText(fontSize, fontStyles, alignment));
         }
 
         private void CreateLobbyButton(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, string label)
         {
-            CreateSettlementButton(parent, name, anchoredPosition, size, label);
+            UiFactory.CreateButton(parent, name, DotArenaUiRect.TopCenter(anchoredPosition, size), label);
         }
 
         private void EnsureSettlementPanel()
@@ -336,8 +323,7 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            _settlementPanel = new GameObject("SettlementPanel", typeof(RectTransform), typeof(Image));
-            _settlementPanel.transform.SetParent(_sceneUiRoot.transform, false);
+            _settlementPanel = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "SettlementPanel");
             var panelRect = (RectTransform)_settlementPanel.transform;
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -441,8 +427,7 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            _matchmakingPanel = new GameObject("MatchmakingPanel", typeof(RectTransform), typeof(Image));
-            _matchmakingPanel.transform.SetParent(_sceneUiRoot.transform, false);
+            _matchmakingPanel = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "MatchmakingPanel");
             var panelRect = (RectTransform)_matchmakingPanel.transform;
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -457,53 +442,16 @@ namespace SampleClient.Gameplay
 
         private void CreateSettlementText(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyles)
         {
-            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)textObject.transform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-
-            var text = textObject.GetComponent<TextMeshProUGUI>();
-            text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            text.fontSize = fontSize;
-            text.fontStyle = fontStyles;
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = true;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.richText = false;
+            UiFactory.CreateText(
+                parent,
+                name,
+                DotArenaUiRect.TopCenter(anchoredPosition, size),
+                DotArenaUiStyleCatalog.CenterPanelText(fontSize, fontStyles));
         }
 
         private void CreateSettlementButton(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, string label)
         {
-            var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)buttonObject.transform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-
-            var labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-            labelObject.transform.SetParent(buttonObject.transform, false);
-            var labelRect = (RectTransform)labelObject.transform;
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-
-            var text = labelObject.GetComponent<TextMeshProUGUI>();
-            text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            text.fontSize = 13f;
-            text.fontStyle = FontStyles.Bold;
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.richText = false;
-            text.text = label;
+            UiFactory.CreateButton(parent, name, DotArenaUiRect.TopCenter(anchoredPosition, size), label);
         }
     }
 }

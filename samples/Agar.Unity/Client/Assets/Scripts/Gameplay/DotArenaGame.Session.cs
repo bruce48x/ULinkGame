@@ -29,26 +29,19 @@ namespace SampleClient.Gameplay
 
                 if (reply.Code != 0)
                 {
-                    _hasAuthenticatedProfile = false;
-                    _authenticatedPlayerId = string.Empty;
-                    _localWinCount = 0;
-                    _localPlayerId = string.Empty;
+                    _multiplayerState.ClearAuthenticatedProfile();
+                    _multiplayerState.ClearSession();
                     _localMatch = null;
-                    _sessionMode = SessionMode.None;
                     _status = $"登录失败, code={reply.Code}";
                     _eventMessage = "登录失败，请检查账号或密码";
                     return;
                 }
 
-                _localPlayerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
+                var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.WinCount);
                 _localMatch = null;
-                _reliablePushTracker.Reset();
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
-                _localWinCount = Math.Max(0, reply.WinCount);
-                _hasAuthenticatedProfile = true;
-                _authenticatedPlayerId = _localPlayerId;
-                _sessionMode = SessionMode.Multiplayer;
                 _flowState = FrontendFlowState.Entry;
                 _entryMenuState = EntryMenuState.MultiplayerLobby;
                 _status = $"联机大厅: {_localPlayerId}";
@@ -102,12 +95,9 @@ namespace SampleClient.Gameplay
 
                 if (reply.Code != 0)
                 {
-                    _hasAuthenticatedProfile = false;
-                    _authenticatedPlayerId = string.Empty;
-                    _localWinCount = 0;
-                    _localPlayerId = string.Empty;
+                    _multiplayerState.ClearAuthenticatedProfile();
+                    _multiplayerState.ClearSession();
                     _localMatch = null;
-                    _sessionMode = SessionMode.None;
                     _status = $"游客登录失败, code={reply.Code}";
                     _eventMessage = "无法申请游客账号，请稍后重试";
                     return;
@@ -115,15 +105,11 @@ namespace SampleClient.Gameplay
 
                 _account = string.IsNullOrWhiteSpace(reply.Account) ? reply.PlayerId : reply.Account;
                 _password = reply.Password;
-                _localPlayerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
+                var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.WinCount);
                 _localMatch = null;
-                _reliablePushTracker.Reset();
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
-                _localWinCount = Math.Max(0, reply.WinCount);
-                _hasAuthenticatedProfile = true;
-                _authenticatedPlayerId = _localPlayerId;
-                _sessionMode = SessionMode.Multiplayer;
                 _flowState = FrontendFlowState.Entry;
                 _entryMenuState = EntryMenuState.MultiplayerLobby;
                 _status = $"联机大厅: {_localPlayerId}";
@@ -210,13 +196,10 @@ namespace SampleClient.Gameplay
 
                         if (reply.Code == LoginResultCodes.Ok)
                         {
-                            _localPlayerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _authenticatedPlayerId : reply.PlayerId;
-                            _authenticatedPlayerId = _localPlayerId;
-                            _hasAuthenticatedProfile = true;
-                            _localWinCount = Math.Max(0, reply.WinCount);
+                            var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _authenticatedPlayerId : reply.PlayerId;
+                            _multiplayerState.ApplyControlReconnect(playerId, reply.WinCount);
                             EnsureMetaState(_localPlayerId);
                             _ = RefreshLeaderboardAsync();
-                            _sessionMode = SessionMode.Multiplayer;
                             _status = _flowState == FrontendFlowState.InMatch
                                 ? $"对局中: {_localPlayerId}"
                                 : $"联机大厅: {_localPlayerId}";
@@ -271,14 +254,10 @@ namespace SampleClient.Gameplay
             await NetworkSession.DisposeRealtimeAsync().ConfigureAwait(false);
             ResetSessionPresentation();
             _callbackInbox.Clear();
-            _lastRealtimeConnection = null;
-            _matchmakingStartedAt = -1f;
-            _reliablePushTracker.Reset();
-            _pendingUiRequest = PendingUiRequest.None;
+            _multiplayerState.ClearRequestState(resetReliablePush: true);
             _flowState = FrontendFlowState.Entry;
             _entryMenuState = EntryMenuState.MultiplayerAuth;
-            _sessionMode = SessionMode.None;
-            _localPlayerId = string.Empty;
+            _multiplayerState.ClearSession();
             _localMatch = null;
             await ConnectAsync().ConfigureAwait(false);
         }
@@ -292,22 +271,20 @@ namespace SampleClient.Gameplay
         {
             var sessionMode = _sessionMode;
             var localScore = GetLocalPlayerScoreValue();
-            var authenticatedPlayerId = _authenticatedPlayerId;
-            var localWinCount = _localWinCount;
+            var authenticatedProfile = _multiplayerState.CaptureAuthenticatedProfile();
 
             if (_sessionMode == SessionMode.Multiplayer)
             {
                 _ = NetworkSession.DisposeRealtimeAsync();
-                _lastRealtimeConnection = null;
-                _matchmakingStartedAt = -1f;
+                _multiplayerState.LastRealtimeConnection = null;
+                _multiplayerState.MatchmakingStartedAt = -1f;
             }
 
             if (_sessionMode != SessionMode.Multiplayer)
             {
                 ResetSessionPresentation();
-                _sessionMode = SessionMode.None;
+                _multiplayerState.ClearSession();
                 _localMatch = null;
-                _localPlayerId = string.Empty;
             }
             else
             {
@@ -322,19 +299,14 @@ namespace SampleClient.Gameplay
 
             if (preserveLoginState)
             {
-                _hasAuthenticatedProfile = true;
-                _authenticatedPlayerId = authenticatedPlayerId;
-                _localWinCount = localWinCount;
+                _multiplayerState.RestoreAuthenticatedProfile(authenticatedProfile);
                 _sessionMode = SessionMode.Multiplayer;
-                _localPlayerId = authenticatedPlayerId;
+                _localPlayerId = authenticatedProfile.PlayerId;
             }
             else
             {
-                _hasAuthenticatedProfile = false;
-                _authenticatedPlayerId = string.Empty;
-                _localWinCount = 0;
-                _sessionMode = SessionMode.None;
-                _localPlayerId = string.Empty;
+                _multiplayerState.ClearAuthenticatedProfile();
+                _multiplayerState.ClearSession();
             }
 
             _settlementSummary = new MatchSettlementSummary
@@ -362,7 +334,7 @@ namespace SampleClient.Gameplay
                     _metaState,
                     sessionMode,
                     winnerPlayerId,
-                    preserveLoginState ? authenticatedPlayerId : "Player",
+                    preserveLoginState ? authenticatedProfile.PlayerId : "Player",
                     localScore);
                 _settlementSummary.RewardSummary = DotArenaUiTextComposer.BuildSettlementRewardSummary(sessionMode, _lastRewardSummary);
                 _settlementSummary.TaskSummary = DotArenaUiTextComposer.BuildSettlementTaskSummary(_metaState);
@@ -401,8 +373,7 @@ namespace SampleClient.Gameplay
 
             if (clearSessionState)
             {
-                _sessionMode = SessionMode.None;
-                _localPlayerId = string.Empty;
+                _multiplayerState.ClearSession();
                 _localMatch = null;
             }
         }
@@ -418,16 +389,15 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            var preserveLoginState = _sessionMode == SessionMode.Multiplayer && _hasAuthenticatedProfile;
-            var authenticatedPlayerId = _authenticatedPlayerId;
-            var localWinCount = _localWinCount;
+            var preserveLoginState = _multiplayerState.HasRecoverableLogin;
+            var authenticatedProfile = _multiplayerState.CaptureAuthenticatedProfile();
 
             if (_sessionMode == SessionMode.Multiplayer)
             {
                 try
                 {
                     await NetworkSession.DisposeRealtimeAsync().ConfigureAwait(false);
-                    _lastRealtimeConnection = null;
+                    _multiplayerState.LastRealtimeConnection = null;
                     await NetworkSession.CancelMatchmakingAsync(_cts.Token).ConfigureAwait(false);
                     _status = "正在取消匹配";
                     _eventMessage = "等待服务器确认取消";
@@ -450,32 +420,26 @@ namespace SampleClient.Gameplay
             else
             {
                 ResetSessionPresentation();
-                _sessionMode = SessionMode.None;
+                _multiplayerState.ClearSession();
                 _localMatch = null;
-                _localPlayerId = string.Empty;
             }
 
             _localMatch = null;
-            _matchmakingStartedAt = -1f;
+            _multiplayerState.MatchmakingStartedAt = -1f;
             _flowState = FrontendFlowState.Entry;
             if (preserveLoginState)
             {
-                _hasAuthenticatedProfile = true;
-                _authenticatedPlayerId = authenticatedPlayerId;
-                _localWinCount = localWinCount;
+                _multiplayerState.RestoreAuthenticatedProfile(authenticatedProfile);
                 _sessionMode = SessionMode.Multiplayer;
-                _localPlayerId = authenticatedPlayerId;
+                _localPlayerId = authenticatedProfile.PlayerId;
                 _entryMenuState = EntryMenuState.MultiplayerLobby;
-                _status = $"联机大厅: {authenticatedPlayerId}";
+                _status = $"联机大厅: {authenticatedProfile.PlayerId}";
                 _eventMessage = "已返回联机大厅";
             }
             else
             {
-                _hasAuthenticatedProfile = false;
-                _authenticatedPlayerId = string.Empty;
-                _localWinCount = 0;
-                _sessionMode = SessionMode.None;
-                _localPlayerId = string.Empty;
+                _multiplayerState.ClearAuthenticatedProfile();
+                _multiplayerState.ClearSession();
                 _entryMenuState = EntryMenuState.ModeSelect;
                 _status = "选择模式";
                 _eventMessage = "请选择单机或联机";
@@ -619,31 +583,25 @@ namespace SampleClient.Gameplay
         private void ReturnToEntryMenuFromSettlement()
         {
             var preserveLoginState = _settlementSummary?.SessionMode == SessionMode.Multiplayer;
-            var authenticatedPlayerId = _authenticatedPlayerId;
-            var localWinCount = _localWinCount;
+            var authenticatedProfile = _multiplayerState.CaptureAuthenticatedProfile();
 
             _settlementSummary = null;
             _flowState = FrontendFlowState.Entry;
 
             if (preserveLoginState)
             {
-                _hasAuthenticatedProfile = true;
-                _authenticatedPlayerId = authenticatedPlayerId;
-                _localWinCount = localWinCount;
+                _multiplayerState.RestoreAuthenticatedProfile(authenticatedProfile);
                 _sessionMode = SessionMode.Multiplayer;
-                _localPlayerId = authenticatedPlayerId;
+                _localPlayerId = authenticatedProfile.PlayerId;
                 _localMatch = null;
                 _entryMenuState = EntryMenuState.MultiplayerLobby;
-                _status = $"联机大厅: {authenticatedPlayerId}";
+                _status = $"联机大厅: {authenticatedProfile.PlayerId}";
                 _eventMessage = "已返回联机大厅";
                 return;
             }
 
-            _hasAuthenticatedProfile = false;
-            _authenticatedPlayerId = string.Empty;
-            _localWinCount = 0;
-            _sessionMode = SessionMode.None;
-            _localPlayerId = string.Empty;
+            _multiplayerState.ClearAuthenticatedProfile();
+            _multiplayerState.ClearSession();
             _localMatch = null;
             _requestedSinglePlayerMode = SinglePlayerMode.Normal;
             _currentSinglePlayerMode = SinglePlayerMode.Normal;
@@ -659,18 +617,11 @@ namespace SampleClient.Gameplay
             _callbackInbox.Clear();
             _settlementSummary = null;
             _lastRewardSummary = null;
-            _pendingUiRequest = PendingUiRequest.None;
-            _controlReconnectInProgress = false;
-            _lastRealtimeConnection = null;
-            _matchmakingStartedAt = -1f;
-            _reliablePushTracker.Reset();
+            _multiplayerState.ClearRequestState(resetReliablePush: true);
             _flowState = FrontendFlowState.Entry;
             _entryMenuState = EntryMenuState.ModeSelect;
-            _sessionMode = SessionMode.None;
-            _hasAuthenticatedProfile = false;
-            _authenticatedPlayerId = string.Empty;
-            _localPlayerId = string.Empty;
-            _localWinCount = 0;
+            _multiplayerState.ClearAuthenticatedProfile();
+            _multiplayerState.ClearSession();
             _localMatch = null;
             _requestedSinglePlayerMode = SinglePlayerMode.Normal;
             _currentSinglePlayerMode = SinglePlayerMode.Normal;

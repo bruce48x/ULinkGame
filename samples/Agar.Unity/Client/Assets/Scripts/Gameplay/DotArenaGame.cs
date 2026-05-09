@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Threading;
 using Shared.Gameplay;
 using Shared.Interfaces;
-using ULinkGame.Client.ReliablePush;
 using UnityEngine;
 using static SampleClient.Gameplay.DotArenaTuning;
 
@@ -23,6 +22,7 @@ namespace SampleClient.Gameplay
         private readonly DotArenaCallbackInbox _callbackInbox = new();
         private readonly DotArenaSceneUiPresenter _sceneUiPresenter = new();
         private readonly DotArenaPlayerOverlayPresenter _overlayPresenter = new();
+        private readonly DotArenaMultiplayerState _multiplayerState = new();
         private readonly Dictionary<string, DotView> _views = new(StringComparer.Ordinal);
         private readonly Dictionary<string, PlayerRenderState> _renderStates = new(StringComparer.Ordinal);
         private readonly List<PickupView> _pickupViews = new();
@@ -30,24 +30,15 @@ namespace SampleClient.Gameplay
         private DotArenaNetworkSession? _networkSession;
         private DotArenaWorldSynchronizer? _worldSynchronizer;
         private ArenaSimulation? _localMatch;
-        private string _localPlayerId = string.Empty;
         private bool _singlePlayerStartRequested;
         private bool _rematchRequested;
         private bool _returnToLobbyRequested;
         private SinglePlayerMode _requestedSinglePlayerMode = SinglePlayerMode.Normal;
         private SinglePlayerMode _currentSinglePlayerMode = SinglePlayerMode.Normal;
         private EntryMenuState _entryMenuState = EntryMenuState.ModeSelect;
-        private SessionMode _sessionMode = SessionMode.None;
         private FrontendFlowState _flowState = FrontendFlowState.Entry;
         private int _inputTick;
         private float _nextInputAt;
-        private float _singlePlayerTickAccumulator;
-        private float _matchmakingStartedAt = -1f;
-        private readonly ReliablePushTracker _reliablePushTracker = new();
-
-        private int _localWinCount;
-        private bool _hasAuthenticatedProfile;
-        private string _authenticatedPlayerId = string.Empty;
 
         private Sprite _pixelSprite = null!;
         private Sprite _playerSprite = null!;
@@ -68,14 +59,12 @@ namespace SampleClient.Gameplay
         private int _lastLoggedPlayerCount = -1;
         private bool _shutdownStarted;
         private bool _ignoreDisconnectCallback;
-        private bool _controlReconnectInProgress;
         private string _lastLoggedInputVector = string.Empty;
         private bool _showDebugPanel;
         private int _lastRoundRemainingSeconds;
         private MatchSettlementSummary? _settlementSummary;
         private DotArenaMetaState? _metaState;
         private DotArenaRewardSummary? _lastRewardSummary;
-        private PendingUiRequest _pendingUiRequest;
         private MetaTab _selectedMetaTab;
         private SpriteRenderer? _safeZoneRenderer;
         private SpriteRenderer? _topBorderRenderer;
@@ -86,7 +75,6 @@ namespace SampleClient.Gameplay
         private int _singlePlayerPlaylistIndex = -1;
         private ArenaMapVariant _currentArenaMapVariant = ArenaMapVariant.ClassicSquare;
         private ArenaRuleVariant _currentArenaRuleVariant = ArenaRuleVariant.ClassicElimination;
-        private RealtimeConnectionInfo? _lastRealtimeConnection;
 #if UNITY_EDITOR
         private Vector2 _editorMoveOverride;
         private bool _hasEditorInputOverride;
@@ -98,8 +86,17 @@ namespace SampleClient.Gameplay
         private bool IsConnecting => NetworkSession.IsConnecting;
         private bool IsRealtimeConnected => NetworkSession.IsRealtimeConnected;
         private bool CanSubmitGameplayInput => NetworkSession.CanSubmitGameplayInput;
-        private bool HasPendingUiRequest => _pendingUiRequest != PendingUiRequest.None;
+        private bool HasPendingUiRequest => _multiplayerState.HasPendingUiRequest;
         private bool IsUiBusy => IsConnecting || HasPendingUiRequest || _controlReconnectInProgress;
+        private string _localPlayerId { get => _multiplayerState.LocalPlayerId; set => _multiplayerState.LocalPlayerId = value; }
+        private SessionMode _sessionMode { get => _multiplayerState.SessionMode; set => _multiplayerState.SessionMode = value; }
+        private float _matchmakingStartedAt { get => _multiplayerState.MatchmakingStartedAt; set => _multiplayerState.MatchmakingStartedAt = value; }
+        private int _localWinCount { get => _multiplayerState.LocalWinCount; set => _multiplayerState.LocalWinCount = value; }
+        private bool _hasAuthenticatedProfile { get => _multiplayerState.HasAuthenticatedProfile; set => _multiplayerState.HasAuthenticatedProfile = value; }
+        private string _authenticatedPlayerId { get => _multiplayerState.AuthenticatedPlayerId; set => _multiplayerState.AuthenticatedPlayerId = value; }
+        private PendingUiRequest _pendingUiRequest { get => _multiplayerState.PendingUiRequest; set => _multiplayerState.PendingUiRequest = value; }
+        private bool _controlReconnectInProgress { get => _multiplayerState.ControlReconnectInProgress; set => _multiplayerState.ControlReconnectInProgress = value; }
+        private RealtimeConnectionInfo? _lastRealtimeConnection { get => _multiplayerState.LastRealtimeConnection; set => _multiplayerState.LastRealtimeConnection = value; }
 
         private DotArenaWorldSynchronizer WorldSynchronizer => _worldSynchronizer ??= new DotArenaWorldSynchronizer(
             _views,

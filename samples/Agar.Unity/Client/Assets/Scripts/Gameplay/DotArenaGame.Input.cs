@@ -27,15 +27,8 @@ namespace SampleClient.Gameplay
                 Debug.Log($"[DotArena] HandleInput mode={_sessionMode} move={inputSummary} localMatch={_localMatch != null}");
             }
 
-            if (_sessionMode == SessionMode.SinglePlayer && _localMatch != null)
+            if (SubmitSinglePlayerInput(move))
             {
-                _localMatch.SubmitInput(new InputMessage
-                {
-                    PlayerId = _localPlayerId,
-                    MoveX = move.x,
-                    MoveY = move.y,
-                    Tick = ++_inputTick
-                });
                 return;
             }
 

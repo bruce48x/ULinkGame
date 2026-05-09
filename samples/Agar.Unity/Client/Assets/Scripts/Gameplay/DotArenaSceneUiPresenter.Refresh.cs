@@ -149,10 +149,10 @@ namespace SampleClient.Gameplay
                 SetText(row.ScoreText, DotArenaPresentation.FormatScore(entry.Score));
 
                 var rowBackground = (i & 1) == 0
-                    ? new Color(0.08f, 0.12f, 0.16f, 0.58f)
-                    : new Color(0.04f, 0.07f, 0.1f, 0.42f);
+                    ? new Color(0.08f, 0.12f, 0.16f, 0.10f)
+                    : new Color(0.04f, 0.07f, 0.1f, 0.06f);
                 row.Background.color = entry.IsLocalPlayer
-                    ? new Color(0.16f, 0.36f, 0.38f, 0.92f)
+                    ? new Color(0.16f, 0.36f, 0.38f, 0.20f)
                     : rowBackground;
 
                 var nameColor = entry.IsLocalPlayer ? UiAccentTextColor : UiPrimaryTextColor;

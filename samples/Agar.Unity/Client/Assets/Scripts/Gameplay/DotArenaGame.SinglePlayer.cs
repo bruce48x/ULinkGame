@@ -1,54 +1,36 @@
 #nullable enable
 
-using Shared.Gameplay;
-using Shared.Interfaces;
 using UnityEngine;
-using static SampleClient.Gameplay.DotArenaTuning;
 
 namespace SampleClient.Gameplay
 {
     public sealed partial class DotArenaGame
     {
+        private readonly DotArenaSinglePlayerController _singlePlayerController = new();
+
         private void BeginSinglePlayerMatch()
         {
-            _currentSinglePlayerMode = _requestedSinglePlayerMode;
-            var preset = DotArenaSinglePlayerCatalog.GetNextPreset(ref _singlePlayerPlaylistIndex);
-            var options = DotArenaSinglePlayerCatalog.CreateOptions(preset);
-            var initialScore = 1;
-            if (_currentSinglePlayerMode == SinglePlayerMode.Invincible)
-            {
-                initialScore = InvincibleSinglePlayerInitialScore;
-                options.FixedRespawnPlayerId = "Player";
-                options.FixedRespawnScore = InvincibleSinglePlayerInitialScore;
-                options.MoveSpeedMultiplierPlayerId = "Player";
-                options.MoveSpeedMultiplier = 2f;
-                options.InvertedMoveSpeedPlayerId = "Player";
-            }
+            var start = _singlePlayerController.BeginMatch(_requestedSinglePlayerMode, ref _singlePlayerPlaylistIndex);
 
             _settlementSummary = null;
             ResetSessionPresentation();
             _ = DisposeConnectionAsync(clearSessionState: false);
             _sessionMode = SessionMode.SinglePlayer;
             _flowState = FrontendFlowState.Matchmaking;
-            _localPlayerId = "Player";
+            _localPlayerId = start.LocalPlayerId;
             EnsureMetaState(_localPlayerId);
-            _currentArenaMapVariant = preset.MapVariant;
-            _currentArenaRuleVariant = preset.RuleVariant;
-            _localMatch = new ArenaSimulation(options);
-            _localMatch.UpsertPlayer(new ArenaPlayerRegistration
-            {
-                PlayerId = _localPlayerId,
-                Score = initialScore
-            });
+            _currentSinglePlayerMode = start.Mode;
+            _currentArenaMapVariant = start.MapVariant;
+            _currentArenaRuleVariant = start.RuleVariant;
+            _localMatch = start.Match;
             _localWinCount = 0;
             _entryMenuState = EntryMenuState.Hidden;
             _status = $"{GetSinglePlayerModeLabel(_currentSinglePlayerMode)} | {DotArenaSinglePlayerCatalog.GetRuleVariantName(_currentArenaRuleVariant)}";
             _eventMessage = $"Loading {DotArenaSinglePlayerCatalog.GetMapVariantName(_currentArenaMapVariant)}";
             _lastWorldTick = -1;
             _inputTick = 0;
-            _singlePlayerTickAccumulator = 0f;
             Debug.Log("[DotArena] BeginSinglePlayerMatch");
-            ApplyWorldState(_localMatch.CreateWorldState());
+            ApplyWorldState(start.InitialWorldState);
             PushEvent($"Preset: {DotArenaSinglePlayerCatalog.GetPresetLabel(_currentArenaMapVariant, _currentArenaRuleVariant)}", 4f);
             _status = $"{GetSinglePlayerModeLabel(_currentSinglePlayerMode)}: {_localPlayerId}";
         }
@@ -60,20 +42,14 @@ namespace SampleClient.Gameplay
 
         private void TickLocalMatch()
         {
-            if (_sessionMode != SessionMode.SinglePlayer || _localMatch == null)
+            if (_sessionMode != SessionMode.SinglePlayer || _singlePlayerController.Match == null)
             {
                 return;
             }
 
-            _singlePlayerTickAccumulator += Mathf.Min(Time.deltaTime, SinglePlayerTickSeconds * MaxSinglePlayerCatchUpTicks);
-
-            var catchUpTicks = 0;
-            while (_singlePlayerTickAccumulator >= SinglePlayerTickSeconds && catchUpTicks < MaxSinglePlayerCatchUpTicks)
+            var result = _singlePlayerController.Tick(Time.deltaTime);
+            foreach (var step in result.Steps)
             {
-                _singlePlayerTickAccumulator -= SinglePlayerTickSeconds;
-                catchUpTicks++;
-
-                var step = _localMatch.Tick(SinglePlayerTickSeconds);
                 ApplyWorldState(step.WorldState);
 
                 foreach (var deadEvent in step.Deaths)
@@ -84,15 +60,20 @@ namespace SampleClient.Gameplay
                 if (step.MatchEnd != null)
                 {
                     HandleMatchEnd(step.MatchEnd);
-                    _singlePlayerTickAccumulator = 0f;
                     break;
                 }
             }
+        }
 
-            if (catchUpTicks == MaxSinglePlayerCatchUpTicks && _singlePlayerTickAccumulator > SinglePlayerTickSeconds)
+        private bool SubmitSinglePlayerInput(Vector2 move)
+        {
+            if (_sessionMode != SessionMode.SinglePlayer || _singlePlayerController.Match == null)
             {
-                _singlePlayerTickAccumulator = 0f;
+                return false;
             }
+
+            _singlePlayerController.SubmitInput(move, ++_inputTick);
+            return true;
         }
 
         private Vector2 ReadMoveVector()

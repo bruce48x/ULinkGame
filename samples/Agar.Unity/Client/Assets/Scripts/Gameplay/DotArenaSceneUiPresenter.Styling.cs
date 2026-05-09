@@ -45,7 +45,7 @@ namespace SampleClient.Gameplay
         private void ApplySceneUiTheme()
         {
             StylePanelImage(_hudPanel, Color.clear);
-            StylePanelImage(_matchRankingPanel, UiPanelBackgroundColor);
+            StyleMatchRankingPanelImage();
             StylePanelImage(_debugPanel, UiPanelBackgroundColor);
             StylePanelImage(_entryPanel, UiPanelBackgroundColor);
             StylePanelImage(_matchmakingPanel, UiPanelBackgroundColor);
@@ -136,104 +136,22 @@ namespace SampleClient.Gameplay
 
         private void StylePanelImage(GameObject? panel, Color color)
         {
-            if (panel == null)
-            {
-                return;
-            }
-
-            if (panel.TryGetComponent<Image>(out var image))
-            {
-                if (_uiPanelSprite != null && color.a > 0f)
-                {
-                    image.sprite = _uiPanelSprite;
-                    image.type = Image.Type.Simple;
-                    image.color = Color.white;
-                }
-                else
-                {
-                    image.sprite = null;
-                    image.color = color;
-                }
-
-                image.raycastTarget = color.a > 0f;
-            }
+            DotArenaUiStyleCatalog.ApplyPanelImage(panel, color, _uiPanelSprite);
         }
 
         private static void StyleText(TMP_Text? text, Color color, float fontSize, bool wrap, TextAlignmentOptions alignment, TextOverflowModes overflowMode)
         {
-            if (text == null)
-            {
-                return;
-            }
-
-            text.color = color;
-            text.fontSize = fontSize;
-            text.alignment = alignment;
-            text.enableWordWrapping = wrap;
-            text.overflowMode = overflowMode;
-            text.richText = false;
+            DotArenaUiStyleCatalog.ApplyText(text, color, fontSize, wrap, alignment, overflowMode);
         }
 
         private void StyleButton(Button? button)
         {
-            if (button == null)
-            {
-                return;
-            }
-
-            if (button.targetGraphic is Image buttonImage && _uiButtonNormalSprite != null)
-            {
-                buttonImage.sprite = _uiButtonNormalSprite;
-                buttonImage.type = Image.Type.Simple;
-                buttonImage.color = Color.white;
-            }
-
-            var colors = button.colors;
-            colors.normalColor = _uiButtonNormalSprite != null ? Color.white : new Color(0.2f, 0.29f, 0.38f, 1f);
-            colors.highlightedColor = _uiButtonNormalSprite != null ? new Color(1.08f, 1.08f, 1.08f, 1f) : new Color(0.27f, 0.39f, 0.5f, 1f);
-            colors.pressedColor = _uiButtonNormalSprite != null ? new Color(0.86f, 0.9f, 0.94f, 1f) : new Color(0.14f, 0.22f, 0.3f, 1f);
-            colors.selectedColor = colors.highlightedColor;
-            colors.disabledColor = new Color(0.2f, 0.2f, 0.22f, 0.7f);
-            colors.colorMultiplier = 1f;
-            button.colors = colors;
-
-            if (_uiButtonPressedSprite != null)
-            {
-                button.transition = Selectable.Transition.SpriteSwap;
-                var spriteState = button.spriteState;
-                spriteState.highlightedSprite = _uiButtonNormalSprite;
-                spriteState.pressedSprite = _uiButtonPressedSprite;
-                spriteState.selectedSprite = _uiButtonNormalSprite;
-                spriteState.disabledSprite = _uiButtonNormalSprite;
-                button.spriteState = spriteState;
-            }
-            else
-            {
-                button.transition = Selectable.Transition.ColorTint;
-            }
+            DotArenaUiStyleCatalog.ApplyButton(button, _uiButtonNormalSprite, _uiButtonPressedSprite);
         }
 
         private static void StyleInputField(TMP_InputField? inputField)
         {
-            if (inputField == null)
-            {
-                return;
-            }
-
-            if (inputField.targetGraphic is Image inputImage)
-            {
-                inputImage.color = UiInputBackgroundColor;
-            }
-
-            if (inputField.textComponent != null)
-            {
-                StyleText(inputField.textComponent, UiPrimaryTextColor, 14f, false, TextAlignmentOptions.MidlineLeft, TextOverflowModes.Ellipsis);
-            }
-
-            if (inputField.placeholder is TMP_Text placeholderText)
-            {
-                StyleText(placeholderText, UiMutedTextColor, 13f, false, TextAlignmentOptions.MidlineLeft, TextOverflowModes.Ellipsis);
-            }
+            DotArenaUiStyleCatalog.ApplyInputField(inputField);
         }
 
         private static void EnsureInputFieldViewport(TMP_InputField? inputField)
@@ -276,15 +194,26 @@ namespace SampleClient.Gameplay
             _uiButtonNormalSprite = null;
             _uiButtonPressedSprite = null;
             _uiBackgroundSprite = null;
+            _matchRankingPanelSprite = null;
             _leaderboardIconSprite = null;
 
 #if UNITY_EDITOR
             _uiBackgroundSprite = TryLoadSceneUiSprite("UI background", "Assets/Art/Backgrounds/BG_Arena_Grid_Dark_01.png");
             _uiPanelSprite = TryLoadSceneUiSprite("UI panel", "Assets/Art/UI/UI_Panel_Dark_01.png");
+            _matchRankingPanelSprite = TryLoadSceneUiSprite("match ranking panel", "Assets/Art/UI/UI_HUD_Rank_Panel_Translucent_01.png");
             _uiButtonNormalSprite = TryLoadSceneUiSprite("UI button normal", "Assets/Art/UI/UI_Button_Primary_Normal.png");
             _uiButtonPressedSprite = TryLoadSceneUiSprite("UI button pressed", "Assets/Art/UI/UI_Button_Primary_Pressed.png");
             _leaderboardIconSprite = TryLoadSceneUiSprite("leaderboard icon", "Assets/Art/Icons/Icon_Leaderboard_01.png");
 #endif
+        }
+
+        private void StyleMatchRankingPanelImage()
+        {
+            DotArenaUiStyleCatalog.ApplyPanelSprite(
+                _matchRankingPanel,
+                _matchRankingPanelSprite,
+                new Color(1f, 1f, 1f, 0.72f),
+                raycastTarget: false);
         }
 
 #if UNITY_EDITOR

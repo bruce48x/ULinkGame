@@ -32,7 +32,6 @@ namespace SampleClient.Gameplay
             _lastWorldTick = -1;
             _lastLoggedPlayerCount = -1;
             _nextInputAt = 0f;
-            _singlePlayerTickAccumulator = 0f;
             _currentArenaHalfExtents = GameplayConfig.ArenaHalfExtents;
             UpdateArenaVisuals();
         }

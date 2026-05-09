@@ -19,8 +19,7 @@ namespace SampleClient.Gameplay
             _matchRankingPanel = FindSceneUiObject("SceneUI/MatchRankingPanel");
             if (_matchRankingPanel == null)
             {
-                _matchRankingPanel = new GameObject("MatchRankingPanel", typeof(RectTransform), typeof(Image));
-                _matchRankingPanel.transform.SetParent(_sceneUiRoot.transform, false);
+                _matchRankingPanel = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "MatchRankingPanel");
             }
 
             EnsureMatchRankingPanelContents();
@@ -74,28 +73,11 @@ namespace SampleClient.Gameplay
             FontStyles fontStyles,
             TextAlignmentOptions alignment)
         {
-            var text = FindSceneUiText($"SceneUI/MatchRankingPanel/{name}");
-            if (text == null)
-            {
-                var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-                textObject.transform.SetParent(parent, false);
-                text = textObject.GetComponent<TextMeshProUGUI>();
-                text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            }
-
-            var rect = text.rectTransform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-            text.fontSize = fontSize;
-            text.fontStyle = fontStyles;
-            text.alignment = alignment;
-            text.enableWordWrapping = false;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.richText = false;
-            return text;
+            return UiFactory.EnsureText(
+                parent,
+                name,
+                DotArenaUiRect.TopCenter(anchoredPosition, size),
+                DotArenaUiStyleCatalog.RankingText(fontSize, fontStyles, alignment));
         }
 
         private MatchRankingRowUi EnsureMatchRankingRow(int index)
@@ -105,8 +87,7 @@ namespace SampleClient.Gameplay
             GameObject rowObject;
             if (rowTransform == null)
             {
-                rowObject = new GameObject(rowName, typeof(RectTransform), typeof(Image));
-                rowObject.transform.SetParent(_matchRankingPanel.transform, false);
+                rowObject = DotArenaUiFactory.CreatePanel(_matchRankingPanel.transform, rowName);
             }
             else
             {
@@ -137,33 +118,11 @@ namespace SampleClient.Gameplay
 
         private TMP_Text EnsureMatchRankingRowText(Transform parent, string name, float x, float width, TextAlignmentOptions alignment)
         {
-            var textTransform = parent.Find(name);
-            TMP_Text text;
-            if (textTransform == null)
-            {
-                var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-                textObject.transform.SetParent(parent, false);
-                text = textObject.GetComponent<TextMeshProUGUI>();
-                text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            }
-            else
-            {
-                text = textTransform.GetComponent<TMP_Text>();
-            }
-
-            var rect = text.rectTransform;
-            rect.anchorMin = new Vector2(0f, 0.5f);
-            rect.anchorMax = new Vector2(0f, 0.5f);
-            rect.pivot = new Vector2(0f, 0.5f);
-            rect.anchoredPosition = new Vector2(x, 0f);
-            rect.sizeDelta = new Vector2(width, 20f);
-            text.fontSize = 12f;
-            text.fontStyle = FontStyles.Bold;
-            text.alignment = alignment;
-            text.enableWordWrapping = false;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.richText = false;
-            return text;
+            return UiFactory.EnsureText(
+                parent,
+                name,
+                DotArenaUiRect.LeftMiddle(new Vector2(x, 0f), new Vector2(width, 20f)),
+                DotArenaUiStyleCatalog.RankingText(12f, FontStyles.Bold, alignment));
         }
 
         private void EnsureHudCountdownText()
@@ -193,25 +152,12 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            var countdownObject = new GameObject("CountdownText", typeof(RectTransform), typeof(TextMeshProUGUI));
-            countdownObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)countdownObject.transform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -10f);
-            rect.sizeDelta = new Vector2(220f, 28f);
-
-            var text = countdownObject.GetComponent<TextMeshProUGUI>();
-            text.font = _tmpFontAsset ??= LoadTmpFontAsset();
-            text.fontSize = 14f;
-            text.fontStyle = FontStyles.Bold;
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.color = UiAccentTextColor;
-            text.richText = false;
-            _hudCountdownText = text;
+            _hudCountdownText = UiFactory.CreateText(
+                parent,
+                "CountdownText",
+                DotArenaUiRect.TopCenter(new Vector2(0f, -10f), new Vector2(220f, 28f)),
+                DotArenaUiStyleCatalog.RankingText(14f, FontStyles.Bold, TextAlignmentOptions.Center));
+            _hudCountdownText.color = UiAccentTextColor;
         }
 
         private void EnsureDebugPanel()
@@ -228,8 +174,7 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            _debugPanel = new GameObject("DebugPanel", typeof(RectTransform), typeof(Image));
-            _debugPanel.transform.SetParent(_sceneUiRoot.transform, false);
+            _debugPanel = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "DebugPanel");
             var panelRect = (RectTransform)_debugPanel.transform;
             panelRect.anchorMin = new Vector2(1f, 1f);
             panelRect.anchorMax = new Vector2(1f, 1f);
@@ -301,8 +246,7 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            _lobbyPanel = new GameObject("LobbyPanel", typeof(RectTransform), typeof(Image));
-            _lobbyPanel.transform.SetParent(_sceneUiRoot.transform, false);
+            _lobbyPanel = DotArenaUiFactory.CreatePanel(_sceneUiRoot.transform, "LobbyPanel");
             EnsureLobbyPanelContents();
             _lobbyPanel.SetActive(false);
         }

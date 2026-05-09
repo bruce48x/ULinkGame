@@ -58,7 +58,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 游戏暂不包含任务、商店和记录功能；大厅不应展示或跳转到 Tasks / Shop / Records 页面。
 - 面向玩家的 Unity 界面应使用中文文案；联机大厅和战斗内 HUD 不显示 DEBUG 信息、调试面板、tick、连接细节、内部状态枚举、同步视图数或快捷键提示。将来需要排查问题时只通过 Unity Console、服务端日志或客户端日志打印，不在玩家 UI 中保留。
 - 战斗中需要实时显示当前对局玩家排名，排名框固定在画面右侧，背景必须低遮挡半透明，避免遮挡游戏画面和影响玩家判断。
-- 自动化测试当前为 20 个（`ArenaSimulationRulesTests` 16 个，`MatchmakingQueuePolicyTests` 4 个）。
+- 自动化测试当前为 31 个（`ArenaSimulationRulesTests` 17 个测试用例、`LeaderboardGrainTests` 6 个、`MatchmakingQueuePolicyTests` 4 个、`SessionDirectoryCleanupTests` 4 个）。
 - `samples/Agar.Unity/docs/ART_DIRECTION.md` 已定义整体美术、UI 设计、素材生成、Unity 接入和验收标准。
 
 已经从当前计划中移除的方向：
@@ -89,7 +89,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 ### 测试缺口
 
-当前已有 20 个自动化测试。仍缺少覆盖：网络会话生命周期、房间运行时行为、网关清理语义、客户端流程状态，以及 `LeaderboardGrain` 的持久化周期重置路径。
+当前已有 31 个自动化测试。仍缺少覆盖：网络会话生命周期、房间运行时行为、客户端流程状态，以及更完整的网关清理语义。
 
 ## 待办
 
@@ -109,7 +109,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 在 Unity 游戏视图手动检查入口/模式选择、联机登录、匹配中、大厅和结算界面。
 - 在 Unity 游戏视图手动检查对局中的右侧实时排名面板。
-- 调整右侧实时排名面板背景为低遮挡半透明，避免当前背景框遮挡游戏画面。
+- 在 Unity 游戏视图复查右侧实时排名面板的新半透明背景 `UI_HUD_Rank_Panel_Translucent_01.png`，确认不再遮挡背后的玩家球、食物、边界和移动方向。
 - 覆盖 1200x600 和 960x540，重点看文本、按钮、输入框与可见面板边框是否对齐。
 - 确认裁切后的 `UI_Panel_Dark_01.png`、`UI_Button_Primary_Normal.png`、`UI_Button_Primary_Pressed.png` 不再造成 `RectTransform` 逻辑尺寸和视觉边界错位。
 - 如果现有 UI 面板或按钮风格仍不达标，按 `ART_DIRECTION.md` 的透明边缘规范重新生成或重做最小 UI 基础件。
@@ -136,6 +136,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
   - `Pickup_Mass_Gold_01.png`
   - `BG_Arena_Grid_Dark_01.png`
   - `UI_Panel_Dark_01.png`
+  - `UI_HUD_Rank_Panel_Translucent_01.png`
   - `UI_Button_Primary_Normal.png`
   - `UI_Button_Primary_Pressed.png`
   - `Icon_Leaderboard_01.png`
@@ -301,7 +302,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 验收标准：
 
-- 自动化测试数量从 9 个增加到至少 30 个。（当前 20 个）
+- 自动化测试数量从 9 个增加到至少 30 个。（当前 31 个）
 - 核心业务逻辑路径（模拟、匹配、房间、会话）有可运行的测试覆盖。
 
 ### 阶段 12：验证与打包
@@ -358,12 +359,15 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 排序规则需要按新口径调整为整型质量降序、玩家标识升序；旧分数不再参与战斗内实时排名。
 - 面板应展示名次、玩家名和整型质量，本地玩家行使用高亮背景和文字颜色；旧分数列应移除。
 - 面板背景需要按新视觉要求改为低遮挡半透明；当前背景框遮挡游戏画面，影响用户体验，应作为后续 UI 修复项处理。
+- 已为右侧实时排名面板生成并接入专用低遮挡背景 `UI_HUD_Rank_Panel_Translucent_01.png`；中心 alpha 约 9%，边缘 alpha 约 33%，角落透明，并在 UI 侧再乘 72% 整体透明度。
+- 已降低排名行背景透明度：普通行约 6% 到 10%，本地玩家行约 20%，避免行底色继续遮挡游戏画面。
 - 面板文案为中文，不展示 tick、连接状态、端点等内部字段。
 - Unity 脚本刷新通过，控制台无编译错误；人工视觉回归仍在阶段 2/5 继续覆盖。
 
 ### 阶段 2：启动界面视觉修复
 
 - 已接入非对局 UI 背景：入口、匹配、大厅和结算这些状态显示 `BG_Arena_Grid_Dark_01.png`，实际对局中隐藏菜单背景。
+- 已为战斗内右侧实时排名面板接入专用半透明背景 `UI_HUD_Rank_Panel_Translucent_01.png`，不再复用通用深色面板。
 - 已校正入口/模式选择按钮布局，三个模式按钮同轴、等尺寸、文字居中。
 - 已移除联机登录界面的 `Enter account credentials` 和 `联机登录` 标题文案。
 - 已把 `MultiplayerPanel` 从铺满面板背景改为独立内容安全区，登录表单控件相对安全区排布。
@@ -392,6 +396,12 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ### 阶段 6：客户端拆分
 
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
+- 已完成第一轮客户端职责拆分：新增 `DotArenaMultiplayerState` 集中保存联机会话身份、认证资料、待处理 UI 请求、重连标记、匹配计时、实时连接和可靠推送 tracker；`DotArenaGame` 通过转发属性兼容现有 partial，后续还需继续减少直接状态写入。
+- 已新增 `DotArenaSinglePlayerController`，负责本地模拟创建、无敌模式选项、本地输入提交、tick catch-up 和模拟推进；`DotArenaGame.SinglePlayer.cs` 改为把单机结果接回现有表现和结算流程的适配层。
+- 已新增 `DotArenaUiFactory` 和 `DotArenaUiStyleCatalog`，将 `DotArenaSceneUiPresenter.Layout*.cs` 与 `Styling.cs` 中重复的运行时文本、按钮、面板、输入框创建和样式逻辑抽到共享工厂/样式目录。
+- 已把 UI 快照构建移动到 `DotArenaGame.UiSnapshot.cs`，让 `DotArenaGame.UiSurface.cs` 更集中于 UI 命令处理。
+- 本轮客户端脚本编译通过：`dotnet build samples/Agar.Unity/Client/SampleClient.Gameplay.csproj --no-restore`，0 警告、0 错误。
+- 尚未达到阶段 6 的最终验收硬指标：`DotArenaGame` 仍有多份 partial 文件和较多转发状态，`DotArenaSceneUiPresenter` 仍未拆成独立面板 presenter；完整单机/联机手动回归仍需在 Unity 游戏视图执行。
 
 ### 阶段 8：胜利积分与排行榜
 
@@ -409,10 +419,11 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 ### 阶段 11：测试扩展
 
-- 当前自动化测试数量为 20 个。
-- `ArenaSimulationRulesTests` 已覆盖 16 个模拟规则测试。
+- 当前自动化测试数量为 31 个。
+- `ArenaSimulationRulesTests` 已覆盖 17 个模拟规则测试用例。
 - `MatchmakingQueuePolicyTests` 已覆盖 4 个匹配队列策略测试。
-- `LeaderboardGrain` 已覆盖排序、当地时区周重置和归档保留。
+- `LeaderboardGrainTests` 已覆盖 6 个排序、当地时区周重置、归档保留和旧 UTC 周期迁移测试。
+- `SessionDirectoryCleanupTests` 已覆盖 4 个房间和实时注册清理测试。
 - AI 过滤由 `VictoryPointAwards` 测试覆盖。
 
 ### 阶段 12：验证与打包
@@ -420,6 +431,6 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 本轮已通过 `Shared/Shared.csproj` 构建。
 - 本轮已通过 `Server/Silo/Silo.csproj` 构建。
 - 本轮已通过 `Server/Server/Server.csproj` 构建。
-- 本轮已通过已有自动化测试，20/20。
+- 本轮已通过已有自动化测试，31/31。
 - Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍需按待办执行。
 - README 已同步到当时的命令、端口和架构事实。

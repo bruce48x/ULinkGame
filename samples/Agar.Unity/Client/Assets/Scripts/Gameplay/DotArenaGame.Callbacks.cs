@@ -83,7 +83,7 @@ namespace SampleClient.Gameplay
                 return;
             }
 
-            if (_sessionMode == SessionMode.Multiplayer && _hasAuthenticatedProfile && !_shutdownStarted)
+            if (_multiplayerState.HasRecoverableLogin && !_shutdownStarted)
             {
                 BeginControlReconnect(disconnectMessage);
                 return;
@@ -203,7 +203,7 @@ namespace SampleClient.Gameplay
 
         private void HandleMatchmakingStatus(MatchmakingStatusUpdate matchmakingStatus)
         {
-            var reliableDecision = _reliablePushTracker.Decide(matchmakingStatus.ReliableSequence);
+            var reliableDecision = _multiplayerState.ReliablePushTracker.Decide(matchmakingStatus.ReliableSequence);
             if (!reliableDecision.ShouldApply)
             {
                 if (reliableDecision.ShouldAck)
@@ -251,7 +251,7 @@ namespace SampleClient.Gameplay
 
             if (reliableDecision.ShouldAck)
             {
-                _reliablePushTracker.MarkApplied(reliableDecision.Sequence);
+                _multiplayerState.ReliablePushTracker.MarkApplied(reliableDecision.Sequence);
                 _ = AckReliablePushAsync(reliableDecision.Sequence);
             }
         }

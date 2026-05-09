@@ -165,13 +165,17 @@ namespace SampleClient.Gameplay
         private Sprite? _uiButtonNormalSprite;
         private Sprite? _uiButtonPressedSprite;
         private Sprite? _uiBackgroundSprite;
+        private Sprite? _matchRankingPanelSprite;
         private Sprite? _leaderboardIconSprite;
+        private DotArenaUiFactory? _uiFactory;
         private readonly DotArenaSceneLobbyUiCoordinator _lobbyUi = new();
         private readonly List<MatchRankingRowUi> _matchRankingRows = new();
 
         public bool HasSceneUi => _sceneUiRoot != null;
 
         public RectTransform? OverlayLayer { get; private set; }
+
+        private DotArenaUiFactory UiFactory => _uiFactory ??= new DotArenaUiFactory(() => _tmpFontAsset ??= LoadTmpFontAsset());
 
         public void Bind(
             Transform owner,
