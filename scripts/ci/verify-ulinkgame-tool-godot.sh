@@ -16,7 +16,7 @@ SERIALIZER_LABEL="$(tr '[:lower:]' '[:upper:]' <<< "${SERIALIZER:0:1}")${SERIALI
 PROJECT_NAME="ULinkGameGodot${TRANSPORT_LABEL}${SERIALIZER_LABEL}"
 PROJECT_DIR="$GENERATED_ROOT/$PROJECT_NAME"
 CLIENT_DIR="$PROJECT_DIR/Client"
-CLIENT_PROJECT="$CLIENT_DIR/$PROJECT_NAME.csproj"
+CLIENT_PROJECT=""
 SILO_PROJECT="$PROJECT_DIR/Server/Silo/Silo.csproj"
 SERVER_PROJECT="$PROJECT_DIR/Server/Edge/Edge.csproj"
 SILO_LOG="$LOG_DIR/silo.log"
@@ -136,6 +136,33 @@ wait_for_server_ready() {
   esac
 }
 
+resolve_single_project() {
+  local search_dir="$1"
+  local label="$2"
+  local projects=()
+
+  if [[ ! -d "$search_dir" ]]; then
+    echo "$label directory does not exist: $search_dir" >&2
+    return 1
+  fi
+
+  mapfile -t projects < <(find "$search_dir" -maxdepth 1 -type f -name "*.csproj" | sort)
+  case "${#projects[@]}" in
+    1)
+      printf '%s\n' "${projects[0]}"
+      ;;
+    0)
+      echo "No $label project file found in $search_dir." >&2
+      return 1
+      ;;
+    *)
+      echo "Multiple $label project files found in $search_dir:" >&2
+      printf '  %s\n' "${projects[@]}" >&2
+      return 1
+      ;;
+  esac
+}
+
 pack_local_package() {
   local project_path="$1"
   dotnet pack "$project_path" -c Release -o "$LOCAL_FEED" --nologo
@@ -174,6 +201,9 @@ dotnet run --project "$ROOT_DIR/src/ULinkGame.Tool/ULinkGame.Tool.csproj" -- \
   --client-engine godot \
   --transport "$TRANSPORT" \
   --serializer "$SERIALIZER"
+
+CLIENT_PROJECT="$(resolve_single_project "$CLIENT_DIR" "Godot client")"
+echo "Using generated Godot client project: $CLIENT_PROJECT"
 
 echo "Restoring and building generated server projects"
 dotnet restore "$SILO_PROJECT" --configfile "$CI_NUGET_CONFIG"
