@@ -18,6 +18,7 @@
     <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.10" />
     <PackageReference Include="ULinkRPC.Transport.WebSocket" Version="0.11.6" />
     <PackageReference Include="Microsoft.Orleans.Client" Version="10.0.0" />
+    <PackageReference Include="Npgsql" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup>

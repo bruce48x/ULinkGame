@@ -65,3 +65,10 @@ src/**/*.meta
 
 # Logs
 *.log
+
+# Terraform local state
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
