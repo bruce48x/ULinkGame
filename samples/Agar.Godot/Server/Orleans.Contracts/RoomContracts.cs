@@ -37,7 +37,7 @@ public sealed class RoomCreateRequest
     public List<PlayerRoomAssignment> Players { get; set; } = [];
 
     [Id(6)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -206,7 +206,7 @@ public sealed class RoomSnapshot
     public int CapacityRemaining { get; set; }
 
     [Id(17)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -292,7 +292,7 @@ public sealed class RoomState
     public string Message { get; set; } = "";
 
     [Id(13)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }
 
 [GenerateSerializer]

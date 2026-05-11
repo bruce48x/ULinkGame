@@ -1,7 +1,7 @@
 namespace Orleans.Contracts;
 
 [GenerateSerializer]
-public sealed class GatewayEndpointDescriptor
+public sealed class EdgeEndpointDescriptor
 {
     [Id(0)]
     public string InstanceId { get; set; } = "";

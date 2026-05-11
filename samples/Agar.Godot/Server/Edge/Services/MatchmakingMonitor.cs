@@ -14,7 +14,7 @@ internal sealed class MatchmakingMonitor
     private readonly IClusterClient _clusterClient;
     private readonly SessionDirectory _sessionDirectory;
     private readonly RoomRuntimeHost _roomRuntimeHost;
-    private readonly GatewayNodeIdentity _gatewayNodeIdentity;
+    private readonly EdgeNodeIdentity _edgeNodeIdentity;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
     private readonly ILogger<MatchmakingMonitor> _logger;
 
@@ -22,14 +22,14 @@ internal sealed class MatchmakingMonitor
         IClusterClient clusterClient,
         SessionDirectory sessionDirectory,
         RoomRuntimeHost roomRuntimeHost,
-        GatewayNodeIdentity gatewayNodeIdentity,
+        EdgeNodeIdentity edgeNodeIdentity,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
         ILogger<MatchmakingMonitor> logger)
     {
         _clusterClient = clusterClient;
         _sessionDirectory = sessionDirectory;
         _roomRuntimeHost = roomRuntimeHost;
-        _gatewayNodeIdentity = gatewayNodeIdentity;
+        _edgeNodeIdentity = edgeNodeIdentity;
         _reliableMatchmakingPublisher = reliableMatchmakingPublisher;
         _logger = logger;
     }
@@ -51,7 +51,7 @@ internal sealed class MatchmakingMonitor
                 _sessionDirectory.SetQueueTicket(playerId, null);
                 _sessionDirectory.AssignRoom(playerId, snapshot.CurrentRoomId, snapshot.CurrentMatchId, player?.SeatIndex ?? -1);
 
-                if (_gatewayNodeIdentity.IsRuntimeOwner(room.RuntimeGateway))
+                if (_edgeNodeIdentity.IsRuntimeOwner(room.RuntimeEdge))
                 {
                     await _roomRuntimeHost.EnsureRoomReadyAsync(room).ConfigureAwait(false);
                 }
@@ -64,8 +64,8 @@ internal sealed class MatchmakingMonitor
                     RoomId = room.RoomId,
                     MatchedPlayerCount = room.MemberCount,
                     Message = $"Matched into room {room.RoomId}",
-                    RealtimeConnection = GatewayEndpointMapper.ToRealtimeConnectionInfo(
-                        room.RuntimeGateway,
+                    RealtimeConnection = RealtimeEndpointMapper.ToRealtimeConnectionInfo(
+                        room.RuntimeEdge,
                         room.RoomId,
                         room.MatchId,
                         snapshot.SessionToken)

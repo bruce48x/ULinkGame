@@ -5,17 +5,17 @@ using Shared.Interfaces;
 
 namespace Edge.Services;
 
-internal sealed class GatewayNodeIdentity
+internal sealed class EdgeNodeIdentity
 {
-    public GatewayNodeIdentity(IConfiguration configuration, RealtimeRpcServerOptions realtimeOptions)
+    public EdgeNodeIdentity(IConfiguration configuration, RealtimeRpcServerOptions realtimeOptions)
     {
-        InstanceId = configuration["Gateway:NodeId"] ?? string.Empty;
+        InstanceId = configuration["Edge:NodeId"] ?? string.Empty;
         if (string.IsNullOrWhiteSpace(InstanceId))
         {
             InstanceId = $"{Environment.MachineName}-{Environment.ProcessId}";
         }
 
-        RealtimeEndpoint = new GatewayEndpointDescriptor
+        RealtimeEndpoint = new EdgeEndpointDescriptor
         {
             InstanceId = InstanceId,
             Transport = RealtimeTransportToString(realtimeOptions.Endpoint.Transport),
@@ -27,13 +27,13 @@ internal sealed class GatewayNodeIdentity
 
     public string InstanceId { get; }
 
-    public GatewayEndpointDescriptor RealtimeEndpoint { get; }
+    public EdgeEndpointDescriptor RealtimeEndpoint { get; }
 
-    public bool IsRuntimeOwner(GatewayEndpointDescriptor? gateway)
+    public bool IsRuntimeOwner(EdgeEndpointDescriptor? edge)
     {
-        return gateway is not null
-            && !string.IsNullOrWhiteSpace(gateway.InstanceId)
-            && string.Equals(gateway.InstanceId, InstanceId, StringComparison.Ordinal);
+        return edge is not null
+            && !string.IsNullOrWhiteSpace(edge.InstanceId)
+            && string.Equals(edge.InstanceId, InstanceId, StringComparison.Ordinal);
     }
 
     private static string RealtimeTransportToString(string transport) =>

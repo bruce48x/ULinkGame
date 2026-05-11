@@ -3,20 +3,20 @@ using Shared.Interfaces;
 
 namespace Edge.Services;
 
-internal static class GatewayEndpointMapper
+internal static class RealtimeEndpointMapper
 {
     public static RealtimeConnectionInfo ToRealtimeConnectionInfo(
-        GatewayEndpointDescriptor gateway,
+        EdgeEndpointDescriptor edge,
         string roomId,
         string matchId,
         string sessionToken)
     {
         return new RealtimeConnectionInfo
         {
-            Transport = ParseTransport(gateway.Transport),
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Path = gateway.Path,
+            Transport = ParseTransport(edge.Transport),
+            Host = edge.Host,
+            Port = edge.Port,
+            Path = edge.Path,
             RoomId = roomId,
             MatchId = matchId,
             SessionToken = sessionToken

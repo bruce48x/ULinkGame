@@ -15,8 +15,8 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
     private readonly IClusterClient _clusterClient;
     private readonly IPlayerCallback _callback;
     private readonly SessionDirectory _sessionDirectory;
-    private readonly GatewayMatchmakingService _gatewayMatchmaking;
-    private readonly GatewayNodeIdentity _gatewayNodeIdentity;
+    private readonly EdgeMatchmakingService _edgeMatchmaking;
+    private readonly EdgeNodeIdentity _edgeNodeIdentity;
     private readonly RoomRuntimeHost _roomRuntimeHost;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
     private readonly IReliablePushOutbox _reliablePushOutbox;
@@ -31,8 +31,8 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         IPlayerCallback callback,
         IClusterClient clusterClient,
         SessionDirectory sessionDirectory,
-        GatewayMatchmakingService gatewayMatchmaking,
-        GatewayNodeIdentity gatewayNodeIdentity,
+        EdgeMatchmakingService edgeMatchmaking,
+        EdgeNodeIdentity edgeNodeIdentity,
         RoomRuntimeHost roomRuntimeHost,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
         IReliablePushOutbox reliablePushOutbox,
@@ -41,8 +41,8 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         _callback = callback;
         _clusterClient = clusterClient;
         _sessionDirectory = sessionDirectory;
-        _gatewayMatchmaking = gatewayMatchmaking;
-        _gatewayNodeIdentity = gatewayNodeIdentity;
+        _edgeMatchmaking = edgeMatchmaking;
+        _edgeNodeIdentity = edgeNodeIdentity;
         _roomRuntimeHost = roomRuntimeHost;
         _reliableMatchmakingPublisher = reliableMatchmakingPublisher;
         _reliablePushOutbox = reliablePushOutbox;
@@ -121,7 +121,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
                     SessionToken = loginResult.SessionToken,
                     ConnectionId = _connectionId,
                     ReconnectedAtUtc = DateTime.UtcNow,
-                    ControlGateway = CloneGateway(_gatewayNodeIdentity.RealtimeEndpoint)
+                    ControlEdge = CloneEdge(_edgeNodeIdentity.RealtimeEndpoint)
                 })
                 .ConfigureAwait(false);
             await _reliableMatchmakingPublisher.ReplayPendingAsync(loginResult.UserId).ConfigureAwait(false);
@@ -136,7 +136,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
                 SessionToken = loginResult.SessionToken,
                 ConnectionId = _connectionId,
                 AttachedAtUtc = DateTime.UtcNow,
-                ControlGateway = CloneGateway(_gatewayNodeIdentity.RealtimeEndpoint)
+                ControlEdge = CloneEdge(_edgeNodeIdentity.RealtimeEndpoint)
             })
             .ConfigureAwait(false);
             await _reliablePushOutbox.AckAsync(loginResult.UserId, long.MaxValue).ConfigureAwait(false);
@@ -192,7 +192,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             return;
         }
 
-        await _gatewayMatchmaking.EnqueueAsync(_playerId).ConfigureAwait(false);
+        await _edgeMatchmaking.EnqueueAsync(_playerId).ConfigureAwait(false);
     }
 
     public async ValueTask CancelMatchmakingAsync(CancelMatchmakingRequest req)
@@ -204,7 +204,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             return;
         }
 
-        await _gatewayMatchmaking.CancelAsync(_playerId, "Matchmaking cancelled").ConfigureAwait(false);
+        await _edgeMatchmaking.CancelAsync(_playerId, "Matchmaking cancelled").ConfigureAwait(false);
     }
 
     public async ValueTask<RealtimeAttachReply> AttachRealtimeAsync(RealtimeAttachRequest req)
@@ -237,12 +237,12 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             };
         }
 
-        if (!_gatewayNodeIdentity.IsRuntimeOwner(sessionSnapshot.RuntimeGateway))
+        if (!_edgeNodeIdentity.IsRuntimeOwner(sessionSnapshot.RuntimeEdge))
         {
             return new RealtimeAttachReply
             {
                 Code = 3,
-                Message = "Realtime session must attach to the runtime owner gateway."
+                Message = "Realtime session must attach to the runtime owner edge."
             };
         }
 
@@ -357,7 +357,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             .GetSnapshotAsync()
             .ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(sessionSnapshot.CurrentRoomId) ||
-            !_gatewayNodeIdentity.IsRuntimeOwner(sessionSnapshot.RuntimeGateway))
+            !_edgeNodeIdentity.IsRuntimeOwner(sessionSnapshot.RuntimeEdge))
         {
             return;
         }
@@ -414,7 +414,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         var registration = _sessionDirectory.Get(playerId);
         try
         {
-            await _gatewayMatchmaking.ReleasePlayerAsync(playerId, reason).ConfigureAwait(false);
+            await _edgeMatchmaking.ReleasePlayerAsync(playerId, reason).ConfigureAwait(false);
             await _clusterClient.GetGrain<IPlayerSessionGrain>(playerId)
                 .MarkDisconnectedAsync(new PlayerSessionDisconnectRequest
                 {
@@ -487,15 +487,15 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         return string.Equals(registration.SessionToken, sessionToken, StringComparison.Ordinal);
     }
 
-    private static GatewayEndpointDescriptor CloneGateway(GatewayEndpointDescriptor gateway)
+    private static EdgeEndpointDescriptor CloneEdge(EdgeEndpointDescriptor edge)
     {
-        return new GatewayEndpointDescriptor
+        return new EdgeEndpointDescriptor
         {
-            InstanceId = gateway.InstanceId,
-            Transport = gateway.Transport,
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Path = gateway.Path
+            InstanceId = edge.InstanceId,
+            Transport = edge.Transport,
+            Host = edge.Host,
+            Port = edge.Port,
+            Path = edge.Path
         };
     }
 

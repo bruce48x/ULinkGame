@@ -197,7 +197,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
             {
                 var roomId = $"room-{Guid.NewGuid():N}";
                 var matchId = $"match-{Guid.NewGuid():N}";
-                var runtimeGateway = await ResolveRuntimeGatewayAsync(batch);
+                var runtimeEdge = await ResolveRuntimeEdgeAsync(batch);
                 var playerAssignments = batch.Select((ticket, seatIndex) => new PlayerRoomAssignment
                 {
                     UserId = ticket.UserId,
@@ -207,7 +207,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
                     SessionToken = ticket.SessionToken,
                     ConnectionId = "",
                     AssignedAtUtc = nowUtc,
-                    RuntimeGateway = CloneGateway(runtimeGateway)
+                    RuntimeEdge = CloneEdge(runtimeEdge)
                 }).ToList();
 
                 var roomGrain = GrainFactory.GetGrain<IRoomGrain>(roomId);
@@ -219,7 +219,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
                     CreatedAtUtc = nowUtc,
                     MaxPlayers = roomSize,
                     Players = playerAssignments.Select(CloneAssignment).ToList(),
-                    RuntimeGateway = CloneGateway(runtimeGateway)
+                    RuntimeEdge = CloneEdge(runtimeEdge)
                 });
 
                 if (!createResult.Succeeded)
@@ -247,7 +247,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
                     MatchId = matchId,
                     AssignedAtUtc = nowUtc,
                     Players = playerAssignments.Select(CloneAssignment).ToList(),
-                    RuntimeGateway = CloneGateway(runtimeGateway)
+                    RuntimeEdge = CloneEdge(runtimeEdge)
                 };
 
                 foreach (var playerAssignment in playerAssignments)
@@ -381,7 +381,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
             SessionToken = assignment.SessionToken,
             ConnectionId = assignment.ConnectionId,
             AssignedAtUtc = assignment.AssignedAtUtc,
-            RuntimeGateway = CloneGateway(assignment.RuntimeGateway)
+            RuntimeEdge = CloneEdge(assignment.RuntimeEdge)
         };
     }
 
@@ -392,7 +392,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
             RoomId = sessionSnapshot.CurrentRoomId,
             MatchId = sessionSnapshot.CurrentMatchId,
             AssignedAtUtc = assignedAtUtc,
-            RuntimeGateway = CloneGateway(sessionSnapshot.RuntimeGateway),
+            RuntimeEdge = CloneEdge(sessionSnapshot.RuntimeEdge),
             Players = new List<PlayerRoomAssignment>
             {
                 new()
@@ -404,7 +404,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
                     SessionToken = sessionSnapshot.SessionToken,
                     ConnectionId = sessionSnapshot.ConnectionId,
                     AssignedAtUtc = assignedAtUtc,
-                    RuntimeGateway = CloneGateway(sessionSnapshot.RuntimeGateway)
+                    RuntimeEdge = CloneEdge(sessionSnapshot.RuntimeEdge)
                 }
             }
         };
@@ -425,43 +425,43 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
         return value == default ? DateTime.UtcNow : value;
     }
 
-    private async Task<GatewayEndpointDescriptor> ResolveRuntimeGatewayAsync(IReadOnlyList<MatchmakingQueueTicket> batch)
+    private async Task<EdgeEndpointDescriptor> ResolveRuntimeEdgeAsync(IReadOnlyList<MatchmakingQueueTicket> batch)
     {
         foreach (var ticket in batch)
         {
             var snapshot = await GrainFactory.GetGrain<IPlayerSessionGrain>(ticket.UserId)
                 .GetSnapshotAsync();
-            if (HasValidGateway(snapshot.ControlGateway))
+            if (HasValidEdge(snapshot.ControlEdge))
             {
-                return CloneGateway(snapshot.ControlGateway);
+                return CloneEdge(snapshot.ControlEdge);
             }
         }
 
-        return new GatewayEndpointDescriptor();
+        return new EdgeEndpointDescriptor();
     }
 
-    private static bool HasValidGateway(GatewayEndpointDescriptor? gateway)
+    private static bool HasValidEdge(EdgeEndpointDescriptor? edge)
     {
-        return gateway is not null
-            && !string.IsNullOrWhiteSpace(gateway.InstanceId)
-            && !string.IsNullOrWhiteSpace(gateway.Host)
-            && gateway.Port > 0;
+        return edge is not null
+            && !string.IsNullOrWhiteSpace(edge.InstanceId)
+            && !string.IsNullOrWhiteSpace(edge.Host)
+            && edge.Port > 0;
     }
 
-    private static GatewayEndpointDescriptor CloneGateway(GatewayEndpointDescriptor? gateway)
+    private static EdgeEndpointDescriptor CloneEdge(EdgeEndpointDescriptor? edge)
     {
-        if (gateway is null)
+        if (edge is null)
         {
-            return new GatewayEndpointDescriptor();
+            return new EdgeEndpointDescriptor();
         }
 
-        return new GatewayEndpointDescriptor
+        return new EdgeEndpointDescriptor
         {
-            InstanceId = gateway.InstanceId,
-            Transport = gateway.Transport,
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Path = gateway.Path
+            InstanceId = edge.InstanceId,
+            Transport = edge.Transport,
+            Host = edge.Host,
+            Port = edge.Port,
+            Path = edge.Path
         };
     }
 }

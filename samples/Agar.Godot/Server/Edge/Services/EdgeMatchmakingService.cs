@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Edge.Services;
 
-internal sealed class GatewayMatchmakingService
+internal sealed class EdgeMatchmakingService
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, CancellationTokenSource> _watchers = new(StringComparer.Ordinal);
@@ -15,24 +15,24 @@ internal sealed class GatewayMatchmakingService
     private readonly SessionDirectory _sessionDirectory;
     private readonly MatchmakingMonitor _matchmakingMonitor;
     private readonly RoomRuntimeHost _roomRuntimeHost;
-    private readonly GatewayNodeIdentity _gatewayNodeIdentity;
+    private readonly EdgeNodeIdentity _edgeNodeIdentity;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
-    private readonly ILogger<GatewayMatchmakingService> _logger;
+    private readonly ILogger<EdgeMatchmakingService> _logger;
 
-    public GatewayMatchmakingService(
+    public EdgeMatchmakingService(
         IClusterClient clusterClient,
         SessionDirectory sessionDirectory,
         MatchmakingMonitor matchmakingMonitor,
         RoomRuntimeHost roomRuntimeHost,
-        GatewayNodeIdentity gatewayNodeIdentity,
+        EdgeNodeIdentity edgeNodeIdentity,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
-        ILogger<GatewayMatchmakingService> logger)
+        ILogger<EdgeMatchmakingService> logger)
     {
         _clusterClient = clusterClient;
         _sessionDirectory = sessionDirectory;
         _matchmakingMonitor = matchmakingMonitor;
         _roomRuntimeHost = roomRuntimeHost;
-        _gatewayNodeIdentity = gatewayNodeIdentity;
+        _edgeNodeIdentity = edgeNodeIdentity;
         _reliableMatchmakingPublisher = reliableMatchmakingPublisher;
         _logger = logger;
     }
@@ -140,7 +140,7 @@ internal sealed class GatewayMatchmakingService
             .GetSnapshotAsync()
             .ConfigureAwait(false);
 
-        if (_gatewayNodeIdentity.IsRuntimeOwner(room.RuntimeGateway))
+        if (_edgeNodeIdentity.IsRuntimeOwner(room.RuntimeEdge))
         {
             await _roomRuntimeHost.EnsureRoomReadyAsync(room).ConfigureAwait(false);
         }
@@ -164,8 +164,8 @@ internal sealed class GatewayMatchmakingService
                 RoomId = room.RoomId,
                 MatchedPlayerCount = room.Players.Count,
                 Message = $"Matched into room {room.RoomId}",
-                RealtimeConnection = GatewayEndpointMapper.ToRealtimeConnectionInfo(
-                    assignment.RuntimeGateway,
+                RealtimeConnection = RealtimeEndpointMapper.ToRealtimeConnectionInfo(
+                    assignment.RuntimeEdge,
                     room.RoomId,
                     room.MatchId,
                     player.SessionToken)

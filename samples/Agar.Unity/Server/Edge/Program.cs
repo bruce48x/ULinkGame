@@ -26,12 +26,12 @@ builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
         builder.Configuration,
         "Realtime",
         new EdgeRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
-builder.Services.AddSingleton<GatewayNodeIdentity>();
+builder.Services.AddSingleton<EdgeNodeIdentity>();
 builder.Services.AddSingleton<MatchmakingMonitor>();
 builder.Services.AddSingleton<RoomRuntimeHost>();
 builder.Services.AddSingleton<ReliableMatchmakingPublisher>();
 builder.Services.AddULinkGameServerReliablePush();
-builder.Services.AddSingleton<GatewayMatchmakingService>();
+builder.Services.AddSingleton<EdgeMatchmakingService>();
 builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
 builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
 builder.Services.AddHostedService<MatchmakingHostedService>();

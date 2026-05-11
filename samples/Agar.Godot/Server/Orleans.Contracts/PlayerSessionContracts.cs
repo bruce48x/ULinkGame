@@ -32,7 +32,7 @@ public sealed class PlayerSessionReconnectRequest
     public DateTime ReconnectedAtUtc { get; set; }
 
     [Id(4)]
-    public GatewayEndpointDescriptor ControlGateway { get; set; } = new();
+    public EdgeEndpointDescriptor ControlEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -51,7 +51,7 @@ public sealed class PlayerSessionAttachRequest
     public DateTime AttachedAtUtc { get; set; }
 
     [Id(4)]
-    public GatewayEndpointDescriptor ControlGateway { get; set; } = new();
+    public EdgeEndpointDescriptor ControlEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -114,7 +114,7 @@ public sealed class PlayerRoomAssignment
     public DateTime AssignedAtUtc { get; set; }
 
     [Id(7)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -211,10 +211,10 @@ public sealed class PlayerSessionSnapshot
     public string ReconnectToken { get; set; } = "";
 
     [Id(16)]
-    public GatewayEndpointDescriptor ControlGateway { get; set; } = new();
+    public EdgeEndpointDescriptor ControlEdge { get; set; } = new();
 
     [Id(17)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }
 
 [GenerateSerializer]
@@ -269,8 +269,8 @@ public sealed class PlayerSessionState
     public string ReconnectToken { get; set; } = "";
 
     [Id(16)]
-    public GatewayEndpointDescriptor ControlGateway { get; set; } = new();
+    public EdgeEndpointDescriptor ControlEdge { get; set; } = new();
 
     [Id(17)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }

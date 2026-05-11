@@ -12,18 +12,18 @@ internal sealed class DisconnectedSessionCleanupHostedService : BackgroundServic
     private static readonly TimeSpan ReconnectGracePeriod = TimeSpan.FromSeconds(60);
 
     private readonly SessionDirectory _sessionDirectory;
-    private readonly GatewayMatchmakingService _gatewayMatchmaking;
+    private readonly EdgeMatchmakingService _edgeMatchmaking;
     private readonly IClusterClient _clusterClient;
     private readonly ILogger<DisconnectedSessionCleanupHostedService> _logger;
 
     public DisconnectedSessionCleanupHostedService(
         SessionDirectory sessionDirectory,
-        GatewayMatchmakingService gatewayMatchmaking,
+        EdgeMatchmakingService edgeMatchmaking,
         IClusterClient clusterClient,
         ILogger<DisconnectedSessionCleanupHostedService> logger)
     {
         _sessionDirectory = sessionDirectory;
-        _gatewayMatchmaking = gatewayMatchmaking;
+        _edgeMatchmaking = edgeMatchmaking;
         _clusterClient = clusterClient;
         _logger = logger;
     }
@@ -52,7 +52,7 @@ internal sealed class DisconnectedSessionCleanupHostedService : BackgroundServic
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await _gatewayMatchmaking
+                await _edgeMatchmaking
                     .ReleasePlayerAsync(registration.PlayerId, "Reconnect grace period expired")
                     .ConfigureAwait(false);
                 await _clusterClient.GetGrain<IPlayerSessionGrain>(registration.PlayerId)

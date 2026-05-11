@@ -44,7 +44,7 @@ public sealed class RoomGrain : Grain, IRoomGrain
             MaxPlayers = maxPlayers,
             CreatedAtUtc = createdAtUtc,
             LastUpdatedAtUtc = createdAtUtc,
-            RuntimeGateway = CloneGateway(request.RuntimeGateway)
+            RuntimeEdge = CloneEdge(request.RuntimeEdge)
         };
 
         foreach (var player in request.Players)
@@ -397,7 +397,7 @@ public sealed class RoomGrain : Grain, IRoomGrain
             ConnectedCount = connectedCount,
             ReadyCount = readyCount,
             CapacityRemaining = Math.Max(0, maxPlayers - memberCount),
-            RuntimeGateway = _state.RecordExists ? CloneGateway(_state.State.RuntimeGateway) : new GatewayEndpointDescriptor()
+            RuntimeEdge = _state.RecordExists ? CloneEdge(_state.State.RuntimeEdge) : new EdgeEndpointDescriptor()
         };
     }
 
@@ -447,20 +447,20 @@ public sealed class RoomGrain : Grain, IRoomGrain
         return value == default ? DateTime.UtcNow : value;
     }
 
-    private static GatewayEndpointDescriptor CloneGateway(GatewayEndpointDescriptor? gateway)
+    private static EdgeEndpointDescriptor CloneEdge(EdgeEndpointDescriptor? edge)
     {
-        if (gateway is null)
+        if (edge is null)
         {
-            return new GatewayEndpointDescriptor();
+            return new EdgeEndpointDescriptor();
         }
 
-        return new GatewayEndpointDescriptor
+        return new EdgeEndpointDescriptor
         {
-            InstanceId = gateway.InstanceId,
-            Transport = gateway.Transport,
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Path = gateway.Path
+            InstanceId = edge.InstanceId,
+            Transport = edge.Transport,
+            Host = edge.Host,
+            Port = edge.Port,
+            Path = edge.Path
         };
     }
 }

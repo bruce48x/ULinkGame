@@ -187,5 +187,5 @@ public sealed class RoomAssignment
     public List<PlayerRoomAssignment> Players { get; set; } = [];
 
     [Id(4)]
-    public GatewayEndpointDescriptor RuntimeGateway { get; set; } = new();
+    public EdgeEndpointDescriptor RuntimeEdge { get; set; } = new();
 }

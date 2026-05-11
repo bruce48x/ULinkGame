@@ -34,8 +34,8 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
         _state.State.LastConnectedAtUtc = attachedAtUtc;
         _state.State.LastHeartbeatAtUtc = attachedAtUtc;
         _state.State.ReconnectToken = EnsureReconnectToken(_state.State.ReconnectToken);
-        _state.State.ControlGateway = CloneGateway(request.ControlGateway);
-        _state.State.RuntimeGateway = new GatewayEndpointDescriptor();
+        _state.State.ControlEdge = CloneEdge(request.ControlEdge);
+        _state.State.RuntimeEdge = new EdgeEndpointDescriptor();
 
         await _state.WriteStateAsync();
         return BuildSnapshot();
@@ -54,7 +54,7 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
         _state.State.LastConnectedAtUtc = reconnectedAtUtc;
         _state.State.LastHeartbeatAtUtc = reconnectedAtUtc;
         _state.State.ReconnectToken = EnsureReconnectToken(_state.State.ReconnectToken);
-        _state.State.ControlGateway = CloneGateway(request.ControlGateway);
+        _state.State.ControlEdge = CloneEdge(request.ControlEdge);
 
         await _state.WriteStateAsync();
         return BuildSnapshot();
@@ -108,7 +108,7 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
         _state.State.LastConnectedAtUtc = assignedAtUtc;
         _state.State.LastHeartbeatAtUtc = assignedAtUtc;
         _state.State.ReconnectToken = EnsureReconnectToken(_state.State.ReconnectToken);
-        _state.State.RuntimeGateway = CloneGateway(request.RuntimeGateway);
+        _state.State.RuntimeEdge = CloneEdge(request.RuntimeEdge);
 
         await _state.WriteStateAsync();
         return BuildSnapshot();
@@ -216,8 +216,8 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
             LastDisconnectedAtUtc = _state.State.LastDisconnectedAtUtc,
             LastHeartbeatAtUtc = _state.State.LastHeartbeatAtUtc,
             ReconnectToken = _state.State.ReconnectToken,
-            ControlGateway = CloneGateway(_state.State.ControlGateway),
-            RuntimeGateway = CloneGateway(_state.State.RuntimeGateway)
+            ControlEdge = CloneEdge(_state.State.ControlEdge),
+            RuntimeEdge = CloneEdge(_state.State.RuntimeEdge)
         };
     }
 
@@ -241,20 +241,20 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
         return string.IsNullOrWhiteSpace(value) ? Guid.NewGuid().ToString("N") : value;
     }
 
-    private static GatewayEndpointDescriptor CloneGateway(GatewayEndpointDescriptor? gateway)
+    private static EdgeEndpointDescriptor CloneEdge(EdgeEndpointDescriptor? edge)
     {
-        if (gateway is null)
+        if (edge is null)
         {
-            return new GatewayEndpointDescriptor();
+            return new EdgeEndpointDescriptor();
         }
 
-        return new GatewayEndpointDescriptor
+        return new EdgeEndpointDescriptor
         {
-            InstanceId = gateway.InstanceId,
-            Transport = gateway.Transport,
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Path = gateway.Path
+            InstanceId = edge.InstanceId,
+            Transport = edge.Transport,
+            Host = edge.Host,
+            Port = edge.Port,
+            Path = edge.Path
         };
     }
 }
