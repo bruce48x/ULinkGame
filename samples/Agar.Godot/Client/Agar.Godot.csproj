@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ULinkGame.Client" Version="0.1.4" />
     <PackageReference Include="ULinkRPC.Client" Version="0.11.1" />
     <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.0" />
     <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.3" />
@@ -16,6 +17,5 @@
     <ProjectReference Include="../Shared/Shared.csproj" TargetFramework="net8.0">
       <SetTargetFramework>TargetFramework=net8.0</SetTargetFramework>
     </ProjectReference>
-    <ProjectReference Include="../../../src/ULinkGame.Client/ULinkGame.Client.csproj" />
   </ItemGroup>
 </Project>

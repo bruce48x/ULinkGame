@@ -223,7 +223,7 @@ namespace SampleClient.Gameplay
                     (payload, _) =>
                     {
                         ApplyMatchmakingStatus(payload);
-                        return ValueTask.CompletedTask;
+                        return default;
                     },
                     async (ack, _) => await AckReliablePushAsync(ack.Sequence.Value),
                     _cts.Token);
