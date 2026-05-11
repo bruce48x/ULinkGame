@@ -528,7 +528,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 已初始化库可以安全重复执行迁移入口。
 - 备份文件可以恢复到新 PostgreSQL 实例，并通过 Silo 启动校验。
 
-#### P6：Redis 用途与可靠状态
+#### P6：Redis 用途与生产配置
 
 目标：
 
@@ -540,9 +540,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P6.2：为 Redis 配置密码、持久化、连接池、operation timeout 和 key prefix。
 - P6.3：确认 Docker compose 中 Redis 开启持久化 volume，不把排行榜当前周期数据写入临时容器层。
 - P6.4：确认 Redis 不可用时排行榜查询返回可解释错误或空结果，对局结算主流程不整体崩溃。
-- P6.5：评估 reliable push outbox 是否也从内存迁移到 Redis、Orleans grain state 或 SQL。
-- P6.6：如果 reliable push 首发仍使用内存 outbox，定义网关重启后的玩家体验和客户端恢复路径。
-- P6.7：明确 Redis 后续是否继续承担跨网关路由、在线状态或限流；未实现的职责不要写成当前能力。
+- P6.5：定义内存 reliable push outbox 在网关重启后的玩家体验和客户端恢复路径。
+- P6.6：明确 Redis 后续是否继续承担跨网关路由、在线状态或限流；未实现的职责不要写成当前能力。
 
 验收标准：
 

@@ -45,7 +45,7 @@ PostgreSQL 是 grain 状态的持久化后端，Silo 通过 sample-local Dapper 
 - `silo` 容器运行 `Server/Silo/Silo.csproj` 的发布产物，承载 Orleans grains。
 - `edge` 容器运行 `Server/Edge/Edge.csproj` 的发布产物，承载控制面 RPC、实时 RPC 和房间运行时。
 - `postgres` 容器或托管 PostgreSQL 保存 Orleans grain 状态，必须使用持久化 volume 或外部数据库。
-- `redis` 容器或托管 Redis 用于胜利积分排行榜 sorted set；后续也可承载跨网关路由、在线状态或可靠队列，必须启用密码和持久化策略。
+- `redis` 容器或托管 Redis 用于胜利积分排行榜 sorted set；后续也可承载跨网关路由或在线状态，必须启用密码和持久化策略。
 - 可选反向代理或负载均衡负责 WebSocket/TLS 入口；KCP 实时端口需要按传输要求单独暴露。
 
 生产配置必须通过环境变量、env 文件或部署平台 secret 注入，不把生产连接串、数据库密码、Redis 密码、token secret 或公网主机名写死在 `appsettings.json` 中。

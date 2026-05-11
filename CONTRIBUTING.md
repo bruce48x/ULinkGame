@@ -306,6 +306,26 @@ ULinkGame should not become a full game business framework. Keep the boundary na
 
 When a capability is only useful to one sample, keep it under that sample in `samples/`. Move it into `src` only when it is demonstrably reusable across games.
 
+## Endpoint Model Boundary
+
+ULinkGame should support multiple named RPC endpoints or channels, but it should not force every game to understand a fixed "control connection plus realtime connection" split.
+
+The reusable framework capability is:
+
+- host several named ULinkRPC servers in the same .NET process
+- let projects choose transport, serializer, endpoint names, and lifecycle policy
+- provide connection/session lifecycle helpers that can work with one endpoint or several endpoints
+- keep logging, health checks, and diagnostics understandable per endpoint
+
+The default user mental model should remain simple: one session endpoint can handle login, normal requests, reliable business push, and reconnect for light online games.
+
+The control/realtime split is an optional architecture for games that need high-frequency, low-latency gameplay traffic. In that model:
+
+- the control endpoint handles login, matchmaking, room entry, settlement, low-frequency queries, and reliable business push
+- the realtime endpoint handles input, snapshots, and other high-frequency gameplay traffic
+
+This split belongs in samples or templates that explicitly opt into realtime multiplayer. It should not become a mandatory package concept, and starter output should avoid introducing realtime attach, room runtime, or dual-connection terminology unless the selected project shape needs it.
+
 ## Reliable Business Push Design
 
 ### Problem
@@ -387,6 +407,24 @@ Reliable push must also handle the case where the client believes it is resuming
 
 The server should not silently accept this as a successful reconnect. It must return an explicit "state lost" result and require a new session.
 
+Prefer authoritative-state refresh before declaring the session lost:
+
+```mermaid
+flowchart TD
+    A["Client reconnects or sends reliable-push ack"] --> B["Server validates session token and generation"]
+    B -->|invalid| L["StateLost / NewSessionRequired"]
+    B -->|valid| C["Server compares client sequence and session state"]
+    C -->|compatible| R["Resume and replay pending records"]
+    C -->|mismatch| D["Can server validate authoritative session state?"]
+    D -->|yes| E["StateRefreshRequired"]
+    E --> F["Client clears transient state and reliable sequence"]
+    F --> G["Client fetches authoritative session snapshot"]
+    G --> H["Client resumes lobby, match, room, or settlement from snapshot"]
+    D -->|no| L
+    L --> I["Client clears cached session, room, match, realtime binding, and reliable sequence"]
+    I --> J["Client starts a new login/session flow"]
+```
+
 There are two detection points:
 
 - `LoginAsync(reconnect: true)`: before accepting the reconnect, the server verifies that the session still exists and that the token matches. If not, it returns a reconnect-state-lost code.
@@ -401,15 +439,13 @@ Client behavior:
 
 ### Persistence
 
-The first implementation is an in-memory outbox. It solves short reconnect gaps on the same gateway process, which is the current failure mode.
+The default outbox is process-local and in-memory. Reliable push is a short-window, low-frequency control-plane notification mechanism, not a durable business event log and not the source of truth for game state.
 
-For production-grade cross-process recovery, replace the store behind `IReliablePushOutbox` with durable storage:
+If a server process restarts or otherwise loses the outbox, the server should not pretend that replay is still possible. It should return an explicit state-lost result when reconnect or acknowledgement proves that the client has state the server can no longer validate. The client must then clear local session state, reset reliable sequence tracking, and start a new session or return to a coherent lobby/login flow.
 
-- Redis sorted sets or streams keyed by player id
-- Orleans grain state keyed by player id
-- SQL table with `(ownerKey, sequence)` primary key
+Business code should recover from missing reliable pushes through authoritative state queries when the authoritative state still exists. If the authoritative state is gone, forcing a new session is preferred over replaying stale notifications.
 
-The public mechanism should not change when the store becomes durable.
+Projects may still replace `IReliablePushOutbox` with a durable implementation for specialized low-frequency business events, but that is a project-specific choice. A durable outbox must preserve consistency with the authoritative business state and absorb the added performance, storage, retention, and operations costs. It should not be the ULinkGame default or a reason to turn framework reliable push into a general event-sourcing system.
 
 ### Retention
 
@@ -445,3 +481,561 @@ Implementation points:
 - `IPlayerService.AckReliablePushAsync` is the sample ack RPC.
 - `MatchmakingStatusUpdate.ReliableSequence` carries the sequence to the Unity client.
 - The Unity client acks after applying a newer sequence and ignores duplicate older sequences.
+
+## ULinkGame.Client API Direction
+
+`ULinkGame.Client` currently exposes only low-level reliable push primitives. `ReliablePushTracker.Decide(...)`, `MarkApplied(...)`, and `Reset()` are useful building blocks, but they make application code manually preserve the correct order:
+
+1. decide whether a push is new
+2. apply the business payload
+3. mark the sequence as applied only after successful application
+4. acknowledge the latest applied sequence
+5. react to state-lost or session-mismatch acknowledgement results
+
+That order is easy to get wrong. Future client APIs should keep the low-level primitives, but add a higher-level inbox/session layer that makes the correct flow natural.
+
+The preferred shape is:
+
+```csharp
+public sealed class ReliablePushInbox
+{
+    public ReliablePushSession? CurrentSession { get; }
+    public long LastAppliedSequence { get; }
+
+    public void StartSession(ReliablePushSession session, long lastAppliedSequence = 0);
+
+    public void EndSession();
+
+    public ReliablePushDecision Decide(ReliablePushSequence sequence);
+
+    public ValueTask<ReliablePushProcessResult> ProcessAsync<TPayload>(
+        ReliablePushSequence sequence,
+        TPayload payload,
+        Func<TPayload, CancellationToken, ValueTask> applyAsync,
+        Func<ReliablePushAck, CancellationToken, ValueTask<ReliablePushAckOutcome>> acknowledgeAsync,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Usage should be closer to:
+
+```csharp
+await reliablePushInbox.ProcessAsync(
+    ReliablePushSequence.From(update.ReliableSequence),
+    update,
+    applyAsync: ApplyMatchmakingUpdateAsync,
+    acknowledgeAsync: ack => playerService.AckReliablePushAsync(ack, ct),
+    ct);
+```
+
+The API should avoid bool-heavy result types. Prefer explicit enums and value objects:
+
+```csharp
+public enum ReliablePushDecisionKind
+{
+    ApplyAndAck,
+    AckDuplicate,
+    RejectNoSession,
+    RejectSessionMismatch
+}
+
+public enum ReliablePushAckStatus
+{
+    Accepted,
+    Duplicate,
+    StateRefreshRequired,
+    StateLost,
+    SessionMismatch
+}
+
+public sealed record ReliablePushSession(
+    string OwnerKey,
+    string SessionId,
+    long Generation);
+
+public sealed record ReliablePushAck(
+    ReliablePushSession Session,
+    long LatestAppliedSequence);
+```
+
+Reliable sequence state should be scoped to a session or generation, not only to a player id. This prevents a new session from acknowledging an old session's sequence and gives the client a clean reset boundary after `StateLost` or `NewSessionRequired`.
+
+`ReliablePushSequence` should be a value object for positive reliable sequences. Messages without a positive reliable sequence are not reliable push messages and should bypass this API instead of being treated as a special reliable case.
+
+Client-side cursor storage can be added behind an engine-neutral interface:
+
+```csharp
+public interface IReliablePushCursorStore
+{
+    ValueTask<long> LoadAsync(ReliablePushSession session, CancellationToken cancellationToken = default);
+
+    ValueTask SaveAsync(ReliablePushSession session, long sequence, CancellationToken cancellationToken = default);
+
+    ValueTask ClearAsync(ReliablePushSession session, CancellationToken cancellationToken = default);
+}
+```
+
+The framework can provide an in-memory implementation. Unity, Godot, and application-specific persistence should stay in the consuming project unless repeated glue code becomes stable enough to justify a separate package.
+
+Suggested implementation order:
+
+1. Add `ReliablePushInbox`, `ReliablePushSession`, `ReliablePushSequence`, acknowledgement/status enums, and result types.
+2. Keep `ReliablePushTracker` as a low-level primitive, but recommend `ReliablePushInbox` in user-facing documentation.
+3. Add `IReliablePushCursorStore` with an in-memory implementation.
+4. Consider a broader engine-neutral client session helper only after reliable push session handling has stabilized.
+
+## Framework Architecture Roadmap
+
+This section records architecture guidance for framework work that is worth extracting from samples into `src/`. These are design targets, not completed capabilities. Keep every item infrastructure-oriented and avoid importing Agar-specific DTOs, account rules, matchmaking policy, room rules, gameplay simulation, leaderboard rules, or Unity UI.
+
+### ULinkGame.Server.Sessions
+
+Goal: provide reusable server-side session lifecycle primitives without defining the game's account model, login RPC, token format, room model, or callback DTOs.
+
+The package should live under `ULinkGame.Server.Sessions` and own these generic concepts:
+
+- session identity: owner key, session id, generation, created time, last seen time
+- endpoint binding: endpoint name, connection id, callback object, bind time, disconnect time
+- lifecycle decisions: new session, resume accepted, state refresh required, state lost, unauthorized
+- cleanup policy: disconnect grace period, max idle session age, endpoint-specific detach rules
+- extension hooks: token validation, authoritative state probe, optional custom metadata
+
+Suggested API shape:
+
+```csharp
+public sealed record GameSessionKey(
+    string OwnerKey,
+    string SessionId,
+    long Generation);
+
+public sealed record SessionEndpointKey(
+    GameSessionKey Session,
+    string EndpointName);
+
+public enum SessionResumeStatus
+{
+    Resumed,
+    StateRefreshRequired,
+    StateLost,
+    Unauthorized
+}
+
+public sealed record SessionResumeDecision(
+    SessionResumeStatus Status,
+    GameSessionKey? Session,
+    string? Reason = null);
+
+public interface IGameSessionDirectory
+{
+    ValueTask<GameSessionKey> StartNewSessionAsync(
+        string ownerKey,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<SessionResumeDecision> TryResumeAsync(
+        GameSessionKey session,
+        CancellationToken cancellationToken = default);
+
+    ValueTask BindEndpointAsync<TCallback>(
+        SessionEndpointKey endpoint,
+        string connectionId,
+        TCallback callback,
+        CancellationToken cancellationToken = default)
+        where TCallback : class;
+
+    ValueTask MarkEndpointDisconnectedAsync(
+        SessionEndpointKey endpoint,
+        string? connectionId = null,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<TCallback?> GetCallbackAsync<TCallback>(
+        SessionEndpointKey endpoint,
+        CancellationToken cancellationToken = default)
+        where TCallback : class;
+}
+```
+
+The exact API can change during implementation, but keep these constraints:
+
+- Store generated RPC callback instances as opaque typed bindings. Framework code must not know callback methods such as `OnMatched`.
+- Treat endpoint names as data. `control` and `realtime` are sample/template names, not mandatory framework concepts.
+- Scope reliable sequence tracking to `GameSessionKey` or an equivalent generation-bearing identity.
+- The first implementation should be in-memory and process-local. Durable session stores are project-specific until repeated use proves a framework need.
+- Token validation should be a hook, not a framework account system.
+
+Implementation order:
+
+1. Extract a minimal in-memory directory from the sample shape: start session, bind endpoint, detach endpoint, expire disconnected endpoints.
+2. Add generation-aware resume decisions and state-lost result types.
+3. Wire reliable push ack/session checks to the session identity instead of plain player id.
+4. Add cleanup hosted service helpers only after the directory API is stable.
+5. Add diagnostics counters and logs for start, resume, bind, detach, expire, state refresh, and state lost.
+
+Test requirements:
+
+- duplicate bind replaces only the matching endpoint binding
+- stale connection id cannot detach a newer binding
+- control-like and realtime-like endpoint bindings can be independently detached
+- session generation prevents old acknowledgements from affecting new sessions
+- expired sessions return `StateLost`, not silent success
+
+### Reconnect And State-Lost Semantics
+
+Goal: make reconnect outcomes explicit and shared by server and client helpers while still letting the game decide what authoritative state means.
+
+ULinkGame should distinguish three cases:
+
+- `Resumed`: session token, generation, and authoritative state are compatible; pending reliable pushes can be replayed.
+- `StateRefreshRequired`: the session is valid but transient client state or reliable sequence state is stale; client must clear transient state and fetch an authoritative snapshot.
+- `StateLost`: the server cannot validate the client's claimed state; client must clear session-local state and start a new session.
+
+Suggested server-side result types:
+
+```csharp
+public enum ReconnectStatus
+{
+    Resumed,
+    StateRefreshRequired,
+    StateLost,
+    Unauthorized
+}
+
+public enum ReliablePushAckStatus
+{
+    Accepted,
+    Duplicate,
+    StateRefreshRequired,
+    StateLost,
+    SessionMismatch
+}
+```
+
+The framework should provide decision helpers, not business snapshots. A game should be able to plug in an authoritative state probe:
+
+```csharp
+public interface IAuthoritativeSessionStateProbe<TSnapshot>
+{
+    ValueTask<AuthoritativeStateProbeResult<TSnapshot>> ProbeAsync(
+        GameSessionKey session,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Guidance:
+
+- Never repair state mismatch by replaying untrusted or stale reliable pushes.
+- If authoritative state exists, prefer `StateRefreshRequired` and let the client fetch a snapshot.
+- If authoritative state does not exist, return `StateLost` or `NewSessionRequired`.
+- If a client acknowledges a sequence for a different session/generation, return `SessionMismatch` or `StateLost`.
+- Do not silently reset sequence numbers on the server while treating reconnect as successful; make the reset visible through an explicit result.
+
+Implementation order:
+
+1. Add framework result types for reconnect and ack outcomes.
+2. Update client helper design to consume those outcomes.
+3. Add sample migration after framework primitives exist.
+4. Add docs showing the difference between replay, refresh, and new session.
+
+Test requirements:
+
+- valid session and compatible sequence returns resume/accepted
+- valid session with missing transient outbox but existing authoritative state returns refresh required
+- invalid token returns unauthorized
+- missing authoritative state returns state lost
+- old generation ack does not mutate the current generation cursor
+
+### Cross-Gateway Realtime Routing
+
+Goal: provide optional infrastructure for realtime multiplayer deployments where a player's current RPC connection and a room/runtime owner may live on different gateway processes.
+
+This is not required for light online games. It should live under an optional namespace such as `ULinkGame.Server.RealtimeRouting` and remain independent of any gameplay DTO.
+
+Framework-owned concepts:
+
+- gateway identity: stable node id, endpoint addresses, health state
+- route key: application-defined key such as room id, match id, or shard id
+- runtime owner: the gateway currently authoritative for a route key
+- routed envelope: ordered key, expiration time, payload, content type, correlation id
+- delivery result: accepted, expired, no owner, backpressure, failed
+
+Suggested API shape:
+
+```csharp
+public sealed record GatewayNodeId(string Value);
+
+public sealed record RealtimeRouteKey(string Value);
+
+public sealed record RealtimeRouteOwner(
+    RealtimeRouteKey Route,
+    GatewayNodeId Gateway,
+    DateTimeOffset ExpiresAt);
+
+public sealed record RealtimeEnvelope(
+    RealtimeRouteKey Route,
+    string Kind,
+    ReadOnlyMemory<byte> Payload,
+    string? OrderedBy = null,
+    DateTimeOffset? ExpiresAt = null,
+    string? CorrelationId = null);
+
+public enum RealtimeRouteSendStatus
+{
+    Accepted,
+    Expired,
+    NoOwner,
+    Backpressure,
+    Failed
+}
+
+public interface IRealtimeRouteRegistry
+{
+    ValueTask RegisterOwnerAsync(RealtimeRouteOwner owner, CancellationToken cancellationToken = default);
+
+    ValueTask<RealtimeRouteOwner?> GetOwnerAsync(RealtimeRouteKey route, CancellationToken cancellationToken = default);
+
+    ValueTask ClearOwnerAsync(RealtimeRouteKey route, GatewayNodeId gateway, CancellationToken cancellationToken = default);
+}
+
+public interface IRealtimeMessageRouter
+{
+    ValueTask<RealtimeRouteSendStatus> SendAsync(
+        RealtimeEnvelope envelope,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Guidance:
+
+- Do not serialize live RPC callback objects into Redis, Orleans state, streams, or route records.
+- Payload serialization belongs to the application or adapter. The framework route layer can move bytes plus metadata.
+- Ordering should be scoped by an explicit key such as player id or route id, not globally.
+- Expiration is mandatory for high-frequency realtime messages; stale inputs and stale snapshots should be dropped, not replayed indefinitely.
+- Backpressure must be visible through return values and metrics.
+- Provide adapters later, for example Orleans streams, Redis pub/sub, or in-process loopback. Start with an in-memory adapter for tests.
+
+Implementation order:
+
+1. Define route registry and router abstractions with in-memory implementation.
+2. Add route owner registration and expiration tests.
+3. Add send result, TTL, and backpressure behavior.
+4. Add one production adapter only after the sample proves the abstraction.
+5. Migrate Agar multi-gateway routing as the first real consumer.
+
+Test requirements:
+
+- only one active owner is returned for a route
+- owner expiration makes the route unavailable
+- expired envelopes are dropped before delivery
+- no-owner and backpressure are surfaced as explicit statuses
+- callback objects never appear in serialized route state
+
+### Engine-Neutral Client Session State
+
+Goal: give Unity, Godot, and plain .NET clients reusable state helpers without depending on an engine, generated RPC client, transport package, UI thread, or local storage mechanism.
+
+This layer should build on `ReliablePushInbox`, not replace it.
+
+Suggested concepts:
+
+- client session identity: owner key, session id, generation
+- connection phase: signed out, connecting, active, reconnecting, refresh required, state lost
+- endpoint state: disconnected, connecting, connected, failed
+- transient state reset: reliable sequence cursor, endpoint binding, pending local callbacks
+- application hooks: connect, disconnect, fetch snapshot, start new session
+
+Suggested API shape:
+
+```csharp
+public enum ClientSessionPhase
+{
+    SignedOut,
+    Connecting,
+    Active,
+    Reconnecting,
+    RefreshRequired,
+    StateLost
+}
+
+public sealed record ClientSessionSnapshot(
+    ClientSessionPhase Phase,
+    ReliablePushSession? ReliablePushSession,
+    long LastReliableSequence);
+
+public sealed class ClientSessionController
+{
+    public ClientSessionSnapshot Snapshot { get; }
+
+    public void StartSession(ReliablePushSession reliablePushSession, long lastReliableSequence = 0);
+
+    public void MarkReconnecting();
+
+    public void ApplyAckOutcome(ReliablePushAckOutcome outcome);
+
+    public void MarkStateLost();
+
+    public void EndSession();
+}
+```
+
+Guidance:
+
+- Keep it synchronous where possible; async belongs to app-provided connect/fetch delegates.
+- Do not dispatch to Unity main thread, Godot main loop, or SynchronizationContext inside the framework.
+- Do not store UI text or user-visible messages.
+- Do not create transports or generated RPC clients.
+- Provide snapshots and explicit transitions so applications can render their own UI and logs.
+- Make `StateLost` terminal until `StartSession` is called again.
+
+Implementation order:
+
+1. Implement `ReliablePushInbox`.
+2. Add session/generation-aware cursor store.
+3. Add `ClientSessionController` with pure transition tests.
+4. Add README examples for Unity/Godot/plain .NET without engine dependencies.
+
+Test requirements:
+
+- state lost clears reliable sequence and endpoint-like transient state
+- refresh required does not imply new login
+- new session starts with isolated cursor
+- duplicate push ack outcome does not change phase
+- all transitions are deterministic and engine-neutral
+
+### Diagnostics, Health Checks, And Metrics
+
+Goal: make ULinkGame infrastructure observable without hard-coding any game's business metrics.
+
+Use standard .NET primitives:
+
+- `ILogger` for structured logs
+- `System.Diagnostics.Metrics` for counters, histograms, and gauges
+- `Microsoft.Extensions.Diagnostics.HealthChecks` for readiness/liveness checks where applicable
+
+Suggested namespaces:
+
+- `ULinkGame.Server.Diagnostics`
+- `ULinkGame.Server.Hosting` for endpoint hosted-service diagnostics
+- `ULinkGame.Server.ReliablePush` for outbox metrics
+- `ULinkGame.Server.Sessions` for session lifecycle metrics once sessions exist
+- `ULinkGame.Server.RealtimeRouting` for routing metrics once routing exists
+
+Suggested metrics:
+
+- `ulinkgame.rpc.endpoint.started`
+- `ulinkgame.rpc.endpoint.stopped`
+- `ulinkgame.rpc.endpoint.failure`
+- `ulinkgame.reliable_push.published`
+- `ulinkgame.reliable_push.replayed`
+- `ulinkgame.reliable_push.acked`
+- `ulinkgame.reliable_push.pending`
+- `ulinkgame.session.started`
+- `ulinkgame.session.resumed`
+- `ulinkgame.session.state_lost`
+- `ulinkgame.route.sent`
+- `ulinkgame.route.dropped`
+- `ulinkgame.route.backpressure`
+
+Suggested health checks:
+
+- Orleans client connected for gateway processes
+- Orleans silo started for silo processes
+- configured RPC endpoints have started listening
+- reliable push outbox service is registered
+- optional route backend is reachable
+
+Guidance:
+
+- Metrics must use low-cardinality tags. Endpoint name, status, and reason category are acceptable; player id, room id, session id, and connection id are not.
+- Logs may include correlation ids and endpoint names, but avoid secrets and raw tokens.
+- Framework diagnostics should expose infrastructure behavior. Business events such as score, ranking, rewards, or inventory belong to the game.
+- Health checks should separate liveness from readiness. A process can be alive but not ready to accept RPC traffic.
+
+Implementation order:
+
+1. Add stable event ids and log scopes for RPC endpoint startup/shutdown/failure.
+2. Add reliable push counters and pending gauge.
+3. Add health checks for Orleans client/silo and endpoint hosted service state.
+4. Add session and routing metrics when those packages exist.
+5. Update tool templates to register health checks in generated server projects.
+
+Test requirements:
+
+- endpoint startup failure is logged with endpoint name
+- reliable push publish/replay/ack increments metrics through a test meter listener
+- health check reports unhealthy when required services are missing or not started
+- metrics do not tag high-cardinality user/session/room identifiers
+
+### ULinkGame.Tool Production Templates
+
+Goal: generate production-ready infrastructure scaffolding without taking ownership of ULinkRPC starter output or game business code.
+
+The tool currently creates an Edge/Silo layout and unconditionally generates control and realtime endpoints. Future work should split templates by project shape:
+
+- simple online game: one session endpoint
+- realtime multiplayer game: session/control endpoint plus optional realtime endpoint
+- server-only or client-engine variants only when supported by `ulinkrpc-starter`
+
+Template-owned additions:
+
+- `ULinkGame.Server` and `ULinkGame.Client` package references
+- Edge/Silo host startup using ULinkGame helpers
+- environment-variable driven `appsettings.json`
+- `.env.example` with development-only defaults
+- optional Dockerfile and compose/override files for Edge and Silo
+- health check registration and endpoint
+- local tool manifest and codegen command wiring
+- README next steps that match the selected project shape
+
+Template non-goals:
+
+- do not rewrite `ULinkRPC.*` package versions generated by `ulinkrpc-starter`
+- do not own game RPC contracts, business DTOs, account schema, leaderboard schema, or room rules
+- do not generate realtime endpoint terminology for simple single-endpoint projects
+- do not include production secrets or real connection strings
+
+Suggested options:
+
+```txt
+ulinkgame-tool new --name MyGame --client-engine unity --network-profile simple
+ulinkgame-tool new --name MyGame --client-engine unity --network-profile realtime
+ulinkgame-tool new --name MyGame --client-engine unity --with-docker
+ulinkgame-tool new --name MyGame --client-engine unity --with-health-checks
+```
+
+The exact option names can change, but the project shape should be explicit. Avoid making realtime multiplayer the implicit default for every new project.
+
+Implementation order:
+
+1. Introduce an internal `NetworkProfile` model with `simple` and `realtime`.
+2. Make the existing dual-endpoint template the `realtime` profile.
+3. Add a simple single-endpoint template and make it the default if that does not break existing users.
+4. Add Docker/compose/health-check output behind explicit options.
+5. Update verification scripts to generate and build both profiles.
+
+Test requirements:
+
+- simple profile generates exactly one endpoint configurator
+- realtime profile generates separate session/control and realtime configurators
+- generated projects build after codegen
+- generated appsettings can be overridden by environment variables
+- Docker template does not contain secrets
+- tool still preserves starter-owned package references and generated layout
+
+## Unfinished Framework Features
+
+This list tracks framework-level gaps only. Do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
+
+### Candidate Framework Work
+
+- Generic session lifecycle primitives: `ULinkGame.Server` does not yet own reusable session registration, reconnect/new-session decisions, state-lost result types, token validation hooks, or session/generation-scoped reliable sequence reset rules. The Agar sample still owns these through its `PlayerService`, `SessionDirectory`, and RPC DTOs.
+- Reliable push state results: the outbox can publish, replay, ack, and prune records, but framework APIs do not yet expose ack/reconnect result helpers such as accepted, duplicate, session mismatch, or state lost. The sample still owns its ack RPC and state-lost response shape.
+- Client session helpers: `ULinkGame.Client` currently contains reliable sequence tracking only. It does not yet provide an engine-neutral reconnect/session state machine, state-lost handling helper, or session/generation wrapper around `ReliablePushTracker`.
+- Endpoint model cleanup: `ULinkGame.Server` can host multiple named RPC servers, but `ULinkGame.Tool` still generates a control endpoint and realtime endpoint unconditionally. The tool should eventually offer a simple single-endpoint project shape by default and only generate realtime endpoint code when the selected template explicitly needs realtime multiplayer.
+- Optional realtime routing infrastructure: no framework abstraction exists yet for gateway-to-gateway routing, runtime owner identity, ordered input forwarding, snapshot fanout, or endpoint-level backpressure. If added, this should remain optional infrastructure for realtime multiplayer templates, not a mandatory concept for light online games.
+- Endpoint diagnostics and operations: the framework does not yet provide built-in per-endpoint health checks, readiness signals, structured log event ids, metrics hooks, graceful endpoint shutdown semantics, or standard diagnostics for reliable push and session lifecycle decisions.
+
+### Deliberately Not Default Work
+
+- Durable reliable push is not a default framework goal. The default remains an in-memory short-window outbox plus explicit state-lost/new-session behavior when authoritative state cannot be validated.
+- `ULinkGame.Shared` is not planned until cross-side framework-owned contracts become stable and numerous enough to justify `ULinkGame.Abstractions`.
+- `ULinkGame.Unity` is not planned until repeated Unity-specific integration code becomes stable enough to justify a package.
+- Game business systems stay out of the framework: accounts, matchmaking policy, room rules, gameplay simulation, rewards, inventory, leaderboard rules, UI, and product DTOs belong in the game project or sample.
