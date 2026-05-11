@@ -3,6 +3,7 @@ using Orleans.Contracts;
 using Orleans.Contracts.Rooms;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
+using ULinkRPC.Sample.Silo.Persistence;
 
 namespace ULinkRPC.Sample.Silo.Rooms;
 
@@ -10,7 +11,7 @@ public sealed class RoomGrain : Grain, IRoomGrain
 {
     private readonly IPersistentState<RoomState> _state;
 
-    public RoomGrain([PersistentState("room", "rooms")] IPersistentState<RoomState> state)
+    public RoomGrain([PersistentState("room", AgarSiloStorageNames.GrainStateProvider)] IPersistentState<RoomState> state)
     {
         _state = state;
     }

@@ -40,7 +40,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 控制面的 WebSocket RPC。
 - 实时面的 KCP RPC。
 - 用于实时会话绑定的 `AttachRealtimeAsync`。
-- 基于 PostgreSQL 的 Orleans 集群成员表和 grain 持久化。
+- 基于 Dapper + PostgreSQL 的 Orleans grain 持久化。
 - 基于 Orleans 的匹配队列。
 - 持久化的房间和会话分配，包含运行时网关端点信息。
 - 支持运行时网关绑定的仅实时连接本地会话注册。

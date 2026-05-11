@@ -3,6 +3,7 @@ using Orleans.Contracts.Users;
 using Orleans.Runtime;
 using System.Security.Cryptography;
 using System.Text;
+using ULinkRPC.Sample.Silo.Persistence;
 
 namespace ULinkRPC.Sample.Silo.Users;
 
@@ -41,7 +42,7 @@ public sealed class UserGrain : Grain, IUserGrain
 {
     private readonly IPersistentState<UserState> _state;
 
-    public UserGrain([PersistentState("user", "users")] IPersistentState<UserState> state)
+    public UserGrain([PersistentState("user", AgarSiloStorageNames.GrainStateProvider)] IPersistentState<UserState> state)
     {
         _state = state;
     }

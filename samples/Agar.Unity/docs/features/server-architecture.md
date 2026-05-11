@@ -26,7 +26,7 @@
 - 房间分配和房间快照状态。
 - 排行榜聚合查询（`ILeaderboardGrain`）。
 
-PostgreSQL 是 Orleans 集群成员表和 grain 状态的持久化后端。
+PostgreSQL 是 grain 状态的持久化后端，Silo 通过 sample-local Dapper grain storage provider 读写。
 
 排行榜 grain 职责：
 
@@ -100,7 +100,7 @@ WorldState
 
 已经分布式或持久化的部分：
 
-- Orleans 成员表和 grain 状态使用 PostgreSQL。
+- Orleans grain 状态通过 Dapper 写入 PostgreSQL。
 - 匹配队列状态在 Orleans 中。
 - 房间分配携带明确的运行时网关信息。
 - 客户端收到明确的实时连接目标，不假设控制网关一定拥有房间。

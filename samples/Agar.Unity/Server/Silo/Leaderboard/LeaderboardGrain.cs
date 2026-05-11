@@ -2,6 +2,7 @@ using Orleans;
 using Orleans.Contracts.Leaderboard;
 using Orleans.Contracts.Users;
 using Orleans.Runtime;
+using ULinkRPC.Sample.Silo.Persistence;
 
 namespace ULinkRPC.Sample.Silo.Leaderboard;
 
@@ -52,7 +53,7 @@ public sealed class LeaderboardGrain : Grain, ILeaderboardGrain
     private readonly IPersistentState<LeaderboardState> _state;
     private readonly TimeZoneInfo _leaderboardTimeZone;
 
-    public LeaderboardGrain([PersistentState("leaderboard", "leaderboards")] IPersistentState<LeaderboardState> state)
+    public LeaderboardGrain([PersistentState("leaderboard", AgarSiloStorageNames.GrainStateProvider)] IPersistentState<LeaderboardState> state)
     {
         _state = state;
         _leaderboardTimeZone = TimeZoneInfo.Local;

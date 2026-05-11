@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
 using ULinkGame.Server.Hosting;
+using ULinkRPC.Sample.Silo.Persistence;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration(configuration =>
@@ -14,33 +14,11 @@ var host = Host.CreateDefaultBuilder(args)
     .UseULinkGameServerOrleansSilo((context, silo) =>
     {
         var configuration = context.Configuration;
-        var invariant = configuration["Orleans:Invariant"] ?? "Npgsql";
         var connectionString = configuration["Orleans:ConnectionString"]
             ?? throw new InvalidOperationException("Missing configuration: Orleans:ConnectionString");
 
-        silo.AddAdoNetGrainStorage("users", options =>
+        silo.AddDapperGrainStorage(AgarSiloStorageNames.GrainStateProvider, options =>
         {
-            options.Invariant = invariant;
-            options.ConnectionString = connectionString;
-        });
-        silo.AddAdoNetGrainStorage("sessions", options =>
-        {
-            options.Invariant = invariant;
-            options.ConnectionString = connectionString;
-        });
-        silo.AddAdoNetGrainStorage("matchmaking", options =>
-        {
-            options.Invariant = invariant;
-            options.ConnectionString = connectionString;
-        });
-        silo.AddAdoNetGrainStorage("rooms", options =>
-        {
-            options.Invariant = invariant;
-            options.ConnectionString = connectionString;
-        });
-        silo.AddAdoNetGrainStorage("leaderboards", options =>
-        {
-            options.Invariant = invariant;
             options.ConnectionString = connectionString;
         });
     })

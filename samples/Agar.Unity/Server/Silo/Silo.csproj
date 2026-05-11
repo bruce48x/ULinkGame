@@ -10,8 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="../../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
         <ProjectReference Include="../Orleans.Contracts/Orleans.Contracts.csproj" />
-        <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.0.0" />
+        <PackageReference Include="Dapper" Version="2.1.72" />
         <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
         <PackageReference Include="Npgsql" Version="9.0.4" />
     </ItemGroup>

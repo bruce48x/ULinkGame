@@ -76,6 +76,7 @@ samples/Agar.Unity
 - `docker-compose.yml`
 - `.env.example`
 - `infra/postgres/init/001-orleans.sql`
+- `infra/postgres/init/002-dapper-grain-storage.sql`
 
 从 `samples/Agar.Unity` 目录启动：
 
@@ -83,7 +84,7 @@ samples/Agar.Unity
 docker compose --env-file .env.example up -d
 ```
 
-PostgreSQL 当前用于 Orleans 集群成员表和 grain 持久化。Redis 只是为后续路由、在线状态或发布订阅预留，当前实时玩法路径还不依赖 Redis。
+PostgreSQL 当前用于 Dapper-backed Orleans grain 状态持久化。Redis 只是为后续路由、在线状态或发布订阅预留，当前实时玩法路径还不依赖 Redis。
 
 ## 运行方式
 

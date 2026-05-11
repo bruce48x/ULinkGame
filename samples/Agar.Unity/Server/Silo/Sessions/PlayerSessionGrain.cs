@@ -2,6 +2,7 @@ using Orleans;
 using Orleans.Contracts;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
+using ULinkRPC.Sample.Silo.Persistence;
 
 namespace ULinkRPC.Sample.Silo.Sessions;
 
@@ -9,7 +10,7 @@ public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
 {
     private readonly IPersistentState<PlayerSessionState> _state;
 
-    public PlayerSessionGrain([PersistentState("player-session", "sessions")] IPersistentState<PlayerSessionState> state)
+    public PlayerSessionGrain([PersistentState("player-session", AgarSiloStorageNames.GrainStateProvider)] IPersistentState<PlayerSessionState> state)
     {
         _state = state;
     }

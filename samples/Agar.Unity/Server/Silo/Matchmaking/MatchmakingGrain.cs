@@ -4,6 +4,7 @@ using Orleans.Contracts.Matchmaking;
 using Orleans.Contracts.Rooms;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
+using ULinkRPC.Sample.Silo.Persistence;
 
 namespace ULinkRPC.Sample.Silo.Matchmaking;
 
@@ -12,7 +13,7 @@ public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
     private const int DefaultRoomSize = 10;
     private readonly IPersistentState<MatchmakingState> _state;
 
-    public MatchmakingGrain([PersistentState("matchmaking", "matchmaking")] IPersistentState<MatchmakingState> state)
+    public MatchmakingGrain([PersistentState("matchmaking", AgarSiloStorageNames.GrainStateProvider)] IPersistentState<MatchmakingState> state)
     {
         _state = state;
     }
