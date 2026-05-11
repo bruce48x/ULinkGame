@@ -24,7 +24,7 @@ ulinkgame-tool codegen
 ```powershell
 dotnet build Shared/Shared.csproj -f net10.0
 dotnet build Server/Silo/Silo.csproj
-dotnet build Server/Server/Server.csproj
+dotnet build Server/Edge/Edge.csproj
 dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ```
 
@@ -160,7 +160,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 待办：
 
 - 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
-- 在 Silo 和 Server 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
+- 在 Silo 和 Edge 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
 - 验证联机大厅不展示 DEBUG 信息，不保留调试面板、连接端点、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
 - 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量；表头、行内容和排序都不出现“分数”。
 - 验证右侧实时排名面板背景已改为低遮挡半透明，不再因为背景框过深或过实影响游戏画面可读性。
@@ -310,7 +310,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 待办：
 
-- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/Silo/Silo.csproj`、`Server/Server/Server.csproj`。
+- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/Silo/Silo.csproj`、`Server/Edge/Edge.csproj`。
 - 每轮触碰业务逻辑后，运行已有自动化测试和新增测试。
 - 每轮触碰 Unity 客户端脚本或资源后，触发 Unity 资源刷新/脚本编译并检查控制台错误。
 - 每轮发布前，手动冒烟测试单机和联机流程。
@@ -431,7 +431,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 本轮已通过 `Shared/Shared.csproj` 构建。
 - 本轮已通过 `Server/Silo/Silo.csproj` 构建。
-- 本轮已通过 `Server/Server/Server.csproj` 构建。
+- 本轮已通过 `Server/Edge/Edge.csproj` 构建。
 - 本轮已通过已有自动化测试，31/31。
 - Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍需按待办执行。
 - README 已同步到当时的命令、端口和架构事实。

@@ -227,7 +227,7 @@ Run the sample server pieces separately:
 
 ```powershell
 dotnet run --project samples/Agar.Unity/Server/Silo/Silo.csproj
-dotnet run --project samples/Agar.Unity/Server/Server/Server.csproj
+dotnet run --project samples/Agar.Unity/Server/Edge/Edge.csproj
 ```
 
 Open `samples/Agar.Unity/Client` in Unity for the client.

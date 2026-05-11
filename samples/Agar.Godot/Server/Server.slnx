@@ -1,7 +1,7 @@
 <Solution>
   <Project Path="../Shared/Shared.csproj" />
   <Project Path="../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
-  <Project Path="Server/Server.csproj" />
+  <Project Path="Edge/Edge.csproj" />
   <Project Path="Orleans.Contracts/Orleans.Contracts.csproj" />
   <Project Path="Silo/Silo.csproj" />
 </Solution>

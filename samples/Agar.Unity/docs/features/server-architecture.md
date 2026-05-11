@@ -4,7 +4,7 @@
 
 ## 服务端边界
 
-`samples/Agar.Unity/Server/Server` 是 RPC 网关和房间运行时宿主。
+`samples/Agar.Unity/Server/Edge` 是 RPC 网关和房间运行时宿主。
 
 当前职责：
 

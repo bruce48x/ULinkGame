@@ -28,7 +28,7 @@
     <Compile Include="../../Shared/Gameplay/VictoryPointAwards.cs" Link="TestHooks/Shared/Gameplay/VictoryPointAwards.cs" />
     <Compile Include="../../Shared/Interfaces/IPlayerService.cs" Link="TestHooks/Shared/Interfaces/IPlayerService.cs" />
     <Compile Include="../../Server/Silo/Matchmaking/MatchmakingQueuePolicy.cs" Link="TestHooks/MatchmakingQueuePolicy.cs" />
-    <Compile Include="../../Server/Server/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
-    <Compile Include="../../Server/Server/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
+    <Compile Include="../../Server/Edge/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
+    <Compile Include="../../Server/Edge/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
   </ItemGroup>
 </Project>

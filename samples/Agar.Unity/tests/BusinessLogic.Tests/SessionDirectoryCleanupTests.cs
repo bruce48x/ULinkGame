@@ -1,4 +1,4 @@
-using Server.Services;
+using Edge.Services;
 using Shared.Interfaces;
 using Xunit;
 

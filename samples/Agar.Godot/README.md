@@ -10,6 +10,8 @@ It follows the same top-level shape as `samples/Agar.Unity`: shared contracts an
 samples/Agar.Godot/
   Shared/
   Server/
+    Edge/
+    Silo/
   Client/
     project.godot
     Agar.Godot.csproj
@@ -30,13 +32,13 @@ samples/Agar.Godot/
 
 ## Run
 
-To run the server side, start the Orleans silo first, then start the gateway server:
+To run the server side, start the Orleans silo first, then start the Edge gateway:
 
 ```powershell
 dotnet run --project samples/Agar.Godot/Server/Silo/Silo.csproj
-dotnet run --project samples/Agar.Godot/Server/Server/Server.csproj
+dotnet run --project samples/Agar.Godot/Server/Edge/Edge.csproj
 ```
 
 Open `samples/Agar.Godot/Client` in Godot 4 .NET and run the main scene. The client connects to the gateway control WebSocket at `127.0.0.1:20000/ws`, starts guest matchmaking, attaches to the KCP realtime endpoint returned by the server, renders pushed `WorldState` snapshots, and submits WASD input to the server.
 
-Both server projects read their Orleans connection string from `appsettings.json`.
+Both Silo and Edge projects read their Orleans connection string from `appsettings.json`.

@@ -9,9 +9,9 @@
   "codegen": {
     "contractsPath": "Shared",
     "server": {
-      "projectPath": "Server/Server",
+      "projectPath": "Server/Edge",
       "outputPath": "Generated",
-      "namespace": "Server.Generated"
+      "namespace": "Edge.Generated"
     },
     "unityClient": {
       "projectPath": "Client",
