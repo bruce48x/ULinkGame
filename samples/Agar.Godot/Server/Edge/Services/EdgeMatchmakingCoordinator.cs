@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Edge.Services;
 
-internal sealed class EdgeMatchmakingService
+internal sealed class EdgeMatchmakingCoordinator
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, CancellationTokenSource> _watchers = new(StringComparer.Ordinal);
@@ -17,16 +17,16 @@ internal sealed class EdgeMatchmakingService
     private readonly RoomRuntimeHost _roomRuntimeHost;
     private readonly EdgeNodeIdentity _edgeNodeIdentity;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
-    private readonly ILogger<EdgeMatchmakingService> _logger;
+    private readonly ILogger<EdgeMatchmakingCoordinator> _logger;
 
-    public EdgeMatchmakingService(
+    public EdgeMatchmakingCoordinator(
         IClusterClient clusterClient,
         SessionDirectory sessionDirectory,
         MatchmakingMonitor matchmakingMonitor,
         RoomRuntimeHost roomRuntimeHost,
         EdgeNodeIdentity edgeNodeIdentity,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
-        ILogger<EdgeMatchmakingService> logger)
+        ILogger<EdgeMatchmakingCoordinator> logger)
     {
         _clusterClient = clusterClient;
         _sessionDirectory = sessionDirectory;
@@ -113,32 +113,10 @@ internal sealed class EdgeMatchmakingService
         }
 
         var roomId = registration?.RoomId;
+        _sessionDirectory.ClearRoom(playerId);
         if (!string.IsNullOrWhiteSpace(roomId))
         {
-            await _clusterClient.GetGrain<IRoomGrain>(roomId)
-                .LeaveAsync(new RoomPlayerLeaveRequest
-                {
-                    UserId = playerId,
-                    RoomId = roomId,
-                    LeftAtUtc = DateTime.UtcNow,
-                    Reason = reason
-                })
-                .ConfigureAwait(false);
-            await _clusterClient.GetGrain<IPlayerSessionGrain>(playerId)
-                .ClearRoomAsync(new PlayerRoomClearRequest
-                {
-                    UserId = playerId,
-                    RoomId = roomId,
-                    ClearedAtUtc = DateTime.UtcNow,
-                    Reason = reason
-                })
-                .ConfigureAwait(false);
-            _sessionDirectory.ClearRoom(playerId, roomId);
             await _roomRuntimeHost.RemovePlayerAsync(roomId, playerId).ConfigureAwait(false);
-        }
-        else
-        {
-            _sessionDirectory.ClearRoom(playerId);
         }
     }
 

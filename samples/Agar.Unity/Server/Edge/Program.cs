@@ -31,7 +31,7 @@ builder.Services.AddSingleton<MatchmakingMonitor>();
 builder.Services.AddSingleton<RoomRuntimeHost>();
 builder.Services.AddSingleton<ReliableMatchmakingPublisher>();
 builder.Services.AddULinkGameServerReliablePush();
-builder.Services.AddSingleton<EdgeMatchmakingService>();
+builder.Services.AddSingleton<EdgeMatchmakingCoordinator>();
 builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
 builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
 builder.Services.AddHostedService<MatchmakingHostedService>();

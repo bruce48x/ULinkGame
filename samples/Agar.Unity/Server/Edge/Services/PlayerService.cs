@@ -15,7 +15,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
     private readonly IClusterClient _clusterClient;
     private readonly IPlayerCallback _callback;
     private readonly SessionDirectory _sessionDirectory;
-    private readonly EdgeMatchmakingService _edgeMatchmaking;
+    private readonly EdgeMatchmakingCoordinator _matchmakingCoordinator;
     private readonly EdgeNodeIdentity _edgeNodeIdentity;
     private readonly RoomRuntimeHost _roomRuntimeHost;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
@@ -31,7 +31,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         IPlayerCallback callback,
         IClusterClient clusterClient,
         SessionDirectory sessionDirectory,
-        EdgeMatchmakingService edgeMatchmaking,
+        EdgeMatchmakingCoordinator matchmakingCoordinator,
         EdgeNodeIdentity edgeNodeIdentity,
         RoomRuntimeHost roomRuntimeHost,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
@@ -41,7 +41,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         _callback = callback;
         _clusterClient = clusterClient;
         _sessionDirectory = sessionDirectory;
-        _edgeMatchmaking = edgeMatchmaking;
+        _matchmakingCoordinator = matchmakingCoordinator;
         _edgeNodeIdentity = edgeNodeIdentity;
         _roomRuntimeHost = roomRuntimeHost;
         _reliableMatchmakingPublisher = reliableMatchmakingPublisher;
@@ -192,7 +192,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             return;
         }
 
-        await _edgeMatchmaking.EnqueueAsync(_playerId).ConfigureAwait(false);
+        await _matchmakingCoordinator.EnqueueAsync(_playerId).ConfigureAwait(false);
     }
 
     public async ValueTask CancelMatchmakingAsync(CancelMatchmakingRequest req)
@@ -204,7 +204,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             return;
         }
 
-        await _edgeMatchmaking.CancelAsync(_playerId, "Matchmaking cancelled").ConfigureAwait(false);
+        await _matchmakingCoordinator.CancelAsync(_playerId, "Matchmaking cancelled").ConfigureAwait(false);
     }
 
     public async ValueTask<RealtimeAttachReply> AttachRealtimeAsync(RealtimeAttachRequest req)
@@ -414,7 +414,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         var registration = _sessionDirectory.Get(playerId);
         try
         {
-            await _edgeMatchmaking.ReleasePlayerAsync(playerId, reason).ConfigureAwait(false);
+            await _matchmakingCoordinator.ReleasePlayerAsync(playerId, reason).ConfigureAwait(false);
             await _clusterClient.GetGrain<IPlayerSessionGrain>(playerId)
                 .MarkDisconnectedAsync(new PlayerSessionDisconnectRequest
                 {
