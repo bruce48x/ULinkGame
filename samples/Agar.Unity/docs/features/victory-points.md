@@ -29,26 +29,40 @@
 
 排行榜查询由客户端在登录、重连和联机结算后通过控制面 RPC 主动拉取，不通过实时通道推送。服务端接口为 `IPlayerService.GetLeaderboardAsync`。
 
+生产目标方案中，当前周期排行榜索引使用 Redis sorted set 实现。`ILeaderboardGrain` 不再把完整排序索引保存在 grain state 中，而是作为排行榜协调者负责周期检查、Redis key 管理、归档和查询聚合。Unity 客户端仍只通过 `IPlayerService.GetLeaderboardAsync` 查询，不直接连接 Redis。
+
 ## 跨场数据流
 
 ```txt
 对局结束 → RoomRuntime 计算排名 → 按排名发放胜利积分 → IUserGrain 持久化
                                            ↓
-                                 ILeaderboardGrain 更新积分索引
+                                 ILeaderboardGrain 协调写入 Redis 排行榜索引
                                            ↓
-客户端拉取排行榜 ← ILeaderboardGrain 排序返回 top N
+客户端拉取排行榜 ← ILeaderboardGrain 从 Redis 查询并聚合 top N
 ```
 
-胜利积分存储在 `IUserGrain` 的 `UserState` 中，作为用户持久化状态的一部分。当前代码没有独立的全量用户目录，因此 `ILeaderboardGrain` 维护由对局结算写入的排行榜积分索引，并按该索引排序返回 top N；客户端不遍历用户列表。
+胜利积分存储在 `IUserGrain` 的 `UserState` 中，作为用户持久化状态的一部分。当前周期排行榜排序索引应迁移到 Redis sorted set；客户端不遍历用户列表。
 
-## 排行榜 Grain 设计
+## Redis 排行榜设计
+
+当前周期 Redis key：
+
+- `agar:leaderboard:{period}:points`：sorted set，member 为 `playerId`，score 为当前周期胜利积分。
+- `agar:leaderboard:{period}:wins`：sorted set 或 hash，保存当前周期胜场，用于积分相同时的第二排序条件。
+- `agar:leaderboard:{period}:players`：hash，保存查询 top N 需要的玩家快照。
+- `agar:leaderboard:current`：当前周期、本地周一日期和榜单时区。
+- `agar:leaderboard:archive:{period}`：上周期 top 100 归档。
+
+排序口径保持：胜利积分降序、胜场降序、玩家标识升序。Redis sorted set 只天然支持单 score 排序，因此查询 top N 时需要从 points zset 取候选集合，再在服务端按完整口径做稳定排序。候选集合大小需要大于 top N；如果同分边界过大，后续应使用 Lua 脚本或扩大候选窗口保证确定性。
+
+## 排行榜 Grain 协调
 
 `ILeaderboardGrain`（`IGrainWithIntegerKey`，固定 key=0，单实例）：
 
-- **写入**：接收 `RecordVictoryPointsAsync(string playerId, int victoryPoints, int winCount)`，在结算后更新该玩家的排行榜索引。
-- **查询**：接收 `GetLeaderboardAsync(int topN)`，按积分降序、胜场降序、玩家标识升序排序后返回 top N。
+- **写入**：接收 `RecordVictoryPointsAsync(string playerId, int victoryPoints, int winCount)`，在结算后调用 Redis 排行榜 store 更新该玩家的当前周期索引。
+- **查询**：接收 `GetLeaderboardAsync(int topN)`，从 Redis 排行榜 store 读取候选集合，按积分降序、胜场降序、玩家标识升序排序后返回 top N。
 - **周期检查**：记录当前周期标识（`yyyy-MM-dd` 格式的本地周一日期）和榜单时区。每次查询或写入时按榜单当地时区检查是否已过周一 00:00，若是则先执行重置。
-- **重置**：归档上周 top 100 到 `WeeklySnapshot`（保留最近两周），清空索引并将索引内玩家的 `VictoryPoints` 归零。后续如果新增全量用户目录，需要把重置扩展为覆盖所有用户。
+- **重置**：归档 Redis 上周 top 100（保留最近两周），切换当前周期 key，并按数据模型要求同步处理用户 grain 中的当前周期胜利积分。
 - **条目结构**：`PlayerId`、`VictoryPoints`、`WinCount`、`Rank`。
 
 ## 积分发放时机
@@ -59,7 +73,7 @@
 2. 根据排名映射胜利积分（1→10, 2→7, 3→5, 4→3, 5→1, 其余 0）。
 3. 过滤 AI 玩家（以 `VictoryPointAwards.BotPrefix` 即 `"AI"` 开头）。
 4. 对剩余玩家调用 `IUserGrain.AddVictoryPointsAsync(points)` 持久化。
-5. 读取用户 profile，并调用 `ILeaderboardGrain.RecordVictoryPointsAsync(...)` 更新排行榜索引。
+5. 读取用户 profile，并调用 `ILeaderboardGrain.RecordVictoryPointsAsync(...)` 更新 Redis 排行榜索引。
 
 ## 当前实现状态
 
@@ -74,6 +88,7 @@
 
 待继续验证：
 
+- 阶段 13：将当前 `LeaderboardGrain` 内部积分索引迁移为 Redis sorted set。
 - 联机实机对局结束后的积分发放和排行榜刷新。
 - 周一当地时间 00:00 后首次查询触发重置的持久化路径。
 - `LeaderboardGrain` 已按榜单当地时区计算周一 00:00 周期；`PeriodStartUtc` 旧字段仅作为兼容字段保留，体验口径使用 `PeriodStartLocalDate`。

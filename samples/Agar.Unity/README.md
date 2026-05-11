@@ -6,6 +6,7 @@
 
 - [玩法与架构设计](docs/GAMEPLAY_DESIGN.md)（总索引，各功能子文档在 `docs/features/` 下）
 - [开发计划](docs/DEVELOPMENT_PLAN.md)
+- [生产上线规划](docs/PRODUCTION_LAUNCH_PLAN.md)
 
 `README.md` 只保留项目入口、运行方式和代码索引；玩法规则、胜利积分系统、客户端服务端边界、联机流程和分布式架构判断都放在 `docs/features/` 下的功能子文档里，避免重复维护。
 

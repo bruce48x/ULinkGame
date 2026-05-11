@@ -101,7 +101,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 1. 阶段 2：完成启动/登录/匹配/结算 UI 的人工视觉回归，确认裁切后的 UI sprite、实时排名面板和运行时布局在 1200x600、960x540 下不再出现视觉边界错位。
 2. 阶段 4：完成第一轮基础美术资产的 Unity 实机验收，确认玩家球、拾取物、背景、UI 基础件、图标、吸收环和出生波纹是否继续沿用或需要重做。
 3. 阶段 5：完成单机和联机全流程手动回归。
-4. 后续进入阶段 7 及之后的清理语义、跨网关路由和测试扩展。
+4. 后续进入阶段 7 及之后的清理语义、跨网关路由、测试扩展和阶段 13 Redis 排行榜迁移。
 
 ### 阶段 2：启动界面视觉修复
 
@@ -322,6 +322,447 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 所有自动化测试通过。
 - 文档中的运行说明和当前代码一致。
 - 不再引用已经删除的文档。
+
+### 阶段 13：Redis Sorted Set 胜利积分排行榜
+
+目标：
+
+- 将胜利积分排行榜的排序索引从 `LeaderboardGrain` 内部状态迁移到 Redis sorted set。
+- 继续保留 `IPlayerService.GetLeaderboardAsync` 作为客户端唯一查询入口，不让 Unity 客户端直接依赖 Redis。
+- 让排行榜实现更接近 Docker 生产部署形态，为后续多 Edge 和生产上线计划打基础。
+
+设计原则：
+
+- 胜利积分发放仍由服务端结算路径触发，客户端不能直接写排行榜。
+- `IUserGrain` 继续保存用户资料、胜场和胜利积分等持久化用户状态。
+- Redis 负责当前周期排行榜索引，不替代用户 profile 存储。
+- `ILeaderboardGrain` 退回为排行榜协调者：周期检查、Redis key 管理、归档、查询聚合和兼容现有 RPC 合同。
+- 排序口径保持不变：胜利积分降序、胜场降序、玩家标识升序。
+
+待办：
+
+- 设计 Redis key：
+  - 当前周期积分 zset：`agar:leaderboard:{period}:points`，member 为 `playerId`，score 为当前周期胜利积分。
+  - 当前周期胜场 zset 或 hash：`agar:leaderboard:{period}:wins`，用于积分相同时的第二排序条件。
+  - 当前周期玩家快照 hash：`agar:leaderboard:{period}:players`，保存查询 top N 所需的 playerId、胜利积分、胜场和显示字段。
+  - 周期元数据 key：`agar:leaderboard:current`，保存当前周期、本地周一日期和时区。
+  - 历史归档 key：`agar:leaderboard:archive:{period}`，保存归档 top 100。
+- 定义排序实现：
+  - 写入时同时更新 points zset、wins zset/hash 和玩家快照。
+  - 查询时从 points zset 取候选集合，再按胜利积分、胜场和玩家标识在服务端内存中做最终稳定排序。
+  - 明确候选 overfetch 规则，避免 top N 边界处大量同分玩家导致排序不稳定；必要时用 Lua 脚本或更大的候选窗口保证确定性。
+- 增加 Redis 配置：
+  - 在 Edge/Silo 配置中增加 Redis connection string、password、database、key prefix、operation timeout。
+  - 本地 compose 继续使用现有 Redis；生产 compose 在生产上线追加计划中补齐持久化和密码。
+  - Redis 不可用时，排行榜写入和查询要返回明确错误或降级结果，不能影响对局结算主流程崩溃。
+- 调整服务端实现：
+  - 新增 Redis 排行榜存储接口，例如 `ILeaderboardStore`。
+  - 实现 `RedisLeaderboardStore`，封装 zset/hash 写入、查询、周期清理和归档读取。
+  - 保留现有 `ILeaderboardGrain` 合同，让它调用 Redis store，而不是继续维护完整积分索引。
+  - `RoomRuntime.PersistMatchEndAsync` 仍按排名调用用户 grain 增加积分，再通过排行榜协调层更新 Redis 索引。
+  - `PlayerService.GetLeaderboardAsync` 对外合同保持不变。
+- 周期重置：
+  - 周期边界仍按榜单当地时间周一 00:00 计算。
+  - 首次查询或写入发现过期时，先归档上个周期 top 100，再切换到新周期 key。
+  - 旧周期 key 设置合理 TTL，只保留最近两周归档。
+  - 明确 Redis 当前榜清空后，用户 grain 中当前周期胜利积分是否同步重置；如果继续把 `UserState.VictoryPoints` 作为当前周期字段，则必须在阶段 13 同步修正重置语义。
+- 兼容迁移：
+  - 为已有 `LeaderboardGrain` 状态提供一次性迁移路径，把当前周期索引写入 Redis。
+  - 迁移完成后，旧 grain 内积分索引只作为兼容读取或废弃，不再作为排行榜主数据源。
+  - README 或功能文档说明本地开发需要 Redis 才能验证排行榜。
+- 测试：
+  - 增加 Redis store 单元或集成测试：写入、累加、top N、同分胜场排序、同分同胜场 playerId 排序。
+  - 增加周期重置测试：周一当地时间切换、归档 top 100、只保留最近两周。
+  - 增加 Redis 不可用测试：写入失败日志、查询失败返回、对局结算不崩溃。
+  - 更新 `LeaderboardGrainTests`，验证 grain 通过 Redis store 返回结果。
+  - 增加 Docker compose Redis 回归步骤。
+- 文档：
+  - 更新 `docs/features/victory-points.md`，把排行榜索引设计改为 Redis sorted set。
+  - 更新 `docs/features/server-architecture.md`，说明 Redis 是胜利积分排行榜当前周期索引的生产组件。
+  - 更新 `PRODUCTION_LAUNCH_PLAN.md` 和本计划中的生产上线追加计划，阶段 13 完成后 P6 不再把 Redis 排行榜职责作为待决项。
+
+验收标准：
+
+- 对局结算后，玩家胜利积分会写入 Redis sorted set 排行榜索引。
+- 客户端通过 `GetLeaderboardAsync` 看到的 top N 来自 Redis 排行榜索引。
+- 排序口径保持胜利积分降序、胜场降序、玩家标识升序。
+- 周一当地时间周期切换会归档上周期 top 100，并切换到新周期 Redis key。
+- Redis 不可用时，服务端有明确日志；排行榜接口返回可解释错误或空结果；对局结算主流程不因排行榜写入失败而整体崩溃。
+- 相关自动化测试通过，并且 Docker 本地 Redis 路径可手动验证。
+
+### 生产上线追加计划
+
+本节排在原阶段计划之后，用于把 `PRODUCTION_LAUNCH_PLAN.md` 落成更细的上线执行任务。除非发现会阻塞前面阶段的安全问题，否则先完成阶段 2 到阶段 13，再按 P0 到 P15 推进生产上线工作。
+
+#### P0：首发范围冻结
+
+目标：
+
+- 锁定首发只交付登录、匹配、对局、结算、胜利积分和排行榜主链路。
+- 防止后续上线准备阶段重新引入任务、商店、记录或复杂玩法。
+
+具体任务：
+
+- P0.1：对照 `GAMEPLAY_DESIGN.md`、`PRODUCTION_LAUNCH_PLAN.md` 和 README，统一首发范围。
+- P0.2：扫描客户端入口、导航按钮和页面跳转，确认任务、商店、记录没有玩家可见路径。
+- P0.3：列出首发必须可玩的用户路径：单机一局、联机登录、匹配、取消匹配、实时对局、结算、排行榜刷新、退出返回。
+- P0.4：列出首发延期项：任务、商店、记录、复杂皮肤、分裂、吐质量、病毒、组队、长期历史榜单。
+- P0.5：在 README 当前状态中说明样例仍处于生产上线准备阶段，不能直接视为生产部署模板。
+
+验收标准：
+
+- 首发范围和延期范围在所有入口文档中一致。
+- 玩家 UI 不展示首发范围外入口。
+- 后续上线任务都能映射到 P0.3 的主链路。
+
+#### P1：Docker 镜像工程
+
+目标：
+
+- 为 Silo 和 Edge 生成可复现、可部署、可回滚的 Docker 镜像。
+
+具体任务：
+
+- P1.1：决定 Dockerfile 结构：两个独立 Dockerfile，或一个支持 `silo` / `edge` target 的多目标 Dockerfile。
+- P1.2：固定 .NET SDK 和 runtime 镜像版本，不使用 floating tag 作为生产基线。
+- P1.3：把 restore、build、publish 和 runtime 分成多阶段构建。
+- P1.4：确保 build context 不依赖开发机绝对路径、`bin`、`obj` 或本地 NuGet 缓存。
+- P1.5：运行容器使用非 root 用户。
+- P1.6：镜像只复制发布产物和必要配置，不把源码、测试产物或本地 secrets 带进 runtime 层。
+- P1.7：定义镜像 tag 规则：`agar-silo:<version>-<sha>`、`agar-edge:<version>-<sha>`。
+- P1.8：写出本地构建命令和 CI 构建命令。
+
+验收标准：
+
+- 干净环境可以构建 Silo 和 Edge 镜像。
+- Silo 和 Edge 镜像可以打印版本信息或启动到配置校验阶段。
+- 镜像不包含生产 secrets，不依赖本地绝对路径。
+
+#### P2：Docker Compose 拓扑
+
+目标：
+
+- 建立可用于小规模生产演练的 Docker Compose 拓扑。
+
+具体任务：
+
+- P2.1：保留现有 `docker-compose.yml` 作为本地 PostgreSQL/Redis 开发基础设施。
+- P2.2：新增生产 compose 或 compose override，加入 `silo`、`edge`、`postgres`、`redis` 和可选反向代理。
+- P2.3：为 PostgreSQL 和 Redis 配置持久化 volume。
+- P2.4：定义 Docker network，区分容器内端口和公网暴露端口。
+- P2.5：明确控制面 WebSocket 端口暴露方式。
+- P2.6：明确 KCP 实时端口暴露方式，按实际传输要求配置 UDP/TCP。
+- P2.7：为 `silo`、`edge`、`postgres`、`redis` 配置 restart 策略。
+- P2.8：为服务之间的启动顺序增加 healthcheck 或显式等待策略，避免只依赖容器启动顺序。
+- P2.9：提供单 Silo + 单 Edge 的 compose 启动命令。
+- P2.10：提供单 Silo + 双 Edge 的 compose 启动命令或 scale 说明。
+
+验收标准：
+
+- 一条 Docker Compose 命令可以启动 PostgreSQL、Redis、Silo 和 Edge。
+- PostgreSQL/Redis 数据写入持久化 volume。
+- 容器重启后服务可以恢复到可连接状态。
+
+#### P3：生产配置与密钥
+
+目标：
+
+- 把开发配置迁移为环境变量驱动，生产 secrets 不写入仓库。
+
+具体任务：
+
+- P3.1：梳理 Silo 必填配置：PostgreSQL 连接串、Orleans ClusterId、ServiceId、AdvertisedIPAddress、SiloPort、GatewayPort。
+- P3.2：梳理 Edge 必填配置：Orleans ClusterId、ServiceId、Edge NodeId、控制面端口、Realtime Host、Realtime Port、Realtime Path。
+- P3.3：梳理业务配置：房间容量、匹配超时、断线保留时间、可靠 push 保留时间、排行榜时区、排行榜归档周期。
+- P3.4：新增或更新 `.env.example`，仅保留开发默认值。
+- P3.5：新增生产 env 模板，所有密码、token secret、公网 host、连接串都要求显式填写。
+- P3.6：让 appsettings 支持环境变量覆盖，不需要改代码即可切换开发和生产类环境。
+- P3.7：定义 secret 管理策略：本地 compose 用 env 文件，生产主机使用受控 secret 文件或部署平台 secret。
+
+验收标准：
+
+- 不改代码即可切换开发 compose 和生产 compose 配置。
+- 仓库中不出现生产密码、生产连接串或 token secret。
+- 缺少生产必填配置时，服务启动失败并给出明确日志。
+
+#### P4：健康检查与生命周期
+
+目标：
+
+- Docker 和运维系统能判断服务是否可启动、可连接、可接流量。
+
+具体任务：
+
+- P4.1：为 Silo 定义健康检查：进程存活、配置有效、PostgreSQL 可连接、Orleans 可启动。
+- P4.2：为 Edge 定义健康检查：进程存活、Orleans client 可连接、控制面 RPC server 可监听、实时端口可监听。
+- P4.3：在 compose 中接入 Silo 和 Edge healthcheck。
+- P4.4：定义优雅停止行为：收到 SIGTERM 后停止接受新连接、清理本地会话、释放房间 runtime。
+- P4.5：验证容器 restart 后不会留下不可恢复的 Orleans membership 或本地注册状态。
+
+验收标准：
+
+- `docker compose ps` 能看到关键容器进入 healthy。
+- 关闭 Edge 容器后，日志中能看到清理路径。
+- 重启 Edge 后可以重新登录并进入匹配。
+
+#### P5：PostgreSQL 迁移、备份与恢复
+
+目标：
+
+- 生产数据库升级和恢复不依赖手工复制 init SQL。
+
+具体任务：
+
+- P5.1：盘点现有 `infra/postgres/init` SQL 的职责和执行顺序。
+- P5.2：选定迁移方式：脚本化 SQL 版本目录、迁移工具，或容器启动前一次性迁移 job。
+- P5.3：建立迁移版本表或等价记录，避免重复执行破坏性 SQL。
+- P5.4：写出初始化新库流程。
+- P5.5：写出从旧版本升级到新版本流程。
+- P5.6：写出 PostgreSQL 备份命令。
+- P5.7：写出 PostgreSQL 恢复演练步骤。
+- P5.8：验证排行榜和 Orleans grain 状态在恢复后可读取。
+
+验收标准：
+
+- 空库可以按脚本初始化。
+- 已初始化库可以安全重复执行迁移入口。
+- 备份文件可以恢复到新 PostgreSQL 实例，并通过 Silo 启动校验。
+
+#### P6：Redis 用途与可靠状态
+
+目标：
+
+- 明确 Redis 在首发中的职责，确保阶段 13 的排行榜 sorted set 方案进入生产部署边界。
+
+具体任务：
+
+- P6.1：确认阶段 13 的 Redis 排行榜 key、TTL、归档和不可用降级策略已经实现并写入配置。
+- P6.2：为 Redis 配置密码、持久化、连接池、operation timeout 和 key prefix。
+- P6.3：确认 Docker compose 中 Redis 开启持久化 volume，不把排行榜当前周期数据写入临时容器层。
+- P6.4：确认 Redis 不可用时排行榜查询返回可解释错误或空结果，对局结算主流程不整体崩溃。
+- P6.5：评估 reliable push outbox 是否也从内存迁移到 Redis、Orleans grain state 或 SQL。
+- P6.6：如果 reliable push 首发仍使用内存 outbox，定义网关重启后的玩家体验和客户端恢复路径。
+- P6.7：明确 Redis 后续是否继续承担跨网关路由、在线状态或限流；未实现的职责不要写成当前能力。
+
+验收标准：
+
+- Redis 在首发中的职责有明确文档：当前至少承担胜利积分排行榜 sorted set。
+- Redis 排行榜路径已由阶段 13 验证通过。
+- reliable push 的进程重启行为有明确验收和玩家体验。
+- Redis 密码和持久化策略进入生产配置。
+
+#### P7：账号安全与会话安全
+
+目标：
+
+- 外部上线前消除明文凭据和基础越权风险。
+
+具体任务：
+
+- P7.1：检查 `UserGrain` 当前账号和密码存储方式。
+- P7.2：将密码改为不可逆哈希存储，选择 salt 和迭代策略。
+- P7.3：为游客登录生成可撤销凭据或明确游客会话生命周期。
+- P7.4：统一 token 生成、过期、刷新和失效策略。
+- P7.5：校验 `playerId` 与 token 的绑定。
+- P7.6：校验 `roomId`、`matchId` 与当前玩家会话的绑定。
+- P7.7：禁止客户端伪造他人输入、房间绑定或排行榜敏感查询。
+- P7.8：为重复登录和顶号行为定义服务端策略与客户端提示。
+
+验收标准：
+
+- 数据库中不保存明文密码。
+- 伪造 playerId/token/roomId/matchId 的请求会被拒绝。
+- 重复登录行为可预期，客户端有中文提示。
+
+#### P8：限流与输入防滥用
+
+目标：
+
+- 防止登录、匹配、排行榜和输入接口被简单滥用拖垮服务。
+
+具体任务：
+
+- P8.1：定义登录尝试限流维度：账号、IP、连接、设备或 token。
+- P8.2：定义匹配和取消匹配的冷却与重复请求处理。
+- P8.3：定义排行榜查询频率限制和客户端缓存刷新间隔。
+- P8.4：定义输入提交最大频率，超过频率时丢弃或采样。
+- P8.5：服务端继续只信任输入方向，不信任客户端位置、质量、速度、排名。
+- P8.6：记录被限流或拒绝的请求日志，避免玩家无反馈。
+
+验收标准：
+
+- 重复点击匹配/取消不会产生重复票据。
+- 高频输入不会让服务端无限排队。
+- 限流触发时服务端有日志，客户端有合理提示或静默降级。
+
+#### P9：日志、指标与告警
+
+目标：
+
+- 上线后能定位玩家无法登录、无法匹配、无法进入房间、结算不发奖等问题。
+
+具体任务：
+
+- P9.1：统一日志字段：playerId、roomId、matchId、edgeNodeId、connectionId、requestId。
+- P9.2：补登录成功/失败日志。
+- P9.3：补匹配入队、取消、超时、成局日志。
+- P9.4：补房间创建、runtime owner、玩家加入、玩家离开、空房释放日志。
+- P9.5：补实时绑定、输入投递失败、世界状态广播失败日志。
+- P9.6：补结算、胜利积分发放、排行榜查询和周重置日志。
+- P9.7：定义指标：在线人数、匹配队列长度、房间数、输入延迟、快照频率、断线率、RPC 错误率、数据库错误率。
+- P9.8：定义告警：Edge/Silo unhealthy、PostgreSQL/Redis 不可用、匹配积压、房间异常退出、错误率升高。
+- P9.9：确认 `docker logs` 能完成最小排障；后续可接入集中日志系统。
+
+验收标准：
+
+- 一次联机完整对局能通过日志串起登录、匹配、房间、结算和发奖。
+- 核心异常路径有错误日志。
+- 告警条件和阈值有文档记录。
+
+#### P10：客户端网络体验补齐
+
+目标：
+
+- 生产环境网络失败时，玩家不会停在无反馈界面。
+
+具体任务：
+
+- P10.1：连接中、重连中、匹配中、取消中显示明确状态。
+- P10.2：控制连接断开时提示并提供重试或返回入口。
+- P10.3：实时连接断开时短暂等待，再进入重连或返回大厅。
+- P10.4：服务器维护或服务不可用时给出中文提示。
+- P10.5：state lost / outbox 过期时清理旧会话，进入新登录或大厅路径。
+- P10.6：可靠推送重复到达时保持幂等，不重复跳转或重复发起实时绑定。
+- P10.7：latest reliable sequence 绑定到当前玩家会话，新会话重置或隔离旧序列。
+- P10.8：所有网络按钮在请求中禁用，失败或超时后恢复。
+
+验收标准：
+
+- 玩家看不到无响应按钮。
+- 控制断线、实时断线、状态丢失都有可回收路径。
+- 重复可靠推送不会造成重复绑定或重复 UI 状态跳转。
+
+#### P11：单网关生产演练
+
+目标：
+
+- 在 Docker 单 Edge 拓扑下完成主链路回归。
+
+具体任务：
+
+- P11.1：用生产 compose 启动 PostgreSQL、Redis、Silo、Edge。
+- P11.2：启动 Unity 客户端，完成游客登录。
+- P11.3：完成匹配、实时绑定和一局对战。
+- P11.4：验证结算和胜利积分发放。
+- P11.5：验证排行榜刷新，并确认排行榜数据来自 Redis sorted set 索引。
+- P11.6：重启 Edge，验证玩家重新登录和匹配。
+- P11.7：重启 Silo，验证服务恢复策略和日志。
+- P11.8：导出本轮日志，确认排障字段齐全。
+
+验收标准：
+
+- Docker 单网关联机完整一局通过。
+- Edge/Silo 重启后的玩家体验符合设计。
+- 日志能定位本轮对局的关键事件。
+
+#### P12：跨网关实时路由设计
+
+目标：
+
+- 在实现前明确多 Edge 下输入、世界状态和断线事件的所有权。
+
+具体任务：
+
+- P12.1：选择网关间事件机制：Orleans stream、Orleans observer 或 Redis 发布订阅。
+- P12.2：定义 room runtime owner 的创建、续租、过期和释放规则。
+- P12.3：定义输入从非 owner Edge 转发到 owner Edge 的消息格式。
+- P12.4：定义世界状态从 owner Edge 扇出到玩家所在 Edge 的消息格式。
+- P12.5：定义断线、登出、取消匹配、离房在跨网关下的事件顺序。
+- P12.6：定义背压策略：输入过期、队列满、慢客户端、广播失败。
+- P12.7：定义重试策略和不可恢复失败的玩家体验。
+- P12.8：更新 `features/server-architecture.md` 和 `GAMEPLAY_DESIGN.md`。
+
+验收标准：
+
+- 设计能解释控制连接在 Edge A、runtime 在 Edge B 的完整路径。
+- 失败行为足够明确，可以编写测试和手动回归步骤。
+- 没有要求序列化实时 RPC callback 对象。
+
+#### P13：跨网关实时路由实现
+
+目标：
+
+- 支持两个 Edge 部署下的真实联机对局。
+
+具体任务：
+
+- P13.1：实现输入转发通道。
+- P13.2：实现世界状态回送通道。
+- P13.3：实现死亡事件和结算事件回送。
+- P13.4：实现 runtime owner 不存在或过期时的失败处理。
+- P13.5：实现跨网关断线、登出和离房清理。
+- P13.6：为路由投递失败、队列背压、owner 过期增加日志。
+- P13.7：增加单元测试或集成测试覆盖路由决策。
+- P13.8：保留单网关路径，不因跨网关路由引入回归。
+
+验收标准：
+
+- 两个 Edge 下，玩家可以分别连接不同 Edge 并完成一局。
+- 世界状态能送达不同 Edge 上的玩家。
+- 关闭一个 Edge 时，受影响玩家有明确失败或重连体验，其他房间不受影响。
+
+#### P14：发布产物与回滚
+
+目标：
+
+- 每次上线都有明确产物、版本、命令和回滚路径。
+
+具体任务：
+
+- P14.1：确定服务端版本号来源。
+- P14.2：生成 Silo 和 Edge 镜像 tag。
+- P14.3：写出 Docker build 命令。
+- P14.4：写出 Docker push/pull 命令。
+- P14.5：写出生产 compose up/down 命令。
+- P14.6：写出查看日志和健康状态命令。
+- P14.7：写出回滚到上一镜像 tag 的步骤。
+- P14.8：写出数据库迁移失败时的停止和恢复策略。
+- P14.9：写出 Unity 客户端构建版本和服务端版本兼容说明。
+
+验收标准：
+
+- 新版本可以按文档部署。
+- 上一版本可以按文档回滚。
+- 版本号能关联到 git commit 和镜像 tag。
+
+#### P15：上线候选验收
+
+目标：
+
+- 把代码、Docker 部署、客户端、测试、文档和运维演练收敛成上线候选版本。
+
+具体任务：
+
+- P15.1：运行 `dotnet build Shared/Shared.csproj -f net10.0`。
+- P15.2：运行 `dotnet build Server/Silo/Silo.csproj`。
+- P15.3：运行 `dotnet build Server/Edge/Edge.csproj`。
+- P15.4：运行 `dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj`。
+- P15.5：执行 Unity 脚本编译检查。
+- P15.6：完成单机完整一局人工回归。
+- P15.7：完成 Docker 单网关联机完整一局人工回归。
+- P15.8：完成 Docker 双 Edge 联机完整一局人工回归。
+- P15.9：完成断线场景回归：匹配中断线、控制连接断开、实时连接断开、Edge 重启、Silo 重启、重复登录。
+- P15.10：完成视觉验收：入口、登录、匹配、大厅、HUD、局内排名、结算、排行榜。
+- P15.11：确认素材、字体和第三方资源许可。
+- P15.12：确认 README、`PRODUCTION_LAUNCH_PLAN.md`、`GAMEPLAY_DESIGN.md` 和功能文档与实现一致。
+- P15.13：完成 PostgreSQL 备份和恢复演练。
+- P15.14：完成发布和回滚演练。
+
+验收标准：
+
+- 所有自动化测试和人工回归通过。
+- Docker 镜像、compose、env 模板、日志、健康检查和回滚步骤可用。
+- 没有阻塞级风险留到上线后处理。
 
 ## 已完成记录
 

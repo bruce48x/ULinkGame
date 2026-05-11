@@ -24,17 +24,31 @@
 - 玩家会话状态。
 - 匹配队列状态。
 - 房间分配和房间快照状态。
-- 排行榜聚合查询（`ILeaderboardGrain`）。
+- 排行榜聚合查询与 Redis 排行榜索引协调（`ILeaderboardGrain`）。
 
 PostgreSQL 是 grain 状态的持久化后端，Silo 通过 sample-local Dapper grain storage provider 读写。
 
 排行榜 grain 职责：
 
-- 接收排行榜查询请求，读取由结算写入维护的排行榜积分索引。
-- 接收结算后的 `RecordVictoryPointsAsync` 写入，更新玩家当前周期积分和胜场。
-- 按积分降序、胜场降序、玩家标识升序排序后返回 top N。
-- 榜单当地时间周一 00:00 触发重置：清空排行榜索引内用户的 `VictoryPoints`，归档上周数据。
-- 排行榜 grain 自身状态存储当前周期本地日期（`CurrentPeriodStartLocalDate`）、兼容旧字段（`CurrentPeriodStartUtc`）、当前周期积分索引和最近两周快照。当前没有全量用户目录，因此重置覆盖的是索引内出现过的玩家；如果后续新增用户目录，需要扩展为全用户重置。
+- 接收排行榜查询请求，读取 Redis sorted set 中由结算写入维护的排行榜积分索引。
+- 接收结算后的 `RecordVictoryPointsAsync` 写入，更新 Redis 当前周期胜利积分 zset、胜场索引和玩家快照。
+- 从 Redis 取候选集合后，按积分降序、胜场降序、玩家标识升序排序后返回 top N。
+- 榜单当地时间周一 00:00 触发重置：归档上周 Redis top 100，切换当前周期 key，并按数据模型要求同步处理用户 grain 中的当前周期胜利积分。
+- 排行榜 grain 自身只保留周期协调和兼容所需状态，不再把完整排行榜排序索引作为主数据源。
+
+## Docker 部署边界
+
+生产环境目标使用 Docker 部署。当前 `docker-compose.yml` 只作为本地开发基础设施，负责启动 PostgreSQL 和 Redis；生产部署还需要补齐 Edge 和 Silo 服务镜像、生产 compose 配置、健康检查、日志、密钥和回滚流程。
+
+生产 Docker 拓扑的目标形态：
+
+- `silo` 容器运行 `Server/Silo/Silo.csproj` 的发布产物，承载 Orleans grains。
+- `edge` 容器运行 `Server/Edge/Edge.csproj` 的发布产物，承载控制面 RPC、实时 RPC 和房间运行时。
+- `postgres` 容器或托管 PostgreSQL 保存 Orleans grain 状态，必须使用持久化 volume 或外部数据库。
+- `redis` 容器或托管 Redis 用于胜利积分排行榜 sorted set；后续也可承载跨网关路由、在线状态或可靠队列，必须启用密码和持久化策略。
+- 可选反向代理或负载均衡负责 WebSocket/TLS 入口；KCP 实时端口需要按传输要求单独暴露。
+
+生产配置必须通过环境变量、env 文件或部署平台 secret 注入，不把生产连接串、数据库密码、Redis 密码、token secret 或公网主机名写死在 `appsettings.json` 中。
 
 ## 联机流程
 
@@ -60,7 +74,7 @@ PostgreSQL 是 grain 状态的持久化后端，Silo 通过 sample-local Dapper 
 1. 客户端在登录后或模式入口界面通过控制面 RPC 请求排行榜。
 2. 网关将请求转发到 `ILeaderboardGrain`。
 3. Leaderboard grain 检查当前周期（若已过周一 00:00 则触发重置）。
-4. 按排行榜索引排序后返回 top N。
+4. Leaderboard grain 从 Redis sorted set 读取候选集合，按排行榜口径排序后返回 top N。
 5. 网关将结果返回客户端渲染。
 
 ## 联机同步边界
@@ -106,7 +120,7 @@ WorldState
 - 客户端收到明确的实时连接目标，不假设控制网关一定拥有房间。
 - 实时绑定不再要求本地已有控制连接回调。
 - 胜利积分存储在用户 grain 中，跨网关读写均通过 Orleans 客户端。
-- 排行榜查询通过控制面 RPC 进入网关，再转发到 singleton `ILeaderboardGrain` key `0`。
+- 排行榜查询通过控制面 RPC 进入网关，再转发到 singleton `ILeaderboardGrain` key `0`，由 grain 协调 Redis sorted set 查询。
 
 仍然局限在单个网关进程内的部分：
 
