@@ -1,0 +1,69 @@
+using System;
+
+namespace ULinkGame.Client.ReliablePush
+{
+    public readonly struct ReliablePushSession : IEquatable<ReliablePushSession>
+    {
+        public ReliablePushSession(string ownerKey, string sessionId, long generation)
+        {
+            if (string.IsNullOrWhiteSpace(ownerKey))
+            {
+                throw new ArgumentException("Owner key is required.", nameof(ownerKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                throw new ArgumentException("Session id is required.", nameof(sessionId));
+            }
+
+            if (generation <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(generation), "Generation must be positive.");
+            }
+
+            OwnerKey = ownerKey;
+            SessionId = sessionId;
+            Generation = generation;
+        }
+
+        public string OwnerKey { get; }
+
+        public string SessionId { get; }
+
+        public long Generation { get; }
+
+        public bool Equals(ReliablePushSession other)
+        {
+            return string.Equals(OwnerKey, other.OwnerKey, StringComparison.Ordinal) &&
+                string.Equals(SessionId, other.SessionId, StringComparison.Ordinal) &&
+                Generation == other.Generation;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is ReliablePushSession other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hash = StringComparer.Ordinal.GetHashCode(OwnerKey);
+                hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(SessionId);
+                hash = (hash * 397) ^ Generation.GetHashCode();
+                return hash;
+            }
+        }
+
+        public static bool operator ==(ReliablePushSession left, ReliablePushSession right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ReliablePushSession left, ReliablePushSession right)
+        {
+            return !left.Equals(right);
+        }
+    }
+}
+

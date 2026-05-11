@@ -104,7 +104,7 @@ builder.Services.AddULinkGameServerReliablePush(options =>
 });
 ```
 
-Publish, replay, and acknowledge records from your own RPC service:
+Publish, replay, and acknowledge records from your own RPC service. The low-level API accepts an owner key:
 
 ```csharp
 using ULinkGame.Server.ReliablePush;
@@ -141,4 +141,91 @@ public sealed class MatchPushService
 }
 ```
 
+When your game has a logical session id and generation, prefer the session-scoped overloads. They prevent an old session acknowledgement from pruning records for a newer session owned by the same player.
+
+```csharp
+using ULinkGame.Server.ReliablePush;
+using ULinkGame.Server.Sessions;
+
+public sealed class MatchPushService
+{
+    private readonly IReliablePushOutbox _outbox;
+    private readonly IReliablePushAckService _acks;
+
+    public MatchPushService(IReliablePushOutbox outbox, IReliablePushAckService acks)
+    {
+        _outbox = outbox;
+        _acks = acks;
+    }
+
+    public ValueTask<long> PublishMatchedAsync(GameSessionKey session, object payload, CancellationToken ct)
+    {
+        return _outbox.PublishAsync(session, "matched", payload, DeliverAsync, ct);
+    }
+
+    public ValueTask ReplayAsync(GameSessionKey session, CancellationToken ct)
+    {
+        return _outbox.ReplayPendingAsync(session, DeliverAsync, ct);
+    }
+
+    public ValueTask<ReliablePushAckOutcome> AckAsync(
+        GameSessionKey currentSession,
+        GameSessionKey acknowledgedSession,
+        long sequence,
+        CancellationToken ct)
+    {
+        return _acks.AckAsync(currentSession, acknowledgedSession, sequence, ct);
+    }
+
+    private static ValueTask DeliverAsync(ReliablePushRecord record)
+    {
+        return ValueTask.CompletedTask;
+    }
+}
+```
+
 The built-in outbox is process-local and in-memory. Replace `IReliablePushOutbox` with a project-specific implementation when pending pushes must survive process restarts.
+
+## Use Session Lifecycle Helpers
+
+Register in-memory session helpers:
+
+```csharp
+using ULinkGame.Server.Sessions;
+
+builder.Services.AddULinkGameServerSessions();
+```
+
+`IGameSessionDirectory` stores session identity, endpoint bindings, and opaque typed callbacks. Endpoint names are application data, so `"control"` and `"realtime"` are sample conventions rather than framework requirements.
+
+For reconnect, use `IGameSessionResumeService` so token validation and authoritative state checks stay in one place:
+
+```csharp
+using ULinkGame.Server.Sessions;
+
+public sealed class PlayerLoginService
+{
+    private readonly IGameSessionResumeService _resume;
+
+    public PlayerLoginService(IGameSessionResumeService resume)
+    {
+        _resume = resume;
+    }
+
+    public async ValueTask<SessionResumeDecision> ResumeAsync(GameSessionKey session, string token, CancellationToken ct)
+    {
+        var decision = await _resume.TryResumeAsync(new GameSessionResumeRequest(session, token), ct);
+
+        return decision.Status switch
+        {
+            SessionResumeStatus.Resumed => decision,
+            SessionResumeStatus.StateRefreshRequired => decision,
+            SessionResumeStatus.StateLost => decision,
+            SessionResumeStatus.Unauthorized => decision,
+            _ => decision
+        };
+    }
+}
+```
+
+Projects can register `IGameSessionTokenValidator` and `IAuthoritativeSessionStateProbe` to decide whether a reconnect is accepted, requires a snapshot refresh, or must start a new session. ULinkGame does not define account models, token formats, room snapshots, or gameplay DTOs.

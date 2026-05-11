@@ -16,7 +16,7 @@ namespace SampleClient.Gameplay
         public bool ControlReconnectInProgress { get; set; }
         public float MatchmakingStartedAt { get; set; } = -1f;
         public RealtimeConnectionInfo? LastRealtimeConnection { get; set; }
-        public ReliablePushTracker ReliablePushTracker { get; } = new();
+        public ReliablePushInbox ReliablePushInbox { get; } = new();
 
         public bool HasPendingUiRequest => PendingUiRequest != PendingUiRequest.None;
         public bool HasRecoverableLogin => SessionMode == SessionMode.Multiplayer && HasAuthenticatedProfile;
@@ -47,19 +47,20 @@ namespace SampleClient.Gameplay
             LocalWinCount = profile.WinCount;
         }
 
-        public void ApplyMultiplayerLogin(string playerId, int winCount)
+        public void ApplyMultiplayerLogin(string playerId, string sessionToken, int winCount)
         {
             LocalPlayerId = playerId;
             SessionMode = SessionMode.Multiplayer;
             ApplyAuthenticatedProfile(playerId, winCount);
-            ReliablePushTracker.Reset();
+            StartReliablePushSession(playerId, sessionToken);
         }
 
-        public void ApplyControlReconnect(string playerId, int winCount)
+        public void ApplyControlReconnect(string playerId, string sessionToken, int winCount)
         {
             LocalPlayerId = playerId;
             SessionMode = SessionMode.Multiplayer;
             ApplyAuthenticatedProfile(playerId, winCount);
+            StartReliablePushSession(playerId, sessionToken);
         }
 
         public void ClearSession()
@@ -84,8 +85,14 @@ namespace SampleClient.Gameplay
 
             if (resetReliablePush)
             {
-                ReliablePushTracker.Reset();
+                ReliablePushInbox.Reset();
             }
+        }
+
+        private void StartReliablePushSession(string playerId, string sessionToken)
+        {
+            var sessionId = string.IsNullOrWhiteSpace(sessionToken) ? playerId : sessionToken;
+            ReliablePushInbox.StartSession(new ReliablePushSession(playerId, sessionId, generation: 1));
         }
     }
 

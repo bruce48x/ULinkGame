@@ -38,7 +38,7 @@ namespace SampleClient.Gameplay
                 }
 
                 var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
-                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.WinCount);
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.WinCount);
                 _localMatch = null;
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
@@ -106,7 +106,7 @@ namespace SampleClient.Gameplay
                 _account = string.IsNullOrWhiteSpace(reply.Account) ? reply.PlayerId : reply.Account;
                 _password = reply.Password;
                 var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
-                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.WinCount);
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.WinCount);
                 _localMatch = null;
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
@@ -197,7 +197,7 @@ namespace SampleClient.Gameplay
                         if (reply.Code == LoginResultCodes.Ok)
                         {
                             var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _authenticatedPlayerId : reply.PlayerId;
-                            _multiplayerState.ApplyControlReconnect(playerId, reply.WinCount);
+                            _multiplayerState.ApplyControlReconnect(playerId, reply.Token, reply.WinCount);
                             EnsureMetaState(_localPlayerId);
                             _ = RefreshLeaderboardAsync();
                             _status = _flowState == FrontendFlowState.InMatch

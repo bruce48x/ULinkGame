@@ -199,7 +199,7 @@ samples/Agar.Unity/
   Client/  Unity client
 
 samples/Agar.Godot/
-  Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
+  Godot .NET client playground that consumes the local ULinkGame.Client project and references Agar.Unity/Shared
 ```
 
 `samples/Agar.Unity` demonstrates:
@@ -1024,11 +1024,60 @@ Test requirements:
 
 This list tracks framework-level gaps only. Do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
 
+### P0 Session Reliability Milestone
+
+These four modules are the highest-priority framework work. Implement them as one dependency chain: explicit state semantics first, session identity second, reliable push session scoping third, and engine-neutral client state last.
+
+#### StateLost Semantics
+
+Status:
+
+- [x] Add framework result enums and outcome types for reconnect/ack decisions.
+- [x] Add reliable push ack decision helper for accepted, duplicate, session mismatch, and state lost outcomes.
+- [x] Add authoritative state probe abstraction for state refresh versus state lost decisions.
+- [ ] Migrate Agar sample login and ack result mapping to framework outcome types.
+- [x] Document replay versus refresh versus new-session behavior in package READMEs.
+
+#### Session Lifecycle
+
+Status:
+
+- [x] Add `ULinkGame.Server.Sessions` session identity, endpoint identity, resume decision, and in-memory directory primitives.
+- [x] Add service registration for the in-memory session directory.
+- [x] Support typed opaque callback bindings by endpoint name.
+- [x] Prevent stale connection ids from detaching newer endpoint bindings.
+- [x] Make session generation changes return `StateLost` instead of silent success.
+- [x] Add token validation hook.
+- [x] Add authoritative state probe integration.
+- [x] Add cleanup hosted service helpers after the directory API stabilizes.
+- [ ] Migrate Agar sample `SessionDirectory`/`PlayerService` to the framework directory.
+
+#### Reliable Push
+
+Status:
+
+- [x] Keep existing in-memory reliable push outbox for publish/replay/ack/prune.
+- [x] Add session/generation-aware ack outcome primitives.
+- [x] Add client `ReliablePushSession`, `ReliablePushSequence`, `ReliablePushAck`, `ReliablePushInbox`, and cursor store primitives.
+- [x] Add tests for duplicate handling, cursor isolation, and old-generation/session mismatch outcomes.
+- [x] Wire server ack helper directly into `IReliablePushOutbox` or an adjacent ack service.
+- [x] Scope server-side pending records to `GameSessionKey` or equivalent generation-bearing identity.
+- [x] Migrate Unity sample from `ReliablePushTracker` to `ReliablePushInbox`.
+- [x] Migrate Godot sample from `ReliablePushTracker` to `ReliablePushInbox`.
+
+#### Engine-Neutral Client State
+
+Status:
+
+- [x] Add `ClientSessionPhase`, `ClientSessionSnapshot`, and `ClientSessionController`.
+- [x] Keep client state helpers synchronous and free of Unity, Godot, transport, generated RPC client, and UI dependencies.
+- [x] Make `StateLost` clear reliable state and remain terminal until `StartSession`.
+- [x] Add deterministic pure transition tests.
+- [x] Add README examples for Unity, Godot, and plain .NET usage.
+- [ ] Migrate sample reconnect/state-lost handling to `ClientSessionController`.
+
 ### Candidate Framework Work
 
-- Generic session lifecycle primitives: `ULinkGame.Server` does not yet own reusable session registration, reconnect/new-session decisions, state-lost result types, token validation hooks, or session/generation-scoped reliable sequence reset rules. The Agar sample still owns these through its `PlayerService`, `SessionDirectory`, and RPC DTOs.
-- Reliable push state results: the outbox can publish, replay, ack, and prune records, but framework APIs do not yet expose ack/reconnect result helpers such as accepted, duplicate, session mismatch, or state lost. The sample still owns its ack RPC and state-lost response shape.
-- Client session helpers: `ULinkGame.Client` currently contains reliable sequence tracking only. It does not yet provide an engine-neutral reconnect/session state machine, state-lost handling helper, or session/generation wrapper around `ReliablePushTracker`.
 - Endpoint model cleanup: `ULinkGame.Server` can host multiple named RPC servers, but `ULinkGame.Tool` still generates a control endpoint and realtime endpoint unconditionally. The tool should eventually offer a simple single-endpoint project shape by default and only generate realtime endpoint code when the selected template explicitly needs realtime multiplayer.
 - Optional realtime routing infrastructure: no framework abstraction exists yet for gateway-to-gateway routing, runtime owner identity, ordered input forwarding, snapshot fanout, or endpoint-level backpressure. If added, this should remain optional infrastructure for realtime multiplayer templates, not a mandatory concept for light online games.
 - Endpoint diagnostics and operations: the framework does not yet provide built-in per-endpoint health checks, readiness signals, structured log event ids, metrics hooks, graceful endpoint shutdown semantics, or standard diagnostics for reliable push and session lifecycle decisions.

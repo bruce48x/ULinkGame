@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-11
+
+### Released
+
+- `ULinkGame.Client` `0.1.4`
+- `ULinkGame.Server` `0.1.4`
+- `ULinkGame.Tool` `0.1.14`
+
+### Changed
+
+- Added framework session lifecycle primitives, reconnect/state-lost outcomes, session-scoped reliable push acknowledgement helpers, and engine-neutral client session state helpers.
+- Migrated Unity and Godot samples to `ReliablePushInbox`.
+- Updated `ULinkGame.Tool` package version constants for generated projects.
+
 ## 2026-05-09
 
 ### Released

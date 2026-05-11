@@ -14,7 +14,7 @@ namespace Agar.Godot.Scripts;
 public partial class Main : Node2D
 {
     private readonly object _gate = new();
-    private readonly ReliablePushTracker _pushTracker = new();
+    private readonly ReliablePushInbox _pushInbox = new();
     private readonly CallbackReceiver _callbackReceiver;
     private AgarNetworkSession? _session;
     private CancellationTokenSource? _cts;
@@ -83,7 +83,7 @@ public partial class Main : Node2D
             worldState = _worldState;
             status = _status;
             localPlayerId = _localPlayerId;
-            reliableSequence = _pushTracker.LastAppliedSequence;
+            reliableSequence = _pushInbox.LastAppliedSequence;
         }
 
         DrawString(
@@ -135,6 +135,10 @@ public partial class Main : Node2D
                 _localPlayerId = login.PlayerId;
                 _status = "Logged in, matchmaking";
             }
+            _pushInbox.StartSession(new ReliablePushSession(
+                login.PlayerId,
+                string.IsNullOrWhiteSpace(login.Token) ? login.PlayerId : login.Token,
+                generation: 1));
 
             await session.StartMatchmakingAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -205,17 +209,48 @@ public partial class Main : Node2D
 
     private void ApplyMatchmakingStatus(MatchmakingStatusUpdate status)
     {
-        var decision = _pushTracker.Decide(status.ReliableSequence);
-        if (!decision.ShouldApply)
+        if (status.ReliableSequence <= 0)
         {
-            if (decision.ShouldAck)
-            {
-                _ = AckReliablePushAsync(decision.Sequence);
-            }
-
+            ApplyMatchmakingStatusPayload(status);
             return;
         }
 
+        _ = ProcessReliableMatchmakingStatusAsync(status);
+    }
+
+    private async Task ProcessReliableMatchmakingStatusAsync(MatchmakingStatusUpdate status)
+    {
+        try
+        {
+            var result = await _pushInbox.ProcessAsync(
+                ReliablePushSequence.From(status.ReliableSequence),
+                status,
+                (payload, _) =>
+                {
+                    ApplyMatchmakingStatusPayload(payload);
+                    return ValueTask.CompletedTask;
+                },
+                async (ack, ct) => await AckReliablePushAsync(ack.Sequence.Value, ct),
+                _cts?.Token ?? CancellationToken.None).ConfigureAwait(false);
+
+            if (result.Acknowledgement is { Status: ReliablePushAckStatus.StateLost or ReliablePushAckStatus.SessionMismatch } acknowledgement)
+            {
+                SetStatus(string.IsNullOrWhiteSpace(acknowledgement.Reason)
+                    ? "Reliable push state lost"
+                    : acknowledgement.Reason);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            GD.PushWarning($"Reliable matchmaking push failed: {ex.Message}");
+        }
+    }
+
+    private void ApplyMatchmakingStatusPayload(MatchmakingStatusUpdate status)
+    {
         lock (_gate)
         {
             _status = status.State switch
@@ -233,12 +268,6 @@ public partial class Main : Node2D
             status.RealtimeConnection is { Transport: RealtimeTransportKind.Kcp } realtimeConnection)
         {
             _ = EnsureRealtimeAsync(CloneRealtimeConnection(realtimeConnection));
-        }
-
-        if (decision.ShouldAck)
-        {
-            _pushTracker.MarkApplied(decision.Sequence);
-            _ = AckReliablePushAsync(decision.Sequence);
         }
     }
 
@@ -272,19 +301,29 @@ public partial class Main : Node2D
         }
     }
 
-    private async Task AckReliablePushAsync(long sequence)
+    private async Task<ReliablePushAckOutcome> AckReliablePushAsync(long sequence, CancellationToken cancellationToken)
     {
         try
         {
-            if (_session != null && _cts != null)
+            if (_session != null)
             {
-                await _session.AckReliablePushAsync(sequence, _cts.Token).ConfigureAwait(false);
+                var reply = await _session.AckReliablePushAsync(sequence, cancellationToken).ConfigureAwait(false);
+                if (reply.RequiresNewSession)
+                {
+                    return ReliablePushAckOutcome.StateLost(reply.Message);
+                }
+
+                return reply.Code == ReliablePushAckResultCodes.Ok
+                    ? ReliablePushAckOutcome.Accepted()
+                    : ReliablePushAckOutcome.Duplicate();
             }
         }
         catch (Exception ex)
         {
             GD.PushWarning($"Reliable push ack failed: {ex.Message}");
         }
+
+        return ReliablePushAckOutcome.Duplicate();
     }
 
     private void OnDisconnected(Exception? ex)

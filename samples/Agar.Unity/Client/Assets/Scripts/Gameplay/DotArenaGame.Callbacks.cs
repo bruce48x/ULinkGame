@@ -2,8 +2,10 @@
 
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Shared.Gameplay;
 using Shared.Interfaces;
+using ULinkGame.Client.ReliablePush;
 using UnityEngine;
 using static SampleClient.Gameplay.DotArenaTuning;
 
@@ -202,17 +204,50 @@ namespace SampleClient.Gameplay
 
         private void HandleMatchmakingStatus(MatchmakingStatusUpdate matchmakingStatus)
         {
-            var reliableDecision = _multiplayerState.ReliablePushTracker.Decide(matchmakingStatus.ReliableSequence);
-            if (!reliableDecision.ShouldApply)
+            if (matchmakingStatus.ReliableSequence <= 0)
             {
-                if (reliableDecision.ShouldAck)
-                {
-                    _ = AckReliablePushAsync(reliableDecision.Sequence);
-                }
-
+                ApplyMatchmakingStatus(matchmakingStatus);
                 return;
             }
 
+            _ = ProcessReliableMatchmakingStatusAsync(matchmakingStatus);
+        }
+
+        private async Task ProcessReliableMatchmakingStatusAsync(MatchmakingStatusUpdate matchmakingStatus)
+        {
+            try
+            {
+                var result = await _multiplayerState.ReliablePushInbox.ProcessAsync(
+                    ReliablePushSequence.From(matchmakingStatus.ReliableSequence),
+                    matchmakingStatus,
+                    (payload, _) =>
+                    {
+                        ApplyMatchmakingStatus(payload);
+                        return ValueTask.CompletedTask;
+                    },
+                    async (ack, _) => await AckReliablePushAsync(ack.Sequence.Value),
+                    _cts.Token);
+
+                if (result.Acknowledgement is { Status: ReliablePushAckStatus.StateLost or ReliablePushAckStatus.SessionMismatch } acknowledgement)
+                {
+                    HandleSessionStateLost(acknowledgement.Reason);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.LogWarning($"[DotArena] Reliable push inbox is not ready: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[DotArena] Reliable matchmaking push failed: {ex.Message}");
+            }
+        }
+
+        private void ApplyMatchmakingStatus(MatchmakingStatusUpdate matchmakingStatus)
+        {
             _sessionMode = SessionMode.Multiplayer;
             _localPlayerId = string.IsNullOrWhiteSpace(_authenticatedPlayerId) ? _localPlayerId : _authenticatedPlayerId;
             if (_matchmakingStartedAt < 0f &&
@@ -247,30 +282,30 @@ namespace SampleClient.Gameplay
             _entryMenuState = viewState.EntryMenuState;
             _status = viewState.Status;
             _eventMessage = viewState.EventMessage;
-
-            if (reliableDecision.ShouldAck)
-            {
-                _multiplayerState.ReliablePushTracker.MarkApplied(reliableDecision.Sequence);
-                _ = AckReliablePushAsync(reliableDecision.Sequence);
-            }
         }
 
-        private async System.Threading.Tasks.Task AckReliablePushAsync(long sequence)
+        private async Task<ReliablePushAckOutcome> AckReliablePushAsync(long sequence)
         {
             try
             {
                 var reply = await NetworkSession.AckReliablePushAsync(sequence, _cts.Token);
                 if (reply.RequiresNewSession)
                 {
-                    HandleSessionStateLost(reply.Message);
+                    return ReliablePushAckOutcome.StateLost(reply.Message);
                 }
+
+                return reply.Code == ReliablePushAckResultCodes.Ok
+                    ? ReliablePushAckOutcome.Accepted()
+                    : ReliablePushAckOutcome.Duplicate();
             }
             catch (OperationCanceledException)
             {
+                throw;
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[DotArena] Reliable push ack failed: {ex.Message}");
+                return ReliablePushAckOutcome.Duplicate();
             }
         }
 

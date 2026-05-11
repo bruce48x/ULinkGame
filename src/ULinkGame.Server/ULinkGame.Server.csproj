@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ULinkGame.Server</RootNamespace>
     <PackageId>ULinkGame.Server</PackageId>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <Description>Server-side hosting helpers, Orleans integration, and reliable push infrastructure for ULinkGame applications.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;server;orleans;rpc;reliable-push</PackageTags>
   </PropertyGroup>
