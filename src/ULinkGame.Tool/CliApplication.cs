@@ -66,7 +66,7 @@ internal sealed class CliApplication(
             return 1;
         }
 
-        await projectScaffolder.AugmentProjectWithULinkGameServerAsync(projectRoot, options).ConfigureAwait(false);
+        await projectScaffolder.AugmentProjectWithULinkGameAsync(projectRoot, options).ConfigureAwait(false);
 
         var configPath = Path.Combine(projectRoot, ProjectConventions.ConfigFileName);
         if (File.Exists(configPath))
@@ -114,8 +114,8 @@ internal sealed class CliApplication(
             ULinkGame.Tool
 
             Commands:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--nugetforunity-source embedded|openupm]
-                  Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server and Microsoft Orleans.
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
+                  Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and Microsoft Orleans.
                   Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
 
               codegen [--config <path>] [--no-restore]

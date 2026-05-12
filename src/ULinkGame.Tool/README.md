@@ -18,19 +18,28 @@
 命令参数面向 ULinkGame 项目创建，并会把可兼容的参数转发给 `ulinkrpc-starter`：
 
 ```bash
-ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network-profile simple --serializer memorypack --nugetforunity-source embedded
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network-profile simple --serializer memorypack --persistence none --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
+该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans、`ULinkGame.Server` 宿主设施与 `ULinkGame.Client` 客户端包引用，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
 
 - `src/ULinkGame.Server/`
+- `src/ULinkGame.Client/`
 - `Server/Silo/` in generated sample projects
 - `Server/Edge/` in generated sample projects
 - 基于 `ULinkGame.Server` 的 edge 启动代码
+- 客户端项目中的 `ULinkGame.Client` 包引用
 - Microsoft Orleans 本地开发配置
 - `ulinkgame.tool.json`
 
-默认生成项目使用 Orleans localhost clustering 和 memory grain storage，不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。生产环境应按项目实际基础设施显式接入 Orleans clustering / storage provider。
+默认生成项目使用 Orleans localhost clustering 和 memory grain storage，不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。需要数据库基础设施时，显式传入：
+
+```bash
+ulinkgame-tool new --name MyGame --persistence postgres
+ulinkgame-tool new --name MyGame --persistence mysql
+```
+
+`--persistence postgres` 会为服务端项目生成 PostgreSQL 连接配置，并加入 `Dapper` / `Npgsql` 包引用；`--persistence mysql` 会生成 MySQL 连接配置，并加入 `Dapper` / `MySqlConnector` 包引用。业务表、账号系统、背包、排行榜等游戏数据 schema 仍由项目自行定义。
 
 最终会在输出目录下生成：
 
@@ -73,6 +82,7 @@ ulinkgame-tool codegen --no-restore
     "transport": "kcp",
     "networkProfile": "simple",
     "serializer": "memorypack",
+    "persistence": "none",
     "nuGetForUnitySource": "embedded"
   },
   "codegen": {
@@ -98,6 +108,7 @@ ulinkgame-tool codegen --no-restore
 运行时能力属于：
 
 - `ULinkGame.Server`
+- `ULinkGame.Client`
 
 项目工具能力属于：
 

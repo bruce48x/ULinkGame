@@ -106,8 +106,10 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeProject()
+    public static string RenderEdgeProject(NewCommandOptions options)
     {
+        var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: false);
+
         return $$"""
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
@@ -128,6 +130,7 @@ internal static class ToolTemplates
 
           <ItemGroup>
             <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
+        {{persistenceReferences}}
           </ItemGroup>
 
           <ItemGroup>
@@ -143,6 +146,7 @@ internal static class ToolTemplates
     {
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var orleansPersistence = RenderOrleansPersistenceSettings(options);
 
         if (!ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
@@ -150,7 +154,7 @@ internal static class ToolTemplates
             {
               "Orleans": {
                 "ClusterId": "dev",
-                "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"
+                "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"{{orleansPersistence}}
               },
               "Endpoint": {
                 "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
@@ -166,7 +170,7 @@ internal static class ToolTemplates
         {
           "Orleans": {
             "ClusterId": "dev",
-            "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"
+            "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"{{orleansPersistence}}
           },
           "ControlPlane": {
             "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
@@ -247,8 +251,10 @@ internal sealed class {typeName}
 }}";
     }
 
-    public static string RenderSiloProject()
+    public static string RenderSiloProject(NewCommandOptions options)
     {
+        var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: true);
+
         return $$"""
         <Project Sdk="Microsoft.NET.Sdk">
           <PropertyGroup>
@@ -263,6 +269,7 @@ internal sealed class {typeName}
           <ItemGroup>
             <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
             <PackageReference Include="Microsoft.Orleans.Server" Version="{{ToolPackageVersions.Orleans}}" />
+        {{persistenceReferences}}
           </ItemGroup>
 
           <ItemGroup>
@@ -309,8 +316,10 @@ internal sealed class {typeName}
         """;
     }
 
-    public static string RenderSiloAppSettings()
+    public static string RenderSiloAppSettings(NewCommandOptions options)
     {
+        var orleansPersistence = RenderOrleansPersistenceSettings(options);
+
         return """
         {
           "Orleans": {
@@ -320,7 +329,10 @@ internal sealed class {typeName}
             "GatewayPort": 30000
           }
         }
-        """;
+        """.Replace(
+            "\"GatewayPort\": 30000",
+            $"\"GatewayPort\": 30000{orleansPersistence}",
+            StringComparison.Ordinal);
     }
 
     public static string RenderDefaultConfigurator(NewCommandOptions options)
@@ -425,6 +437,47 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string GetDefaultPath(string transport, string websocketPath)
     {
         return string.Equals(transport, "websocket", StringComparison.OrdinalIgnoreCase) ? websocketPath : "";
+    }
+
+    private static string RenderPersistencePackageReferences(string persistence, bool includeDapper)
+    {
+        if (!ProjectConventions.UsesExternalPersistence(persistence))
+        {
+            return string.Empty;
+        }
+
+        var references = new List<string>();
+        if (includeDapper)
+        {
+            references.Add($"""<PackageReference Include="Dapper" Version="{ToolPackageVersions.Dapper}" />""");
+        }
+
+        references.Add(string.Equals(persistence, "mysql", StringComparison.OrdinalIgnoreCase)
+            ? $"""<PackageReference Include="MySqlConnector" Version="{ToolPackageVersions.MySqlConnector}" />"""
+            : $"""<PackageReference Include="Npgsql" Version="{ToolPackageVersions.Npgsql}" />""");
+
+        return TemplateText.IndentBlock(string.Join(Environment.NewLine, references), 3);
+    }
+
+    private static string RenderOrleansPersistenceSettings(NewCommandOptions options)
+    {
+        if (!ProjectConventions.UsesExternalPersistence(options.Persistence))
+        {
+            return string.Empty;
+        }
+
+        var (invariant, connectionString) = GetPersistenceDefaults(options);
+        return $",{Environment.NewLine}" +
+            $"    \"Invariant\": \"{TemplateText.SanitizeStringLiteral(invariant)}\",{Environment.NewLine}" +
+            $"    \"ConnectionString\": \"{TemplateText.SanitizeStringLiteral(connectionString)}\"";
+    }
+
+    private static (string Invariant, string ConnectionString) GetPersistenceDefaults(NewCommandOptions options)
+    {
+        var databaseName = TemplateText.SanitizeCSharpIdentifier(options.Name ?? ProjectConventions.DefaultProjectName).ToLowerInvariant();
+        return string.Equals(options.Persistence, "mysql", StringComparison.OrdinalIgnoreCase)
+            ? ("MySqlConnector", $"Server=127.0.0.1;Port=3306;Database={databaseName};User ID=ulinkgame;Password=ulinkgame;")
+            : ("Npgsql", $"Host=127.0.0.1;Port=5432;Database={databaseName};Username=ulinkgame;Password=ulinkgame;");
     }
 
     private static string RenderDefaultAcceptor(string transport)

@@ -1,17 +1,81 @@
 internal sealed class ProjectScaffolder
 {
-    public async Task AugmentProjectWithULinkGameServerAsync(string projectRoot, NewCommandOptions options)
+    public async Task AugmentProjectWithULinkGameAsync(string projectRoot, NewCommandOptions options)
     {
         await MoveStarterServerProjectToEdgeAsync(projectRoot).ConfigureAwait(false);
+        await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
         await WriteDotNetToolManifestAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteEdgeProgramAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteSiloProjectAsync(projectRoot).ConfigureAwait(false);
+        await WriteSiloProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteSiloProgramAsync(projectRoot).ConfigureAwait(false);
-        await WriteSiloAppSettingsAsync(projectRoot).ConfigureAwait(false);
+        await WriteSiloAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
+    }
+
+    private static Task WriteClientPackageReferenceAsync(string projectRoot, NewCommandOptions options)
+    {
+        return ProjectConventions.IsGodot(options.ClientEngine)
+            ? WriteGodotClientPackageReferenceAsync(projectRoot)
+            : WriteUnityClientPackageReferenceAsync(projectRoot);
+    }
+
+    private static async Task WriteGodotClientPackageReferenceAsync(string projectRoot)
+    {
+        var clientDirectory = Path.Combine(projectRoot, "Client");
+        if (!Directory.Exists(clientDirectory))
+        {
+            return;
+        }
+
+        var projectFiles = Directory.EnumerateFiles(clientDirectory, "*.csproj", SearchOption.TopDirectoryOnly).ToArray();
+        if (projectFiles.Length == 0)
+        {
+            return;
+        }
+
+        if (projectFiles.Length > 1)
+        {
+            throw new InvalidOperationException($"Multiple client project files were found in: {clientDirectory}");
+        }
+
+        var path = projectFiles[0];
+        var document = System.Xml.Linq.XDocument.Load(path);
+        var project = document.Root ?? throw new InvalidOperationException($"Invalid project file: {path}");
+
+        EnsurePackageReference(project, "ULinkGame.Client", ToolPackageVersions.ULinkGameClient);
+
+        await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
+    }
+
+    private static async Task WriteUnityClientPackageReferenceAsync(string projectRoot)
+    {
+        var path = Path.Combine(projectRoot, "Client", "Assets", "packages.config");
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? projectRoot);
+
+        System.Xml.Linq.XDocument document;
+        if (File.Exists(path))
+        {
+            document = System.Xml.Linq.XDocument.Load(path);
+        }
+        else
+        {
+            document = new System.Xml.Linq.XDocument(
+                new System.Xml.Linq.XDeclaration("1.0", "utf-8", null),
+                new System.Xml.Linq.XElement("packages"));
+        }
+
+        var packages = document.Root ?? throw new InvalidOperationException($"Invalid packages.config file: {path}");
+        if (!string.Equals(packages.Name.LocalName, "packages", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Invalid packages.config root element in: {path}");
+        }
+
+        EnsureNuGetForUnityPackage(packages, "ULinkGame.Client", ToolPackageVersions.ULinkGameClient);
+
+        await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
 
     private static Task WriteDotNetToolManifestAsync(string projectRoot)
@@ -101,7 +165,7 @@ internal sealed class ProjectScaffolder
         var path = Path.Combine(projectRoot, "Server", "Edge", "Edge.csproj");
         if (!File.Exists(path))
         {
-            await WriteAsync(path, ToolTemplates.RenderEdgeProject()).ConfigureAwait(false);
+            await WriteAsync(path, ToolTemplates.RenderEdgeProject(options)).ConfigureAwait(false);
             return;
         }
 
@@ -119,6 +183,7 @@ internal sealed class ProjectScaffolder
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
+        EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: false);
         EnsureNoneUpdate(project, "appsettings.json", "PreserveNewest");
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
@@ -149,11 +214,11 @@ internal sealed class ProjectScaffolder
             WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options)));
     }
 
-    private static Task WriteSiloProjectAsync(string projectRoot)
+    private static Task WriteSiloProjectAsync(string projectRoot, NewCommandOptions options)
     {
         var siloDirectory = Path.Combine(projectRoot, "Server", "Silo");
         Directory.CreateDirectory(siloDirectory);
-        return WriteAsync(Path.Combine(siloDirectory, "Silo.csproj"), ToolTemplates.RenderSiloProject());
+        return WriteAsync(Path.Combine(siloDirectory, "Silo.csproj"), ToolTemplates.RenderSiloProject(options));
     }
 
     private static Task WriteSiloProgramAsync(string projectRoot)
@@ -161,9 +226,9 @@ internal sealed class ProjectScaffolder
         return WriteAsync(Path.Combine(projectRoot, "Server", "Silo", "Program.cs"), ToolTemplates.RenderSiloProgram());
     }
 
-    private static Task WriteSiloAppSettingsAsync(string projectRoot)
+    private static Task WriteSiloAppSettingsAsync(string projectRoot, NewCommandOptions options)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Silo", "appsettings.json"), ToolTemplates.RenderSiloAppSettings());
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Silo", "appsettings.json"), ToolTemplates.RenderSiloAppSettings(options));
     }
 
     private static Task WriteAsync(string path, string content)
@@ -238,6 +303,47 @@ internal sealed class ProjectScaffolder
         }
 
         reference.SetAttributeValue("Version", version);
+    }
+
+    private static void EnsurePersistenceProviderReference(System.Xml.Linq.XElement project, string persistence, bool includeDapper)
+    {
+        if (!ProjectConventions.UsesExternalPersistence(persistence))
+        {
+            return;
+        }
+
+        if (includeDapper)
+        {
+            EnsurePackageReference(project, "Dapper", ToolPackageVersions.Dapper);
+        }
+
+        if (string.Equals(persistence, "mysql", StringComparison.OrdinalIgnoreCase))
+        {
+            EnsurePackageReference(project, "MySqlConnector", ToolPackageVersions.MySqlConnector);
+            return;
+        }
+
+        EnsurePackageReference(project, "Npgsql", ToolPackageVersions.Npgsql);
+    }
+
+    private static void EnsureNuGetForUnityPackage(System.Xml.Linq.XElement packages, string id, string version)
+    {
+        var package = packages
+            .Elements("package")
+            .FirstOrDefault(element => string.Equals(element.Attribute("id")?.Value, id, StringComparison.OrdinalIgnoreCase));
+
+        if (package is null)
+        {
+            packages.Add(new System.Xml.Linq.XElement(
+                "package",
+                new System.Xml.Linq.XAttribute("id", id),
+                new System.Xml.Linq.XAttribute("version", version),
+                new System.Xml.Linq.XAttribute("manuallyInstalled", "true")));
+            return;
+        }
+
+        package.SetAttributeValue("version", version);
+        package.SetAttributeValue("manuallyInstalled", "true");
     }
 
     private static void EnsureNoneUpdate(System.Xml.Linq.XElement project, string update, string copyToOutputDirectory)

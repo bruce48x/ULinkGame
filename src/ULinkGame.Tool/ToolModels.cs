@@ -6,6 +6,7 @@ internal static class ProjectConventions
     public const string DefaultTransport = "kcp";
     public const string DefaultNetworkProfile = "simple";
     public const string DefaultSerializer = "memorypack";
+    public const string DefaultPersistence = "none";
     public const string DefaultNuGetForUnitySource = "embedded";
     public const string StarterServerProjectPath = "Server/Server";
     public const string EdgeProjectPath = "Server/Edge";
@@ -16,6 +17,7 @@ internal static class ProjectConventions
     public static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
     public static readonly string[] SupportedNetworkProfiles = ["simple", "realtime"];
     public static readonly string[] SupportedSerializers = ["json", "memorypack"];
+    public static readonly string[] SupportedPersistence = ["none", "mysql", "postgres"];
     public static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];
 
     public static bool IsGodot(string clientEngine)
@@ -27,11 +29,19 @@ internal static class ProjectConventions
     {
         return string.Equals(networkProfile, "realtime", StringComparison.OrdinalIgnoreCase);
     }
+
+    public static bool UsesExternalPersistence(string persistence)
+    {
+        return !string.Equals(persistence, DefaultPersistence, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 internal static partial class ToolPackageVersions
 {
     public const string ULinkRpcStarter = "0.2.58";
+    public const string Dapper = "2.1.72";
+    public const string MySqlConnector = "2.5.0";
+    public const string Npgsql = "10.0.2";
     public const string Orleans = "10.0.0";
 }
 
@@ -51,6 +61,7 @@ internal sealed class ToolConfig
                 Transport = options.Transport,
                 NetworkProfile = options.NetworkProfile,
                 Serializer = options.Serializer,
+                Persistence = options.Persistence,
                 NuGetForUnitySource = options.NuGetForUnitySource
             },
             Codegen = new CodegenConfig
@@ -87,6 +98,7 @@ internal sealed class ProjectConfig
     public string Transport { get; set; } = ProjectConventions.DefaultTransport;
     public string NetworkProfile { get; set; } = ProjectConventions.DefaultNetworkProfile;
     public string Serializer { get; set; } = ProjectConventions.DefaultSerializer;
+    public string Persistence { get; set; } = ProjectConventions.DefaultPersistence;
     public string NuGetForUnitySource { get; set; } = ProjectConventions.DefaultNuGetForUnitySource;
 }
 
@@ -104,6 +116,7 @@ internal readonly record struct NewCommandOptions(
     string Transport,
     string NetworkProfile,
     string Serializer,
+    string Persistence,
     string NuGetForUnitySource);
 
 internal readonly record struct RegenerateCodeOptions(string? ConfigPath, bool NoRestore);

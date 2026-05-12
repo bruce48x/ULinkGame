@@ -8,6 +8,7 @@
 - `ULinkGame.Client` `0.1.5`
 - `ULinkGame.Server` `0.1.5`
 - `ULinkGame.Tool` `0.1.16`
+- `ULinkGame.Tool` `0.1.17`
 
 ### Changed
 
@@ -17,6 +18,8 @@
 - Moved shared `GameSessionKey`, `GameEndpointName`, `ReliablePushSequence`, reliable push acknowledgement outcomes, and session resume outcomes out of server/client-only namespaces.
 - Changed `ULinkGame.Tool` to generate its ULinkGame runtime package version constants from the Server and Client project versions during build.
 - Changed `ULinkGame.Tool` project templates to default to one RPC endpoint and require `--network-profile realtime` for separate control and realtime endpoints.
+- Changed `ULinkGame.Tool` project initialization to add `ULinkGame.Client` to generated Unity and Godot client projects.
+- Added `ULinkGame.Tool new --persistence none|mysql|postgres`; MySQL/PostgreSQL profiles add Dapper plus the selected database provider package to generated server projects.
 
 ## 2026-05-11
 

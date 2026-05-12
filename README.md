@@ -68,7 +68,7 @@ Use `ULinkGame.Tool` to create a starter project instead of wiring the runtime p
 
 ```powershell
 dotnet tool install --global ULinkGame.Tool
-ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --persistence none
 ```
 
 The tool creates a ULinkRPC-based project, prepares Microsoft Orleans hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation. By default it generates one RPC endpoint using the selected transport; pass `--network-profile realtime` when you want separate control and realtime endpoints.

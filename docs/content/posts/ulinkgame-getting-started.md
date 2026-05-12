@@ -49,7 +49,7 @@ dotnet tool install --global ULinkGame.Tool
 创建项目：
 
 ```powershell
-ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --persistence none
 ```
 
 生成的项目会使用 ULinkRPC starter 创建基础 RPC 项目，并补充 Microsoft Orleans 配置、ULinkGame server hosting 和可靠业务推送基础设施。
