@@ -2,9 +2,9 @@ using Orleans;
 using Orleans.Contracts.Leaderboard;
 using Orleans.Contracts.Users;
 using Orleans.Runtime;
-using ULinkRPC.Sample.Silo.Persistence;
+using ULinkGame.Sample.Silo.Persistence;
 
-namespace ULinkRPC.Sample.Silo.Leaderboard;
+namespace ULinkGame.Sample.Silo.Leaderboard;
 
 [GenerateSerializer]
 public sealed class LeaderboardState

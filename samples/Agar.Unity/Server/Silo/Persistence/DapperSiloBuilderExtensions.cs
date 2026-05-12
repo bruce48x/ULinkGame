@@ -4,7 +4,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-namespace ULinkRPC.Sample.Silo.Persistence;
+namespace ULinkGame.Sample.Silo.Persistence;
 
 public static class DapperSiloBuilderExtensions
 {

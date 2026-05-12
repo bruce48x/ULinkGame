@@ -1,5 +1,5 @@
 using Orleans.Contracts.Matchmaking;
-using ULinkRPC.Sample.Silo.Matchmaking;
+using ULinkGame.Sample.Silo.Matchmaking;
 using Xunit;
 
 namespace Agar.Unity.Tests;

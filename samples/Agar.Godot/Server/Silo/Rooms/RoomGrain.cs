@@ -4,7 +4,7 @@ using Orleans.Contracts.Rooms;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
 
-namespace ULinkRPC.Sample.Silo.Rooms;
+namespace ULinkGame.Sample.Silo.Rooms;
 
 public sealed class RoomGrain : Grain, IRoomGrain
 {

@@ -1,6 +1,6 @@
 using Orleans.Storage;
 
-namespace ULinkRPC.Sample.Silo.Persistence;
+namespace ULinkGame.Sample.Silo.Persistence;
 
 public sealed class DapperGrainStorageOptions : IStorageProviderSerializerOptions
 {

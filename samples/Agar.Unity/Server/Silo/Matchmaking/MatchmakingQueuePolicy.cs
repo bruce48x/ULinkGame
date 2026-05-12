@@ -1,6 +1,6 @@
 using Orleans.Contracts.Matchmaking;
 
-namespace ULinkRPC.Sample.Silo.Matchmaking;
+namespace ULinkGame.Sample.Silo.Matchmaking;
 
 public static class MatchmakingQueuePolicy
 {

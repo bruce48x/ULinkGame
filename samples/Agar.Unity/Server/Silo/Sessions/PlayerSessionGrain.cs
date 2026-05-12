@@ -2,9 +2,9 @@ using Orleans;
 using Orleans.Contracts;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
-using ULinkRPC.Sample.Silo.Persistence;
+using ULinkGame.Sample.Silo.Persistence;
 
-namespace ULinkRPC.Sample.Silo.Sessions;
+namespace ULinkGame.Sample.Silo.Sessions;
 
 public sealed class PlayerSessionGrain : Grain, IPlayerSessionGrain
 {

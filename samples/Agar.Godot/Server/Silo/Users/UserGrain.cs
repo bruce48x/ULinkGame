@@ -4,7 +4,7 @@ using Orleans.Runtime;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace ULinkRPC.Sample.Silo.Users;
+namespace ULinkGame.Sample.Silo.Users;
 
 [GenerateSerializer]
 public sealed class UserState

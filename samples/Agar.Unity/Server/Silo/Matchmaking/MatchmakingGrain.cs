@@ -4,9 +4,9 @@ using Orleans.Contracts.Matchmaking;
 using Orleans.Contracts.Rooms;
 using Orleans.Contracts.Sessions;
 using Orleans.Runtime;
-using ULinkRPC.Sample.Silo.Persistence;
+using ULinkGame.Sample.Silo.Persistence;
 
-namespace ULinkRPC.Sample.Silo.Matchmaking;
+namespace ULinkGame.Sample.Silo.Matchmaking;
 
 public sealed class MatchmakingGrain : Grain, IMatchmakingGrain
 {

@@ -1,6 +1,6 @@
 extern alias SiloAssembly;
 
-using SiloAssembly::ULinkRPC.Sample.Silo.Leaderboard;
+using SiloAssembly::ULinkGame.Sample.Silo.Leaderboard;
 using Xunit;
 
 namespace Agar.Unity.Tests;

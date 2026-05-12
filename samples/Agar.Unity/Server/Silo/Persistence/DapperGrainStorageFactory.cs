@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Storage;
 
-namespace ULinkRPC.Sample.Silo.Persistence;
+namespace ULinkGame.Sample.Silo.Persistence;
 
 internal static class DapperGrainStorageFactory
 {

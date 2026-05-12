@@ -6,7 +6,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-namespace ULinkRPC.Sample.Silo.Persistence;
+namespace ULinkGame.Sample.Silo.Persistence;
 
 public sealed class DapperGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {

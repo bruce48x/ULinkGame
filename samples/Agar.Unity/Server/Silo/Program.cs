@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using ULinkGame.Server.Hosting;
-using ULinkRPC.Sample.Silo.Persistence;
+using ULinkGame.Sample.Silo.Persistence;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration(configuration =>

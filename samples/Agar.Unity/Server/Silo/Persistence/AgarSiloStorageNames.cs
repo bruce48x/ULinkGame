@@ -1,4 +1,4 @@
-namespace ULinkRPC.Sample.Silo.Persistence;
+namespace ULinkGame.Sample.Silo.Persistence;
 
 internal static class AgarSiloStorageNames
 {
