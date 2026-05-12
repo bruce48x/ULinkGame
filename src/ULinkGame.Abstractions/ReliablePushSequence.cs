@@ -1,6 +1,6 @@
 using System;
 
-namespace ULinkGame.Client.ReliablePush
+namespace ULinkGame.Abstractions
 {
     public readonly struct ReliablePushSequence : IEquatable<ReliablePushSequence>
     {
@@ -37,4 +37,3 @@ namespace ULinkGame.Client.ReliablePush
         }
     }
 }
-

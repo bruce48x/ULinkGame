@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Server.Sessions;
 
 public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
@@ -214,4 +216,3 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         }
     }
 }
-

@@ -18,8 +18,15 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 
 ## What You Get
 
+`ULinkGame.Abstractions` provides cross-side framework primitives:
+
+- shared session identity
+- reliable push sequence values
+- reliable push acknowledgement status values
+
 `ULinkGame.Server` provides server-side hosting helpers:
 
+- one main server entry point for sessions, endpoint bindings, and reliable push
 - ULinkRPC server lifecycle integration with .NET hosting
 - Orleans client and silo integration helpers
 - multiple named RPC server configurators for control/realtime endpoints
@@ -28,6 +35,7 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 
 `ULinkGame.Client` provides engine-neutral client helpers:
 
+- one main client entry point for reconnect state and reliable push processing
 - reliable push sequence tracking
 - duplicate/stale push filtering
 - reusable state primitives that work in Unity, Godot, or plain .NET
@@ -73,9 +81,11 @@ For the full walkthrough, see [ULinkGame getting started](https://bruce48x.githu
 
 ## Package Guide
 
-Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, Microsoft Orleans integration, or reliable push delivery.
+Use `ULinkGame.Abstractions` in shared code when you need framework-owned session and reliable push primitives.
 
-Use `ULinkGame.Client` in client-side code when you need reliable push tracking independent of Unity or Godot.
+Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, Microsoft Orleans integration, session lifecycle, endpoint callback bindings, or reliable push delivery.
+
+Use `ULinkGame.Client` in client-side code when you need reconnect state and reliable push tracking independent of Unity or Godot.
 
 Use `ULinkGame.Tool` when creating or maintaining a ULinkGame project layout.
 

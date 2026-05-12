@@ -1,16 +1,17 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ULinkGame.Abstractions;
 
 namespace ULinkGame.Client.ReliablePush
 {
     public sealed class InMemoryReliablePushCursorStore : IReliablePushCursorStore
     {
         private readonly object _gate = new object();
-        private readonly Dictionary<ReliablePushSession, long> _sequences = new Dictionary<ReliablePushSession, long>();
+        private readonly Dictionary<GameSessionKey, long> _sequences = new Dictionary<GameSessionKey, long>();
 
         public ValueTask<long> LoadAsync(
-            ReliablePushSession session,
+            GameSessionKey session,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -21,7 +22,7 @@ namespace ULinkGame.Client.ReliablePush
         }
 
         public ValueTask SaveAsync(
-            ReliablePushSession session,
+            GameSessionKey session,
             long sequence,
             CancellationToken cancellationToken = default)
         {
@@ -35,7 +36,7 @@ namespace ULinkGame.Client.ReliablePush
         }
 
         public ValueTask ClearAsync(
-            ReliablePushSession session,
+            GameSessionKey session,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -48,4 +49,3 @@ namespace ULinkGame.Client.ReliablePush
         }
     }
 }
-

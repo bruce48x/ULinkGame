@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Server.Sessions;
 
 public sealed record SessionResumeDecision(

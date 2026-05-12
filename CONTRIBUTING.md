@@ -6,6 +6,7 @@ This document is for people working on the ULinkGame repository itself. User-fac
 
 ```txt
 src/
+  ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
   ULinkGame.Server/       Server-side hosting, Microsoft Orleans integration, reliable push outbox
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Tool/         Project management tool entry point
@@ -33,6 +34,7 @@ User-facing articles live in the Hugo site under root `docs/`. Repository-level 
 
 `ULinkGame.Server` is the server-side framework package. It currently owns:
 
+- the `IULinkGameServer` main entry point for session, endpoint, and reliable push workflows
 - hosting helpers for ULinkRPC server lifecycle
 - Orleans client and silo integration helpers
 - a generic reliable push outbox for business-level server push delivery
@@ -42,9 +44,17 @@ It should stay infrastructure-oriented. Matchmaking rules, room rules, user DTOs
 
 ### ULinkGame.Client
 
-`ULinkGame.Client` is an engine-neutral client helper package. It currently contains reliable push sequence tracking that can be reused by Unity, Godot, or plain .NET clients.
+`ULinkGame.Client` is an engine-neutral client helper package. It currently contains the `ULinkGameClient` main entry point plus lower-level reliable push and reconnect state helpers that can be reused by Unity, Godot, or plain .NET clients.
 
-This repository intentionally does not introduce `ULinkGame.Shared` or `ULinkGame.Unity` yet. User-owned contracts still belong in a game `Shared` project, and Unity-specific wrappers should wait until repeated integration code becomes stable enough to justify a package.
+### ULinkGame.Abstractions
+
+`ULinkGame.Abstractions` owns cross-side framework concepts that must be named and interpreted the same way by server and client packages:
+
+- `GameSessionKey`
+- `ReliablePushSequence`
+- reliable push acknowledgement status values
+
+It must stay small. User-owned contracts still belong in a game `Shared` project, and Unity-specific wrappers should wait until repeated integration code becomes stable enough to justify a package.
 
 ### ULinkGame.Tool
 
@@ -56,7 +66,7 @@ ulinkgame-tool
 
 It is separate from runtime packages. Runtime code belongs in `ULinkGame.Server` or `ULinkGame.Client`; project scaffolding and maintenance commands belong in the tool.
 
-Package README files under `src/ULinkGame.Tool`, `src/ULinkGame.Server`, and `src/ULinkGame.Client` are user-facing package documentation. Keep contributor-only implementation policy, maintenance boundaries, release process, and design decisions in this `CONTRIBUTING.md` file instead of package README files.
+Package README files under `src/ULinkGame.Abstractions`, `src/ULinkGame.Tool`, `src/ULinkGame.Server`, and `src/ULinkGame.Client` are user-facing package documentation. Keep contributor-only implementation policy, maintenance boundaries, release process, and design decisions in this `CONTRIBUTING.md` file instead of package README files.
 
 #### ULinkGame.Tool Starter Boundary
 
@@ -100,6 +110,7 @@ Rename the framework family to `ULinkGame`.
 
 The first package split is:
 
+- `ULinkGame.Abstractions`
 - `ULinkGame.Server`
 - `ULinkGame.Client`
 
@@ -118,9 +129,11 @@ Do not introduce `ULinkGame.Unity` yet.
 
 This keeps the product line understandable without forcing a thick game framework.
 
-### Why Not ULinkGame.Shared Now
+### Why ULinkGame.Abstractions, Not ULinkGame.Shared
 
-A third shared package raises the first-time learning cost. Users already have:
+`ULinkGame.Abstractions` exists because session identity, reliable push sequence values, and acknowledgement outcomes are now genuinely shared framework concepts. Keeping these types in either `ULinkGame.Server` or `ULinkGame.Client` makes the opposite side depend on the wrong runtime package.
+
+Do not rename this package to `ULinkGame.Shared`. Users already have:
 
 - `ULinkRPC`
 - their own shared RPC contract project
@@ -136,7 +149,7 @@ For now, shared business contracts should remain in the user's own shared projec
 - reliable sequence fields on business messages
 - app-specific result codes
 
-If cross-side framework abstractions become stable and numerous, introduce `ULinkGame.Abstractions` later. Prefer `Abstractions` over `Shared`, because it communicates framework-owned contracts instead of user-owned game DTOs.
+`ULinkGame.Abstractions` communicates framework-owned contracts only. Keep it limited to primitives that both runtime packages need.
 
 ### Why Not ULinkGame.Unity Now
 
@@ -178,9 +191,9 @@ Unity sample code should remain responsible for:
 
 ### Migration Plan
 
-1. Keep reusable framework code under `src/ULinkGame.Server`, `src/ULinkGame.Client`, and `src/ULinkGame.Tool`.
+1. Keep reusable framework code under `src/ULinkGame.Abstractions`, `src/ULinkGame.Server`, `src/ULinkGame.Client`, and `src/ULinkGame.Tool`.
 2. Keep sample-owned `Shared`, `Server`, and `Client` projects under `samples/Agar.Unity`.
-3. Keep business DTOs in the sample or consuming game's `Shared` project until a real `ULinkGame.Abstractions` need appears.
+3. Keep business DTOs in the sample or consuming game's `Shared` project.
 4. Keep cross-package framework decisions in this guide, package-specific design with the owning package when the scope is local, and sample design under `samples/Agar.Unity/docs`.
 5. Replace sample-local reliable sequence bookkeeping with `ULinkGame.Client` where practical.
 
@@ -239,6 +252,7 @@ Open `samples/Agar.Godot` in Godot 4 .NET for the Godot client playground.
 Build framework projects:
 
 ```powershell
+dotnet build src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj
 dotnet build src/ULinkGame.Server/ULinkGame.Server.csproj
 dotnet build src/ULinkGame.Client/ULinkGame.Client.csproj
 dotnet build src/ULinkGame.Tool/ULinkGame.Tool.csproj
@@ -274,6 +288,7 @@ The workflow uses .NET `10.0.x`, restores all test and package projects, runs th
 
 The packages currently published by this workflow are:
 
+- `ULinkGame.Abstractions`, versioned in `src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj`
 - `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
 - `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
 - `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
@@ -292,6 +307,7 @@ Useful local checks:
 
 ```powershell
 dotnet test Tests/tests.slnx
+dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
@@ -484,7 +500,7 @@ Implementation points:
 
 ## ULinkGame.Client API Direction
 
-`ULinkGame.Client` currently exposes only low-level reliable push primitives. `ReliablePushTracker.Decide(...)`, `MarkApplied(...)`, and `Reset()` are useful building blocks, but they make application code manually preserve the correct order:
+`ULinkGame.Client` should expose `ULinkGameClient` as the recommended main entry point. `ReliablePushTracker.Decide(...)`, `MarkApplied(...)`, `Reset()`, and `ReliablePushInbox` remain useful lower-level building blocks, but application code should not have to manually preserve the correct order:
 
 1. decide whether a push is new
 2. apply the business payload
@@ -492,23 +508,20 @@ Implementation points:
 4. acknowledge the latest applied sequence
 5. react to state-lost or session-mismatch acknowledgement results
 
-That order is easy to get wrong. Future client APIs should keep the low-level primitives, but add a higher-level inbox/session layer that makes the correct flow natural.
+That order is easy to get wrong. The main client API should keep the low-level primitives available, but make the correct inbox/session flow natural.
 
 The preferred shape is:
 
 ```csharp
-public sealed class ReliablePushInbox
+public sealed class ULinkGameClient
 {
-    public ReliablePushSession? CurrentSession { get; }
-    public long LastAppliedSequence { get; }
+    public ClientSessionSnapshot Snapshot { get; }
 
-    public void StartSession(ReliablePushSession session, long lastAppliedSequence = 0);
+    public void StartSession(GameSessionKey session, long lastReliableSequence = 0);
 
     public void EndSession();
 
-    public ReliablePushDecision Decide(ReliablePushSequence sequence);
-
-    public ValueTask<ReliablePushProcessResult> ProcessAsync<TPayload>(
+    public ValueTask<ReliablePushProcessResult> ProcessReliablePushAsync<TPayload>(
         ReliablePushSequence sequence,
         TPayload payload,
         Func<TPayload, CancellationToken, ValueTask> applyAsync,
@@ -520,7 +533,7 @@ public sealed class ReliablePushInbox
 Usage should be closer to:
 
 ```csharp
-await reliablePushInbox.ProcessAsync(
+await client.ProcessReliablePushAsync(
     ReliablePushSequence.From(update.ReliableSequence),
     update,
     applyAsync: ApplyMatchmakingUpdateAsync,
@@ -548,14 +561,15 @@ public enum ReliablePushAckStatus
     SessionMismatch
 }
 
-public sealed record ReliablePushSession(
-    string OwnerKey,
-    string SessionId,
-    long Generation);
+public readonly struct GameSessionKey { }
 
-public sealed record ReliablePushAck(
-    ReliablePushSession Session,
-    long LatestAppliedSequence);
+public readonly struct ReliablePushSequence { }
+
+public readonly struct ReliablePushAck
+{
+    public GameSessionKey Session { get; }
+    public ReliablePushSequence Sequence { get; }
+}
 ```
 
 Reliable sequence state should be scoped to a session or generation, not only to a player id. This prevents a new session from acknowledging an old session's sequence and gives the client a clean reset boundary after `StateLost` or `NewSessionRequired`.
@@ -567,22 +581,22 @@ Client-side cursor storage can be added behind an engine-neutral interface:
 ```csharp
 public interface IReliablePushCursorStore
 {
-    ValueTask<long> LoadAsync(ReliablePushSession session, CancellationToken cancellationToken = default);
+    ValueTask<long> LoadAsync(GameSessionKey session, CancellationToken cancellationToken = default);
 
-    ValueTask SaveAsync(ReliablePushSession session, long sequence, CancellationToken cancellationToken = default);
+    ValueTask SaveAsync(GameSessionKey session, long sequence, CancellationToken cancellationToken = default);
 
-    ValueTask ClearAsync(ReliablePushSession session, CancellationToken cancellationToken = default);
+    ValueTask ClearAsync(GameSessionKey session, CancellationToken cancellationToken = default);
 }
 ```
 
 The framework can provide an in-memory implementation. Unity, Godot, and application-specific persistence should stay in the consuming project unless repeated glue code becomes stable enough to justify a separate package.
 
-Suggested implementation order:
+Implementation order:
 
-1. Add `ReliablePushInbox`, `ReliablePushSession`, `ReliablePushSequence`, acknowledgement/status enums, and result types.
-2. Keep `ReliablePushTracker` as a low-level primitive, but recommend `ReliablePushInbox` in user-facing documentation.
-3. Add `IReliablePushCursorStore` with an in-memory implementation.
-4. Consider a broader engine-neutral client session helper only after reliable push session handling has stabilized.
+1. Add shared session and reliable push primitives to `ULinkGame.Abstractions`.
+2. Keep `ReliablePushTracker` and `ReliablePushInbox` as lower-level primitives.
+3. Recommend `ULinkGameClient` in user-facing documentation.
+4. Keep Unity/Godot persistence and engine dispatch outside the framework.
 
 ## Framework Architecture Roadmap
 
@@ -857,14 +871,14 @@ public enum ClientSessionPhase
 
 public sealed record ClientSessionSnapshot(
     ClientSessionPhase Phase,
-    ReliablePushSession? ReliablePushSession,
+    GameSessionKey? Session,
     long LastReliableSequence);
 
 public sealed class ClientSessionController
 {
     public ClientSessionSnapshot Snapshot { get; }
 
-    public void StartSession(ReliablePushSession reliablePushSession, long lastReliableSequence = 0);
+    public void StartSession(GameSessionKey session, long lastReliableSequence = 0);
 
     public void MarkReconnecting();
 
@@ -1058,7 +1072,7 @@ Status:
 
 - [x] Keep existing in-memory reliable push outbox for publish/replay/ack/prune.
 - [x] Add session/generation-aware ack outcome primitives.
-- [x] Add client `ReliablePushSession`, `ReliablePushSequence`, `ReliablePushAck`, `ReliablePushInbox`, and cursor store primitives.
+- [x] Add shared `GameSessionKey`, `ReliablePushSequence`, `ReliablePushAck`, `ReliablePushInbox`, and cursor store primitives.
 - [x] Add tests for duplicate handling, cursor isolation, and old-generation/session mismatch outcomes.
 - [x] Wire server ack helper directly into `IReliablePushOutbox` or an adjacent ack service.
 - [x] Scope server-side pending records to `GameSessionKey` or equivalent generation-bearing identity.
@@ -1085,6 +1099,6 @@ Status:
 ### Deliberately Not Default Work
 
 - Durable reliable push is not a default framework goal. The default remains an in-memory short-window outbox plus explicit state-lost/new-session behavior when authoritative state cannot be validated.
-- `ULinkGame.Shared` is not planned until cross-side framework-owned contracts become stable and numerous enough to justify `ULinkGame.Abstractions`.
+- `ULinkGame.Shared` is not planned. Cross-side framework-owned contracts belong in `ULinkGame.Abstractions`; user-owned business DTOs belong in the game's own shared contract project.
 - `ULinkGame.Unity` is not planned until repeated Unity-specific integration code becomes stable enough to justify a package.
 - Game business systems stay out of the framework: accounts, matchmaking policy, room rules, gameplay simulation, rewards, inventory, leaderboard rules, UI, and product DTOs belong in the game project or sample.

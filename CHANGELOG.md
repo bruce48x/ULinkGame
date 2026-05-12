@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Added `ULinkGame.Abstractions` for cross-side framework-owned session and reliable push primitives.
+- Added `IULinkGameServer` / `AddULinkGameServer()` and `ULinkGameClient` as the recommended single-entry APIs for server and client code.
+- Moved shared `GameSessionKey`, `ReliablePushSequence`, and reliable push acknowledgement status values out of server/client-only namespaces.
+
 ## 2026-05-11
 
 ### Released

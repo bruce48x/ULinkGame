@@ -1,3 +1,4 @@
+using ULinkGame.Abstractions;
 using ULinkGame.Server.Sessions;
 
 namespace ULinkGame.Server.ReliablePush;
@@ -10,4 +11,3 @@ public interface IReliablePushAckService
         long sequence,
         CancellationToken cancellationToken = default);
 }
-

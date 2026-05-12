@@ -1,3 +1,4 @@
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 using Xunit;
 
@@ -9,7 +10,7 @@ public sealed class ReliablePushInboxTests
     public async Task ProcessAppliesNewSequenceThenAcknowledges()
     {
         var inbox = new ReliablePushInbox();
-        var session = new ReliablePushSession("player-a", "session-a", 1);
+        var session = new GameSessionKey("player-a", "session-a", 1);
         var applied = new List<string>();
         var acknowledged = new List<ReliablePushAck>();
         inbox.StartSession(session);
@@ -39,7 +40,7 @@ public sealed class ReliablePushInboxTests
     public async Task DuplicateSequenceOnlyAcknowledges()
     {
         var inbox = new ReliablePushInbox();
-        var session = new ReliablePushSession("player-a", "session-a", 1);
+        var session = new GameSessionKey("player-a", "session-a", 1);
         var applyCount = 0;
         var ackCount = 0;
         inbox.StartSession(session, lastAppliedSequence: 5);
@@ -70,8 +71,8 @@ public sealed class ReliablePushInboxTests
     public async Task NewSessionUsesIsolatedCursor()
     {
         var store = new InMemoryReliablePushCursorStore();
-        var first = new ReliablePushSession("player-a", "session-a", 1);
-        var second = new ReliablePushSession("player-a", "session-b", 2);
+        var first = new GameSessionKey("player-a", "session-a", 1);
+        var second = new GameSessionKey("player-a", "session-b", 2);
         await store.SaveAsync(first, 10, TestContext.Current.CancellationToken);
         var inbox = new ReliablePushInbox(store);
 
@@ -86,4 +87,3 @@ public sealed class ReliablePushInboxTests
         Assert.Throws<ArgumentOutOfRangeException>(() => ReliablePushSequence.From(0));
     }
 }
-

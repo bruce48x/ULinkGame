@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ULinkGame.Abstractions;
 
 namespace ULinkGame.Client.ReliablePush
 {
@@ -14,14 +15,14 @@ namespace ULinkGame.Client.ReliablePush
             _cursorStore = cursorStore ?? new InMemoryReliablePushCursorStore();
         }
 
-        public ReliablePushSession? CurrentSession { get; private set; }
+        public GameSessionKey? CurrentSession { get; private set; }
 
         public long LastAppliedSequence
         {
             get { return _tracker.LastAppliedSequence; }
         }
 
-        public void StartSession(ReliablePushSession session, long lastAppliedSequence = 0)
+        public void StartSession(GameSessionKey session, long lastAppliedSequence = 0)
         {
             CurrentSession = session;
             _tracker.Reset();
@@ -29,7 +30,7 @@ namespace ULinkGame.Client.ReliablePush
         }
 
         public async ValueTask StartSessionAsync(
-            ReliablePushSession session,
+            GameSessionKey session,
             CancellationToken cancellationToken = default)
         {
             var lastAppliedSequence = await _cursorStore.LoadAsync(session, cancellationToken).ConfigureAwait(false);
@@ -96,7 +97,7 @@ namespace ULinkGame.Client.ReliablePush
             _tracker.Reset();
         }
 
-        private ReliablePushSession EnsureStarted()
+        private GameSessionKey EnsureStarted()
         {
             if (!CurrentSession.HasValue)
             {

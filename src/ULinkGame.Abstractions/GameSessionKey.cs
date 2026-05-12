@@ -1,10 +1,10 @@
 using System;
 
-namespace ULinkGame.Client.ReliablePush
+namespace ULinkGame.Abstractions
 {
-    public readonly struct ReliablePushSession : IEquatable<ReliablePushSession>
+    public readonly struct GameSessionKey : IEquatable<GameSessionKey>
     {
-        public ReliablePushSession(string ownerKey, string sessionId, long generation)
+        public GameSessionKey(string ownerKey, string sessionId, long generation)
         {
             if (string.IsNullOrWhiteSpace(ownerKey))
             {
@@ -32,7 +32,7 @@ namespace ULinkGame.Client.ReliablePush
 
         public long Generation { get; }
 
-        public bool Equals(ReliablePushSession other)
+        public bool Equals(GameSessionKey other)
         {
             return string.Equals(OwnerKey, other.OwnerKey, StringComparison.Ordinal) &&
                 string.Equals(SessionId, other.SessionId, StringComparison.Ordinal) &&
@@ -41,7 +41,7 @@ namespace ULinkGame.Client.ReliablePush
 
         public override bool Equals(object? obj)
         {
-            return obj is ReliablePushSession other && Equals(other);
+            return obj is GameSessionKey other && Equals(other);
         }
 
         public override int GetHashCode()
@@ -55,15 +55,19 @@ namespace ULinkGame.Client.ReliablePush
             }
         }
 
-        public static bool operator ==(ReliablePushSession left, ReliablePushSession right)
+        public override string ToString()
+        {
+            return OwnerKey + "/" + SessionId + "#" + Generation;
+        }
+
+        public static bool operator ==(GameSessionKey left, GameSessionKey right)
         {
             return left.Equals(right);
         }
 
-        public static bool operator !=(ReliablePushSession left, ReliablePushSession right)
+        public static bool operator !=(GameSessionKey left, GameSessionKey right)
         {
             return !left.Equals(right);
         }
     }
 }
-

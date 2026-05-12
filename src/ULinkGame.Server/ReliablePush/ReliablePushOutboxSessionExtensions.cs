@@ -1,3 +1,4 @@
+using ULinkGame.Abstractions;
 using ULinkGame.Server.Sessions;
 
 namespace ULinkGame.Server.ReliablePush;
@@ -55,4 +56,3 @@ public static class ReliablePushOutboxSessionExtensions
         return outbox.GetLastSequence(ReliablePushSessionOwnerKey.Create(session));
     }
 }
-

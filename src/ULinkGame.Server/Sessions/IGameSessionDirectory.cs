@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Server.Sessions;
 
 public interface IGameSessionDirectory
@@ -31,4 +33,3 @@ public interface IGameSessionDirectory
         DateTimeOffset disconnectedBefore,
         CancellationToken cancellationToken = default);
 }
-

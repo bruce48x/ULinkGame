@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Server.Sessions;
 
 public interface IAuthoritativeSessionStateProbe
@@ -6,4 +8,3 @@ public interface IAuthoritativeSessionStateProbe
         GameSessionKey session,
         CancellationToken cancellationToken = default);
 }
-

@@ -1,4 +1,4 @@
-namespace ULinkGame.Client.ReliablePush
+namespace ULinkGame.Abstractions
 {
     public enum ReliablePushAckStatus
     {
@@ -9,4 +9,3 @@ namespace ULinkGame.Client.ReliablePush
         SessionMismatch
     }
 }
-

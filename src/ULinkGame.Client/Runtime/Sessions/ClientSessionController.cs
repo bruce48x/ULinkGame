@@ -1,3 +1,4 @@
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 
 namespace ULinkGame.Client.Sessions
@@ -22,12 +23,12 @@ namespace ULinkGame.Client.Sessions
             }
         }
 
-        public void StartSession(ReliablePushSession reliablePushSession, long lastReliableSequence = 0)
+        public void StartSession(GameSessionKey session, long lastReliableSequence = 0)
         {
-            _reliablePushInbox.StartSession(reliablePushSession, lastReliableSequence);
+            _reliablePushInbox.StartSession(session, lastReliableSequence);
             Snapshot = new ClientSessionSnapshot(
                 ClientSessionPhase.Active,
-                reliablePushSession,
+                session,
                 _reliablePushInbox.LastAppliedSequence);
         }
 
@@ -77,7 +78,7 @@ namespace ULinkGame.Client.Sessions
         {
             Snapshot = new ClientSessionSnapshot(
                 phase,
-                Snapshot.ReliablePushSession,
+                Snapshot.Session,
                 _reliablePushInbox.LastAppliedSequence);
         }
     }

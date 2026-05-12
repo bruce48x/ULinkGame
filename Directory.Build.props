@@ -1,5 +1,5 @@
 <Project>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ULinkGame.Client' Or '$(MSBuildProjectName)' == 'ULinkGame.Server' Or '$(MSBuildProjectName)' == 'ULinkGame.Tool'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'ULinkGame.Abstractions' Or '$(MSBuildProjectName)' == 'ULinkGame.Client' Or '$(MSBuildProjectName)' == 'ULinkGame.Server' Or '$(MSBuildProjectName)' == 'ULinkGame.Tool'">
     <Authors>ULinkGame</Authors>
     <Company>ULinkGame</Company>
     <Product>ULinkGame</Product>

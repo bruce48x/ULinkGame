@@ -2,7 +2,7 @@
 
 `ULinkGame.Client` contains engine-neutral client helpers for game clients built on top of ULinkRPC.
 
-The package currently focuses on reliable server push and reconnect-aware client state:
+The package focuses on one recommended main entry point, `ULinkGameClient`, plus lower-level reliable server push and reconnect-aware state helpers:
 
 - track the latest applied reliable push sequence
 - detect duplicate reliable push messages
@@ -12,34 +12,53 @@ The package currently focuses on reliable server push and reconnect-aware client
 
 The library does not depend on Unity, Godot, or any transport package. Game clients remain responsible for choosing their transport, dispatching callbacks onto the engine main thread, and applying business-specific payloads.
 
-## Low-level sequence tracking
+## Main Client API
 
 ```csharp
+using ULinkGame.Abstractions;
+using ULinkGame.Client;
 using ULinkGame.Client.ReliablePush;
+using ULinkGame.Client.Sessions;
 
-var tracker = new ReliablePushTracker();
-var decision = tracker.Decide(sequence);
+var client = new ULinkGameClient();
+client.StartSession(new GameSessionKey(playerId, sessionId, generation), lastReliableSequence: 0);
 
-if (decision.ShouldApply)
+await client.ProcessReliablePushAsync(
+    ReliablePushSequence.From(update.ReliableSequence),
+    update,
+    applyAsync: static (payload, ct) =>
+    {
+        // Apply the business payload on the application's chosen thread.
+        return ValueTask.CompletedTask;
+    },
+    acknowledgeAsync: async (ack, ct) =>
+    {
+        // Send ack.Session.SessionId, ack.Session.Generation, and ack.Sequence.Value through the game's RPC API.
+        await playerService.AckReliablePushAsync(ack.Session.SessionId, ack.Session.Generation, ack.Sequence.Value, ct);
+        return ReliablePushAckOutcome.Accepted();
+    },
+    cancellationToken);
+
+if (client.Snapshot.Phase == ClientSessionPhase.RefreshRequired)
 {
-    // Apply the business payload.
-    tracker.MarkApplied(sequence);
+    // Clear transient view state and fetch an authoritative game snapshot.
 }
 
-if (decision.ShouldAck)
+if (client.Snapshot.Phase == ClientSessionPhase.StateLost)
 {
-    // Send an acknowledgement through the game RPC API.
+    // Start a new login/session flow. StateLost remains terminal until StartSession is called again.
 }
 ```
 
-## Reliable push inbox
+## Lower-level reliable push inbox
 
-Use `ReliablePushInbox` when the server includes session id and generation in the logical client session. This keeps cursors isolated across reconnect/new-session boundaries.
+Use `ReliablePushInbox` directly only when you want to manage session phase separately. Session identity comes from `ULinkGame.Abstractions.GameSessionKey`.
 
 ```csharp
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 
-var session = new ReliablePushSession(ownerKey: playerId, sessionId: sessionId, generation: generation);
+var session = new GameSessionKey(ownerKey: playerId, sessionId: sessionId, generation: generation);
 var inbox = new ReliablePushInbox();
 inbox.StartSession(session, lastAppliedSequence);
 
@@ -65,11 +84,12 @@ await inbox.ProcessAsync(
 `ClientSessionController` is a pure state helper. Unity, Godot, and plain .NET clients can render their own UI from the snapshot without the framework touching engine APIs or dispatchers.
 
 ```csharp
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 using ULinkGame.Client.Sessions;
 
 var controller = new ClientSessionController();
-controller.StartSession(new ReliablePushSession(playerId, sessionId, generation));
+controller.StartSession(new GameSessionKey(playerId, sessionId, generation));
 controller.MarkReconnecting();
 
 controller.ApplyAckOutcome(ReliablePushAckOutcome.StateRefreshRequired());

@@ -1,4 +1,4 @@
-using ULinkGame.Client.ReliablePush;
+using ULinkGame.Abstractions;
 
 namespace ULinkGame.Client.Sessions
 {
@@ -6,19 +6,18 @@ namespace ULinkGame.Client.Sessions
     {
         public ClientSessionSnapshot(
             ClientSessionPhase phase,
-            ReliablePushSession? reliablePushSession,
+            GameSessionKey? session,
             long lastReliableSequence)
         {
             Phase = phase;
-            ReliablePushSession = reliablePushSession;
+            Session = session;
             LastReliableSequence = lastReliableSequence;
         }
 
         public ClientSessionPhase Phase { get; }
 
-        public ReliablePushSession? ReliablePushSession { get; }
+        public GameSessionKey? Session { get; }
 
         public long LastReliableSequence { get; }
     }
 }
-

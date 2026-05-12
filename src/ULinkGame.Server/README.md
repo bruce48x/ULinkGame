@@ -1,6 +1,6 @@
 # ULinkGame.Server
 
-`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, Microsoft Orleans, and reliable business push.
+`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, Microsoft Orleans, session lifecycle, and reliable business push.
 
 ## Install
 
@@ -15,11 +15,13 @@ Register one or more named RPC server configurators in your gateway process:
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ULinkGame.Server;
 using ULinkGame.Server.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddSingleton<PlayerService>();
+builder.Services.AddULinkGameServer();
 builder.Services.AddULinkRpcServer<ControlPlaneRpcServerConfigurator>();
 builder.Services.AddULinkGameServerGateway();
 
@@ -91,46 +93,58 @@ The helper reads these optional configuration keys:
 
 The default clustering setup is for local development. Configure Orleans storage and production clustering in your project.
 
-## Use Reliable Push
+## Main Server API
 
-Register the in-memory reliable push outbox:
+Register the recommended runtime services with one call:
 
 ```csharp
-using ULinkGame.Server.ReliablePush;
+using ULinkGame.Server;
 
-builder.Services.AddULinkGameServerReliablePush(options =>
-{
-    options.MaxPendingPerOwner = 128;
-});
+builder.Services.AddULinkGameServer();
 ```
 
-Publish, replay, and acknowledge records from your own RPC service. The low-level API accepts an owner key:
+Use `IULinkGameServer` as the main entry point for sessions, endpoint callback bindings, and reliable push:
 
 ```csharp
+using ULinkGame.Abstractions;
+using ULinkGame.Server;
 using ULinkGame.Server.ReliablePush;
 
 public sealed class MatchPushService
 {
-    private readonly IReliablePushOutbox _outbox;
+    private readonly IULinkGameServer _server;
 
-    public MatchPushService(IReliablePushOutbox outbox)
+    public MatchPushService(IULinkGameServer server)
     {
-        _outbox = outbox;
+        _server = server;
     }
 
-    public ValueTask<long> PublishMatchedAsync(string playerId, object payload, CancellationToken ct)
+    public ValueTask<GameSessionKey> LoginAsync(
+        string playerId,
+        string connectionId,
+        IPlayerCallback callback,
+        CancellationToken ct)
     {
-        return _outbox.PublishAsync(playerId, "matched", payload, DeliverAsync, ct);
+        return _server.StartSessionAsync(playerId, "control", connectionId, callback, ct);
     }
 
-    public ValueTask ReplayAsync(string playerId, CancellationToken ct)
+    public ValueTask<long> PublishMatchedAsync(GameSessionKey session, object payload, CancellationToken ct)
     {
-        return _outbox.ReplayPendingAsync(playerId, DeliverAsync, ct);
+        return _server.PublishReliablePushAsync(session, "matched", payload, DeliverAsync, ct);
     }
 
-    public ValueTask AckAsync(string playerId, long sequence, CancellationToken ct)
+    public ValueTask ReplayAsync(GameSessionKey session, CancellationToken ct)
     {
-        return _outbox.AckAsync(playerId, sequence, ct);
+        return _server.ReplayReliablePushAsync(session, DeliverAsync, ct);
+    }
+
+    public ValueTask<ReliablePushAckOutcome> AckAsync(
+        GameSessionKey currentSession,
+        GameSessionKey acknowledgedSession,
+        long sequence,
+        CancellationToken ct)
+    {
+        return _server.AckReliablePushAsync(currentSession, acknowledgedSession, sequence, ct);
     }
 
     private static ValueTask DeliverAsync(ReliablePushRecord record)
@@ -141,56 +155,14 @@ public sealed class MatchPushService
 }
 ```
 
-When your game has a logical session id and generation, prefer the session-scoped overloads. They prevent an old session acknowledgement from pruning records for a newer session owned by the same player.
-
-```csharp
-using ULinkGame.Server.ReliablePush;
-using ULinkGame.Server.Sessions;
-
-public sealed class MatchPushService
-{
-    private readonly IReliablePushOutbox _outbox;
-    private readonly IReliablePushAckService _acks;
-
-    public MatchPushService(IReliablePushOutbox outbox, IReliablePushAckService acks)
-    {
-        _outbox = outbox;
-        _acks = acks;
-    }
-
-    public ValueTask<long> PublishMatchedAsync(GameSessionKey session, object payload, CancellationToken ct)
-    {
-        return _outbox.PublishAsync(session, "matched", payload, DeliverAsync, ct);
-    }
-
-    public ValueTask ReplayAsync(GameSessionKey session, CancellationToken ct)
-    {
-        return _outbox.ReplayPendingAsync(session, DeliverAsync, ct);
-    }
-
-    public ValueTask<ReliablePushAckOutcome> AckAsync(
-        GameSessionKey currentSession,
-        GameSessionKey acknowledgedSession,
-        long sequence,
-        CancellationToken ct)
-    {
-        return _acks.AckAsync(currentSession, acknowledgedSession, sequence, ct);
-    }
-
-    private static ValueTask DeliverAsync(ReliablePushRecord record)
-    {
-        return ValueTask.CompletedTask;
-    }
-}
-```
-
-The built-in outbox is process-local and in-memory. Replace `IReliablePushOutbox` with a project-specific implementation when pending pushes must survive process restarts.
+The built-in outbox is process-local and in-memory. Replace `IReliablePushOutbox` with a project-specific implementation when pending pushes must survive process restarts. Use `IGameSessionDirectory`, `IReliablePushOutbox`, and `IReliablePushAckService` directly only when you need lower-level control.
 
 ## Use Session Lifecycle Helpers
 
-Register in-memory session helpers:
+The main API already registers in-memory session helpers. If you need only the lower-level session services, register them directly:
 
 ```csharp
+using ULinkGame.Abstractions;
 using ULinkGame.Server.Sessions;
 
 builder.Services.AddULinkGameServerSessions();
