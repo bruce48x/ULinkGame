@@ -71,7 +71,7 @@ dotnet tool install --global ULinkGame.Tool
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack
 ```
 
-The tool creates a ULinkRPC-based project, prepares Microsoft Orleans hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation.
+The tool creates a ULinkRPC-based project, prepares Microsoft Orleans hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation. By default it generates one RPC endpoint using the selected transport; pass `--network-profile realtime` when you want separate control and realtime endpoints.
 
 Run code generation later from the generated project:
 

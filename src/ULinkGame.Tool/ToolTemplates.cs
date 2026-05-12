@@ -31,9 +31,52 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeProgram()
+    public static string RenderEdgeProgram(NewCommandOptions options)
     {
-        return """
+        if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
+        {
+            var controlPath = GetDefaultPath(options.Transport, "/ws");
+            var realtimePath = GetDefaultPath(options.Transport, "/realtime");
+
+            return $$"""
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Microsoft.Extensions.Hosting;
+            using Microsoft.Extensions.Logging;
+            using Edge.Hosting;
+            using ULinkGame.Server.Hosting;
+
+            var builder = Host.CreateApplicationBuilder(args);
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+            builder.Configuration
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables();
+
+            builder.AddULinkGameServerOrleansClient();
+            builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
+                EdgeRpcServerOptions.FromConfiguration(
+                    builder.Configuration,
+                    "ControlPlane",
+                    new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
+            builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
+                EdgeRpcServerOptions.FromConfiguration(
+                    builder.Configuration,
+                    "Realtime",
+                    new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
+            builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
+            builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
+            builder.Services.AddULinkGameServerGateway();
+
+            var host = builder.Build();
+            await host.RunAsync();
+            """;
+        }
+
+        var endpointPath = GetDefaultPath(options.Transport, "/ws");
+
+        return $$"""
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
         using Microsoft.Extensions.Hosting;
@@ -50,18 +93,12 @@ internal static class ToolTemplates
             .AddEnvironmentVariables();
 
         builder.AddULinkGameServerOrleansClient();
-        builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
+        builder.Services.AddSingleton(_ =>
             EdgeRpcServerOptions.FromConfiguration(
                 builder.Configuration,
-                "ControlPlane",
-                new EdgeRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
-        builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-            EdgeRpcServerOptions.FromConfiguration(
-                builder.Configuration,
-                "Realtime",
-                new EdgeRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
-        builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
-        builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
+                "Endpoint",
+                new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
+        builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
         builder.Services.AddULinkGameServerGateway();
 
         var host = builder.Build();
@@ -107,6 +144,24 @@ internal static class ToolTemplates
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
 
+        if (!ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
+        {
+            return $$"""
+            {
+              "Orleans": {
+                "ClusterId": "dev",
+                "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"
+              },
+              "Endpoint": {
+                "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
+                "Host": "127.0.0.1",
+                "Port": 20000,
+                "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
+              }
+            }
+            """;
+        }
+
         return $$"""
         {
           "Orleans": {
@@ -114,6 +169,8 @@ internal static class ToolTemplates
             "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"
           },
           "ControlPlane": {
+            "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
+            "Host": "127.0.0.1",
             "Port": 20000,
             "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
           },
@@ -266,6 +323,39 @@ internal sealed class {typeName}
         """;
     }
 
+    public static string RenderDefaultConfigurator(NewCommandOptions options)
+    {
+        var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
+        var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
+
+        return $@"using Edge.Generated;
+using ULinkGame.Server.Hosting;
+using {serializerPackage.Namespace};
+using {transportPackage.Namespace};
+
+namespace Edge.Hosting;
+
+internal sealed class DefaultRpcServerConfigurator : IULinkRpcServerConfigurator
+{{
+    private readonly EdgeRpcServerOptions _options;
+
+    public DefaultRpcServerConfigurator(EdgeRpcServerOptions options)
+    {{
+        _options = options;
+    }}
+
+    public string Name => ""default"";
+
+    public void Configure(ULinkGameServerRpcContext context)
+    {{
+        var builder = context.Builder;
+        builder.UseSerializer(new {serializerType}());
+{TemplateText.IndentBlock(RenderDefaultAcceptor(options.Transport), 2)}
+        AllServicesBinder.BindAll(builder.ServiceRegistry);
+    }}
+}}";
+    }
+
     public static string RenderControlPlaneConfigurator(NewCommandOptions options)
     {
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
@@ -330,6 +420,34 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         AllServicesBinder.BindAll(builder.ServiceRegistry);
     }}
 }}";
+    }
+
+    private static string GetDefaultPath(string transport, string websocketPath)
+    {
+        return string.Equals(transport, "websocket", StringComparison.OrdinalIgnoreCase) ? websocketPath : "";
+    }
+
+    private static string RenderDefaultAcceptor(string transport)
+    {
+        return transport switch
+        {
+            "websocket" => """
+                var path = string.IsNullOrWhiteSpace(_options.Path) ? "/ws" : _options.Path;
+                builder.UseAcceptor(async ct => await WsConnectionAcceptor.CreateAsync(
+                    builder.ResolvePort(_options.Port),
+                    path,
+                    builder.Limits.MaxPendingAcceptedConnections,
+                    ct));
+                """,
+            "tcp" => """
+                builder.UseAcceptor(new TcpConnectionAcceptor(builder.ResolvePort(_options.Port)));
+                """,
+            _ => """
+                builder.UseAcceptor(new KcpConnectionAcceptor(
+                    builder.ResolvePort(_options.Port),
+                    builder.Limits.MaxPendingAcceptedConnections));
+                """
+        };
     }
 
     private static string RenderControlPlaneAcceptor(string transport)

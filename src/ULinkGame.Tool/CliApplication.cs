@@ -114,8 +114,9 @@ internal sealed class CliApplication(
             ULinkGame.Tool
 
             Commands:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--nugetforunity-source embedded|openupm]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--nugetforunity-source embedded|openupm]
                   Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server and Microsoft Orleans.
+                  Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
 
               codegen [--config <path>] [--no-restore]
                   Delegate code generation to ulinkrpc-starter codegen.

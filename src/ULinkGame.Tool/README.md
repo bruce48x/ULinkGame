@@ -18,10 +18,10 @@
 命令参数面向 ULinkGame 项目创建，并会把可兼容的参数转发给 `ulinkrpc-starter`：
 
 ```bash
-ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --nugetforunity-source embedded
+ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network-profile simple --serializer memorypack --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施，并只输出 ULinkGame 项目的最终 Next steps：
+该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 Microsoft Orleans 与 ULinkGame 宿主设施，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
 
 - `src/ULinkGame.Server/`
 - `Server/Silo/` in generated sample projects
@@ -71,6 +71,7 @@ ulinkgame-tool codegen --no-restore
     "name": "MyGame",
     "clientEngine": "unity",
     "transport": "kcp",
+    "networkProfile": "simple",
     "serializer": "memorypack",
     "nuGetForUnitySource": "embedded"
   },

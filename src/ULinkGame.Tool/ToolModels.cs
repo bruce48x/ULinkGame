@@ -4,6 +4,7 @@ internal static class ProjectConventions
     public const string DefaultProjectName = "MyGame";
     public const string DefaultClientEngine = "unity";
     public const string DefaultTransport = "kcp";
+    public const string DefaultNetworkProfile = "simple";
     public const string DefaultSerializer = "memorypack";
     public const string DefaultNuGetForUnitySource = "embedded";
     public const string StarterServerProjectPath = "Server/Server";
@@ -13,12 +14,18 @@ internal static class ProjectConventions
 
     public static readonly string[] SupportedClientEngines = ["unity", "unity-cn", "tuanjie", "godot"];
     public static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
+    public static readonly string[] SupportedNetworkProfiles = ["simple", "realtime"];
     public static readonly string[] SupportedSerializers = ["json", "memorypack"];
     public static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];
 
     public static bool IsGodot(string clientEngine)
     {
         return string.Equals(clientEngine, "godot", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsRealtimeNetworkProfile(string networkProfile)
+    {
+        return string.Equals(networkProfile, "realtime", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -42,6 +49,7 @@ internal sealed class ToolConfig
                 Name = projectName,
                 ClientEngine = options.ClientEngine,
                 Transport = options.Transport,
+                NetworkProfile = options.NetworkProfile,
                 Serializer = options.Serializer,
                 NuGetForUnitySource = options.NuGetForUnitySource
             },
@@ -77,6 +85,7 @@ internal sealed class ProjectConfig
     public string Name { get; set; } = ProjectConventions.DefaultProjectName;
     public string ClientEngine { get; set; } = ProjectConventions.DefaultClientEngine;
     public string Transport { get; set; } = ProjectConventions.DefaultTransport;
+    public string NetworkProfile { get; set; } = ProjectConventions.DefaultNetworkProfile;
     public string Serializer { get; set; } = ProjectConventions.DefaultSerializer;
     public string NuGetForUnitySource { get; set; } = ProjectConventions.DefaultNuGetForUnitySource;
 }
@@ -93,6 +102,7 @@ internal readonly record struct NewCommandOptions(
     string? OutputPath,
     string ClientEngine,
     string Transport,
+    string NetworkProfile,
     string Serializer,
     string NuGetForUnitySource);
 

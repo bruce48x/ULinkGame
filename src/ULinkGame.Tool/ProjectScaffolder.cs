@@ -5,7 +5,7 @@ internal sealed class ProjectScaffolder
         await MoveStarterServerProjectToEdgeAsync(projectRoot).ConfigureAwait(false);
         await WriteDotNetToolManifestAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
-        await WriteEdgeProgramAsync(projectRoot).ConfigureAwait(false);
+        await WriteEdgeProgramAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
@@ -91,9 +91,9 @@ internal sealed class ProjectScaffolder
         }
     }
 
-    private static Task WriteEdgeProgramAsync(string projectRoot)
+    private static Task WriteEdgeProgramAsync(string projectRoot, NewCommandOptions options)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "Program.cs"), ToolTemplates.RenderEdgeProgram());
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "Program.cs"), ToolTemplates.RenderEdgeProgram(options));
     }
 
     private static async Task WriteEdgeProjectAsync(string projectRoot, NewCommandOptions options)
@@ -134,12 +134,19 @@ internal sealed class ProjectScaffolder
         var hostingDirectory = Path.Combine(projectRoot, "Server", "Edge", "Hosting");
         Directory.CreateDirectory(hostingDirectory);
 
+        if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
+        {
+            return Task.WhenAll(
+                WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
+                WriteAsync(Path.Combine(hostingDirectory, "ControlPlaneRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
+                WriteAsync(Path.Combine(hostingDirectory, "RealtimeRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
+                WriteAsync(Path.Combine(hostingDirectory, "DefaultControlPlaneRpcServerConfigurator.cs"), ToolTemplates.RenderControlPlaneConfigurator(options)),
+                WriteAsync(Path.Combine(hostingDirectory, "DefaultRealtimeRpcServerConfigurator.cs"), ToolTemplates.RenderRealtimeConfigurator(options)));
+        }
+
         return Task.WhenAll(
             WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
-            WriteAsync(Path.Combine(hostingDirectory, "ControlPlaneRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
-            WriteAsync(Path.Combine(hostingDirectory, "RealtimeRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
-            WriteAsync(Path.Combine(hostingDirectory, "DefaultControlPlaneRpcServerConfigurator.cs"), ToolTemplates.RenderControlPlaneConfigurator(options)),
-            WriteAsync(Path.Combine(hostingDirectory, "DefaultRealtimeRpcServerConfigurator.cs"), ToolTemplates.RenderRealtimeConfigurator(options)));
+            WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options)));
     }
 
     private static Task WriteSiloProjectAsync(string projectRoot)

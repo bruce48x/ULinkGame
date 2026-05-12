@@ -1095,7 +1095,7 @@ Status:
 
 ### Candidate Framework Work
 
-- Endpoint model cleanup: `ULinkGame.Server` can host multiple named RPC servers, but `ULinkGame.Tool` still generates a control endpoint and realtime endpoint unconditionally. The tool should eventually offer a simple single-endpoint project shape by default and only generate realtime endpoint code when the selected template explicitly needs realtime multiplayer.
+- Endpoint model cleanup: `ULinkGame.Tool` now defaults to a simple single-endpoint project shape and only generates separate control/realtime endpoint code when `--network-profile realtime` is selected. Further cleanup should focus on production health checks, Docker options, and richer profile-specific docs.
 - Optional realtime routing infrastructure: no framework abstraction exists yet for gateway-to-gateway routing, runtime owner identity, ordered input forwarding, snapshot fanout, or endpoint-level backpressure. If added, this should remain optional infrastructure for realtime multiplayer templates, not a mandatory concept for light online games.
 - Endpoint diagnostics and operations: the framework does not yet provide built-in per-endpoint health checks, readiness signals, structured log event ids, metrics hooks, graceful endpoint shutdown semantics, or standard diagnostics for reliable push and session lifecycle decisions.
 
