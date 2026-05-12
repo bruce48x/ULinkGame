@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Client.ReliablePush
 {
     public readonly struct ReliablePushProcessResult
@@ -15,4 +17,3 @@ namespace ULinkGame.Client.ReliablePush
         public ReliablePushAckOutcome? Acknowledgement { get; }
     }
 }
-

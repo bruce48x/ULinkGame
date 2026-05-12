@@ -21,8 +21,10 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 `ULinkGame.Abstractions` provides cross-side framework primitives:
 
 - shared session identity
+- shared endpoint names
 - reliable push sequence values
-- reliable push acknowledgement status values
+- reliable push acknowledgement outcomes
+- session resume outcomes
 
 `ULinkGame.Server` provides server-side hosting helpers:
 

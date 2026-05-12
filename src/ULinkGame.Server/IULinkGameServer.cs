@@ -12,7 +12,7 @@ public interface IULinkGameServer
 
     ValueTask<GameSessionKey> StartSessionAsync<TCallback>(
         string ownerKey,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -20,7 +20,7 @@ public interface IULinkGameServer
 
     ValueTask<SessionResumeDecision> ResumeSessionAsync<TCallback>(
         GameSessionResumeRequest request,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -28,7 +28,7 @@ public interface IULinkGameServer
 
     ValueTask BindEndpointAsync<TCallback>(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -36,13 +36,22 @@ public interface IULinkGameServer
 
     ValueTask MarkEndpointDisconnectedAsync(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
         string? connectionId = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<TCallback?> GetCallbackAsync<TCallback>(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
+        CancellationToken cancellationToken = default)
+        where TCallback : class;
+
+    ValueTask<long> PublishReliablePushAsync<TCallback, TPayload>(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        string kind,
+        TPayload payload,
+        ReliablePushDeliver<TCallback, TPayload> deliver,
         CancellationToken cancellationToken = default)
         where TCallback : class;
 
@@ -57,6 +66,14 @@ public interface IULinkGameServer
         GameSessionKey session,
         Func<ReliablePushRecord, ValueTask> deliver,
         CancellationToken cancellationToken = default);
+
+    ValueTask ReplayReliablePushAsync<TCallback, TPayload>(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        string kind,
+        ReliablePushDeliver<TCallback, TPayload> deliver,
+        CancellationToken cancellationToken = default)
+        where TCallback : class;
 
     ValueTask<ReliablePushAckOutcome> AckReliablePushAsync(
         GameSessionKey currentSession,

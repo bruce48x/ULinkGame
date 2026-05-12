@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ULinkGame.Abstractions;
 using ULinkGame.Server.Sessions;
 using Xunit;
 
@@ -46,4 +47,3 @@ public sealed class GameSessionCleanupHostedServiceTests
     {
     }
 }
-

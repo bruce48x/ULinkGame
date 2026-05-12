@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>ULinkGame.Abstractions</RootNamespace>
     <PackageId>ULinkGame.Abstractions</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Description>Shared engine-neutral session and reliable push abstractions for ULinkGame server and client packages.</Description>
     <PackageTags>ulinkgame;game;abstractions;session;reliable-push</PackageTags>
   </PropertyGroup>

@@ -108,7 +108,6 @@ Use `IULinkGameServer` as the main entry point for sessions, endpoint callback b
 ```csharp
 using ULinkGame.Abstractions;
 using ULinkGame.Server;
-using ULinkGame.Server.ReliablePush;
 
 public sealed class MatchPushService
 {
@@ -125,17 +124,39 @@ public sealed class MatchPushService
         IPlayerCallback callback,
         CancellationToken ct)
     {
-        return _server.StartSessionAsync(playerId, "control", connectionId, callback, ct);
+        return _server.StartSessionAsync(playerId, GameEndpointName.Control, connectionId, callback, ct);
     }
 
-    public ValueTask<long> PublishMatchedAsync(GameSessionKey session, object payload, CancellationToken ct)
+    public ValueTask<long> PublishMatchedAsync(
+        GameSessionKey session,
+        MatchmakingStatusUpdate payload,
+        CancellationToken ct)
     {
-        return _server.PublishReliablePushAsync(session, "matched", payload, DeliverAsync, ct);
+        return _server.PublishReliablePushAsync<IPlayerCallback, MatchmakingStatusUpdate>(
+            session,
+            GameEndpointName.Control,
+            "matched",
+            payload,
+            static (callback, sequence, update, _) =>
+            {
+                update.ReliableSequence = sequence.Value;
+                return callback.OnMatchmakingStatus(update);
+            },
+            ct);
     }
 
     public ValueTask ReplayAsync(GameSessionKey session, CancellationToken ct)
     {
-        return _server.ReplayReliablePushAsync(session, DeliverAsync, ct);
+        return _server.ReplayReliablePushAsync<IPlayerCallback, MatchmakingStatusUpdate>(
+            session,
+            GameEndpointName.Control,
+            "matched",
+            static (callback, sequence, update, _) =>
+            {
+                update.ReliableSequence = sequence.Value;
+                return callback.OnMatchmakingStatus(update);
+            },
+            ct);
     }
 
     public ValueTask<ReliablePushAckOutcome> AckAsync(
@@ -147,15 +168,10 @@ public sealed class MatchPushService
         return _server.AckReliablePushAsync(currentSession, acknowledgedSession, sequence, ct);
     }
 
-    private static ValueTask DeliverAsync(ReliablePushRecord record)
-    {
-        // Send record.Payload and record.Sequence through your ULinkRPC callback.
-        return ValueTask.CompletedTask;
-    }
 }
 ```
 
-The built-in outbox is process-local and in-memory. Replace `IReliablePushOutbox` with a project-specific implementation when pending pushes must survive process restarts. Use `IGameSessionDirectory`, `IReliablePushOutbox`, and `IReliablePushAckService` directly only when you need lower-level control.
+The built-in outbox is process-local and in-memory. Replace `IReliablePushOutbox` with a project-specific implementation when pending pushes must survive process restarts. Use `IGameSessionDirectory`, `IReliablePushOutbox`, `ReliablePushRecord`, and `IReliablePushAckService` directly only when you need lower-level control.
 
 ## Use Session Lifecycle Helpers
 
@@ -174,6 +190,7 @@ For reconnect, use `IGameSessionResumeService` so token validation and authorita
 
 ```csharp
 using ULinkGame.Server.Sessions;
+using ULinkGame.Abstractions;
 
 public sealed class PlayerLoginService
 {

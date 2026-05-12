@@ -61,7 +61,7 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         lock (_gate)
         {
             var state = GetCurrentSessionState(endpoint.Session);
-            state.Endpoints[endpoint.EndpointName] = new EndpointBinding(
+            state.Endpoints[endpoint.EndpointName.Value] = new EndpointBinding(
                 connectionId,
                 callback,
                 typeof(TCallback),
@@ -84,7 +84,7 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         {
             if (!_owners.TryGetValue(endpoint.Session.OwnerKey, out var state) ||
                 !state.Session.Equals(endpoint.Session) ||
-                !state.Endpoints.TryGetValue(endpoint.EndpointName, out var binding))
+                !state.Endpoints.TryGetValue(endpoint.EndpointName.Value, out var binding))
             {
                 return ValueTask.CompletedTask;
             }
@@ -95,7 +95,7 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
                 return ValueTask.CompletedTask;
             }
 
-            state.Endpoints[endpoint.EndpointName] = binding.Disconnect(DateTimeOffset.UtcNow);
+            state.Endpoints[endpoint.EndpointName.Value] = binding.Disconnect(DateTimeOffset.UtcNow);
             state.LastSeenAt = DateTimeOffset.UtcNow;
         }
 
@@ -114,7 +114,7 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         {
             if (!_owners.TryGetValue(endpoint.Session.OwnerKey, out var state) ||
                 !state.Session.Equals(endpoint.Session) ||
-                !state.Endpoints.TryGetValue(endpoint.EndpointName, out var binding) ||
+                !state.Endpoints.TryGetValue(endpoint.EndpointName.Value, out var binding) ||
                 binding.DisconnectedAt is not null)
             {
                 return ValueTask.FromResult<TCallback?>(null);
@@ -175,7 +175,7 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
     private static void ValidateEndpoint(SessionEndpointKey endpoint)
     {
         ValidateSession(endpoint.Session);
-        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint.EndpointName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint.EndpointName.Value);
     }
 
     private static void ValidateSession(GameSessionKey session)

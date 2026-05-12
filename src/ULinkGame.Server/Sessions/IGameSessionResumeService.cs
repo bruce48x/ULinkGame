@@ -1,3 +1,5 @@
+using ULinkGame.Abstractions;
+
 namespace ULinkGame.Server.Sessions;
 
 public interface IGameSessionResumeService
@@ -6,4 +8,3 @@ public interface IGameSessionResumeService
         GameSessionResumeRequest request,
         CancellationToken cancellationToken = default);
 }
-

@@ -51,8 +51,10 @@ It should stay infrastructure-oriented. Matchmaking rules, room rules, user DTOs
 `ULinkGame.Abstractions` owns cross-side framework concepts that must be named and interpreted the same way by server and client packages:
 
 - `GameSessionKey`
+- `GameEndpointName`
 - `ReliablePushSequence`
-- reliable push acknowledgement status values
+- reliable push acknowledgement outcomes
+- session resume outcomes
 
 It must stay small. User-owned contracts still belong in a game `Shared` project, and Unity-specific wrappers should wait until repeated integration code becomes stable enough to justify a package.
 
@@ -617,14 +619,13 @@ The package should live under `ULinkGame.Server.Sessions` and own these generic 
 Suggested API shape:
 
 ```csharp
-public sealed record GameSessionKey(
-    string OwnerKey,
-    string SessionId,
-    long Generation);
+public readonly struct GameSessionKey { }
+
+public readonly struct GameEndpointName { }
 
 public sealed record SessionEndpointKey(
     GameSessionKey Session,
-    string EndpointName);
+    GameEndpointName EndpointName);
 
 public enum SessionResumeStatus
 {
@@ -634,10 +635,12 @@ public enum SessionResumeStatus
     Unauthorized
 }
 
-public sealed record SessionResumeDecision(
-    SessionResumeStatus Status,
-    GameSessionKey? Session,
-    string? Reason = null);
+public sealed class SessionResumeDecision
+{
+    public SessionResumeStatus Status { get; }
+    public GameSessionKey? Session { get; }
+    public string? Reason { get; }
+}
 
 public interface IGameSessionDirectory
 {

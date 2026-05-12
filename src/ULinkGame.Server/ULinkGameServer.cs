@@ -32,7 +32,7 @@ public sealed class ULinkGameServer : IULinkGameServer
 
     public async ValueTask<GameSessionKey> StartSessionAsync<TCallback>(
         string ownerKey,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -46,7 +46,7 @@ public sealed class ULinkGameServer : IULinkGameServer
 
     public async ValueTask<SessionResumeDecision> ResumeSessionAsync<TCallback>(
         GameSessionResumeRequest request,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -65,7 +65,7 @@ public sealed class ULinkGameServer : IULinkGameServer
 
     public ValueTask BindEndpointAsync<TCallback>(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
         string connectionId,
         TCallback callback,
         CancellationToken cancellationToken = default)
@@ -80,7 +80,7 @@ public sealed class ULinkGameServer : IULinkGameServer
 
     public ValueTask MarkEndpointDisconnectedAsync(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
         string? connectionId = null,
         CancellationToken cancellationToken = default)
     {
@@ -92,12 +92,31 @@ public sealed class ULinkGameServer : IULinkGameServer
 
     public ValueTask<TCallback?> GetCallbackAsync<TCallback>(
         GameSessionKey session,
-        string endpointName,
+        GameEndpointName endpointName,
         CancellationToken cancellationToken = default)
         where TCallback : class
     {
         return _sessions.GetCallbackAsync<TCallback>(
             new SessionEndpointKey(session, endpointName),
+            cancellationToken);
+    }
+
+    public ValueTask<long> PublishReliablePushAsync<TCallback, TPayload>(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        string kind,
+        TPayload payload,
+        ReliablePushDeliver<TCallback, TPayload> deliver,
+        CancellationToken cancellationToken = default)
+        where TCallback : class
+    {
+        ArgumentNullException.ThrowIfNull(deliver);
+
+        return _reliablePush.PublishAsync(
+            session,
+            kind,
+            payload ?? throw new ArgumentNullException(nameof(payload)),
+            record => DeliverReliablePushRecordAsync(session, endpointName, kind, record, deliver, cancellationToken),
             cancellationToken);
     }
 
@@ -119,6 +138,22 @@ public sealed class ULinkGameServer : IULinkGameServer
         return _reliablePush.ReplayPendingAsync(session, deliver, cancellationToken);
     }
 
+    public ValueTask ReplayReliablePushAsync<TCallback, TPayload>(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        string kind,
+        ReliablePushDeliver<TCallback, TPayload> deliver,
+        CancellationToken cancellationToken = default)
+        where TCallback : class
+    {
+        ArgumentNullException.ThrowIfNull(deliver);
+
+        return _reliablePush.ReplayPendingAsync(
+            session,
+            record => DeliverReliablePushRecordAsync(session, endpointName, kind, record, deliver, cancellationToken),
+            cancellationToken);
+    }
+
     public ValueTask<ReliablePushAckOutcome> AckReliablePushAsync(
         GameSessionKey currentSession,
         GameSessionKey acknowledgedSession,
@@ -130,5 +165,39 @@ public sealed class ULinkGameServer : IULinkGameServer
             acknowledgedSession,
             sequence,
             cancellationToken);
+    }
+
+    private async ValueTask DeliverReliablePushRecordAsync<TCallback, TPayload>(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        string kind,
+        ReliablePushRecord record,
+        ReliablePushDeliver<TCallback, TPayload> deliver,
+        CancellationToken cancellationToken)
+        where TCallback : class
+    {
+        if (!string.Equals(record.Kind, kind, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (record.Payload is not TPayload payload)
+        {
+            throw new InvalidOperationException(
+                $"Reliable push record '{record.Kind}' payload is not assignable to '{typeof(TPayload).FullName}'.");
+        }
+
+        var callback = await GetCallbackAsync<TCallback>(session, endpointName, cancellationToken)
+            .ConfigureAwait(false);
+        if (callback is null)
+        {
+            return;
+        }
+
+        await deliver(
+            callback,
+            ReliablePushSequence.From(record.Sequence),
+            payload,
+            cancellationToken).ConfigureAwait(false);
     }
 }

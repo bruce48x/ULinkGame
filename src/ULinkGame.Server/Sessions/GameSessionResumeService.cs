@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using ULinkGame.Abstractions;
 
 namespace ULinkGame.Server.Sessions;
 
@@ -62,4 +63,3 @@ public sealed class GameSessionResumeService : IGameSessionResumeService
         };
     }
 }
-
