@@ -44,6 +44,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 基于 Orleans 的匹配队列。
 - 持久化的房间和会话分配，包含运行时网关端点信息。
 - 支持运行时网关绑定的仅实时连接本地会话注册。
+- `SessionDirectory` / `PlayerService` 已接入 `ULinkGame.Server.Sessions`，控制连接和实时连接绑定由框架会话目录保存 opaque callback。
+- 可靠匹配推送已按 `GameSessionKey` 隔离 pending record，ack 路径已接入 `IReliablePushAckService` 的 accepted / duplicate / state lost / session mismatch outcome。
+- Unity 客户端可靠推送和 reconnect/state-lost 状态已由 `ReliablePushInbox` 与 `ClientSessionController` 管理。
 - 包含 PostgreSQL 和 Redis 的本地 compose 基线。
 - `DisconnectedSessionCleanupHostedService` 用于后台清理过期会话。
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
@@ -58,7 +61,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 游戏暂不包含任务、商店和记录功能；大厅不应展示或跳转到 Tasks / Shop / Records 页面。
 - 面向玩家的 Unity 界面应使用中文文案；联机大厅和战斗内 HUD 不显示 DEBUG 信息、调试面板、tick、连接细节、内部状态枚举、同步视图数或快捷键提示。将来需要排查问题时只通过 Unity Console、服务端日志或客户端日志打印，不在玩家 UI 中保留。
 - 战斗中需要实时显示当前对局玩家排名，排名框固定在画面右侧，背景必须低遮挡半透明，避免遮挡游戏画面和影响玩家判断。
-- 自动化测试当前为 31 个（`ArenaSimulationRulesTests` 17 个测试用例、`LeaderboardGrainTests` 6 个、`MatchmakingQueuePolicyTests` 4 个、`SessionDirectoryCleanupTests` 4 个）。
+- sample 自动化测试当前为 31 个（`ArenaSimulationRulesTests` 17 个测试用例、`LeaderboardGrainTests` 6 个、`MatchmakingQueuePolicyTests` 4 个、`SessionDirectoryCleanupTests` 4 个）；框架会话、可靠推送和客户端 session controller 另由 `Tests/tests.slnx` 覆盖。
 - `samples/Agar.Unity/docs/ART_DIRECTION.md` 已定义整体美术、UI 设计、素材生成、Unity 接入和验收标准。
 
 已经从当前计划中移除的方向：
@@ -101,7 +104,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 1. 阶段 2：完成启动/登录/匹配/结算 UI 的人工视觉回归，确认裁切后的 UI sprite、实时排名面板和运行时布局在 1200x600、960x540 下不再出现视觉边界错位。
 2. 阶段 4：完成第一轮基础美术资产的 Unity 实机验收，确认玩家球、拾取物、背景、UI 基础件、图标、吸收环和出生波纹是否继续沿用或需要重做。
 3. 阶段 5：完成单机和联机全流程手动回归。
-4. 后续进入阶段 7 及之后的清理语义、跨网关路由、测试扩展和阶段 13 Redis 排行榜迁移。
+4. 后续进入阶段 7 及之后的清理语义生产回归、跨网关路由、测试扩展和阶段 13 Redis 排行榜迁移。
 
 ### 阶段 2：启动界面视觉修复
 
@@ -201,8 +204,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 待办：
 
 - 盘点 `DotArenaGame*.cs` 中的字段和方法，按所有权分成会话、单机模拟、输入、世界表现、UI 快照、资源/皮肤、本地元进度七组；每组记录迁移目标类。
-- 新增轻量状态模型，集中描述 `SessionMode`、`FrontendFlowState`、`EntryMenuState`、待处理 UI 请求和匹配计时等流程状态，避免多个 partial 文件直接读写同一组字段。
-- 从 `DotArenaGame.Session.cs` / `DotArenaGame.Callbacks.cs` 中抽出联机流程编排，优先复用并扩展现有 `DotArenaMultiplayerFlow`，让登录、游客登录、匹配、取消匹配、实时绑定、断线恢复和可靠推送确认有单一入口。
+- 继续收敛现有轻量状态模型；`DotArenaMultiplayerState` 已集中保存联机会话身份、待处理 UI 请求、重连标记、匹配计时、实时连接和可靠 push/session controller，但 `FrontendFlowState`、`EntryMenuState` 等仍有多个 partial 直接写入。
+- 从 `DotArenaGame.Session.cs` / `DotArenaGame.Callbacks.cs` 中继续抽出联机流程编排，优先复用并扩展现有 `DotArenaMultiplayerFlow`；可靠推送确认和 state-lost 已接入框架 helper，剩余目标是让登录、游客登录、匹配、取消匹配、实时绑定和断线恢复有单一入口。
 - 从 `DotArenaGame.SinglePlayer.cs` 中抽出单机对局控制器，负责创建本地模拟、推进 tick、处理结算和重开；`DotArenaGame` 只转发输入意图和接收渲染状态。
 - 从 `DotArenaGame.Views.cs` / `DotArenaGame.Presentation.cs` 中抽出视图注册表和表现资源目录，减少 `_views`、`_renderStates`、`_pickupViews`、sprite、shader、皮肤列表等字段直接挂在 `MonoBehaviour` 上。
 - 从 `DotArenaGame.UiSurface.cs` / `DotArenaGame.UiActions.cs` 中抽出 UI 快照构建器和 UI 命令处理器。UI 快照只表达要显示什么，UI 命令只表达玩家请求什么，避免 UI 代码直接改网络或模拟状态。
@@ -223,15 +226,15 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 单机开始、联机登录、匹配、取消匹配、实时绑定、世界刷新、断线返回和结算按钮路径都能通过手动回归。
 - Unity 脚本编译无错误；受影响的服务端和共享项目在本阶段未改动时不强制重建。
 
-### 阶段 7：网关清理语义
+### 阶段 7：网关清理语义生产回归
 
 待办：
 
-- 审核 `PlayerService.cs`、`SessionRegistration.cs`、`SessionDirectory.cs`、`DisconnectedSessionCleanupHostedService.cs` 中的登出、断线、取消匹配、离开房间和对局结束清理路径。
-- 确认控制连接和实时连接可以独立解绑（解绑实时连接不意外断开控制连接，反之亦然）。
-- 确认 `IPlayerSessionGrain`、`IRoomGrain` 和 `SessionDirectory` 本地回调状态在失败后能收敛（重复登出不残留、匹配取消后票据不堆积）。
+- 审核 `PlayerService.cs`、`SessionRegistration.cs`、`SessionDirectory.cs`、`DisconnectedSessionCleanupHostedService.cs` 中的登出、断线、取消匹配、离开房间和对局结束清理路径；其中会话绑定、resume 和 ack state-lost 已接入 ULinkGame 框架，剩余重点是业务资源和生产回归。
+- 回归控制连接和实时连接可以独立解绑（解绑实时连接不意外断开控制连接，反之亦然），并覆盖 stale connection id 不会解绑新连接。
+- 确认 `IPlayerSessionGrain`、`IRoomGrain` 和 `SessionDirectory` 本地业务状态在失败后能收敛（重复登出不残留、匹配取消后票据不堆积）。
 - 确认 `RoomRuntime.RemovePlayerAsync` 返回 `remaining == 0` 后，`RoomRuntimeHost` 或调用方正确释放房间资源。
-- 为登出、断线和重复匹配流程增加聚焦测试，或者留下可追踪的手动验证步骤文档。
+- 为登出、断线、重复匹配、session mismatch 和 state-lost 流程增加聚焦测试，或者留下可追踪的手动验证步骤文档。
 
 验收标准：
 
@@ -295,8 +298,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 待办：
 
 - 为 `RoomRuntime` 增加测试：玩家加入/离开、输入提交、对局结束结算、空房间清理。
-- 为 `SessionDirectory` / `SessionRegistration` 增加测试：注册、解绑、房间查询、回调获取。
-- 为 `DotArenaNetworkSession` 增加测试：连接生命周期、重连参数、实时绑定。
+- 在现有 `SessionDirectoryCleanupTests` 基础上补充测试：framework-backed 控制注册、session generation、stale connection 解绑、回调获取和过期清理。
+- 为 `PlayerService` 增加测试：登录、游客登录、重复登录、匹配、取消、实时绑定、ack state lost 和 session mismatch。
+- 为 `DotArenaNetworkSession` 增加测试：连接生命周期、重连参数、实时绑定、ack 携带 session id/generation。
 - 为 `ArenaSimulation` 补充测试：食物刷新边界、吞噬比例边界、AI 补位、多人同时死亡。
 - 为 `DotArenaMetaProgression` 增加测试：经验升级边界、首胜断言，以及阶段 1 后仍保留的本地进度路径。
 - 为 `LeaderboardGrain` 补足测试：AI 过滤、全周期路径、未来全量用户目录接入后的全用户重置路径。
@@ -540,7 +544,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P6.2：为 Redis 配置密码、持久化、连接池、operation timeout 和 key prefix。
 - P6.3：确认 Docker compose 中 Redis 开启持久化 volume，不把排行榜当前周期数据写入临时容器层。
 - P6.4：确认 Redis 不可用时排行榜查询返回可解释错误或空结果，对局结算主流程不整体崩溃。
-- P6.5：定义内存 reliable push outbox 在网关重启后的玩家体验和客户端恢复路径。
+- P6.5：验证内存 reliable push outbox 在网关重启后的玩家体验和客户端恢复路径；框架和 sample 已接入 state lost / new session 语义。
 - P6.6：明确 Redis 后续是否继续承担跨网关路由、在线状态或限流；未实现的职责不要写成当前能力。
 
 验收标准：
@@ -630,9 +634,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P10.2：控制连接断开时提示并提供重试或返回入口。
 - P10.3：实时连接断开时短暂等待，再进入重连或返回大厅。
 - P10.4：服务器维护或服务不可用时给出中文提示。
-- P10.5：state lost / outbox 过期时清理旧会话，进入新登录或大厅路径。
-- P10.6：可靠推送重复到达时保持幂等，不重复跳转或重复发起实时绑定。
-- P10.7：latest reliable sequence 绑定到当前玩家会话，新会话重置或隔离旧序列。
+- P10.5：回归 state lost / outbox 过期时清理旧会话，进入新登录或大厅路径；当前已由 `ClientSessionController` 和 sample reset path 承接。
+- P10.6：回归可靠推送重复到达时保持幂等，不重复跳转或重复发起实时绑定；当前已由 `ReliablePushInbox` 承担基础去重。
+- P10.7：回归 latest reliable sequence 绑定到当前玩家会话，新会话重置或隔离旧序列；当前已使用 session id/generation。
 - P10.8：所有网络按钮在请求中禁用，失败或超时后恢复。
 
 验收标准：
@@ -837,12 +841,23 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ### 阶段 6：客户端拆分
 
 - `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
-- 已完成第一轮客户端职责拆分：新增 `DotArenaMultiplayerState` 集中保存联机会话身份、认证资料、待处理 UI 请求、重连标记、匹配计时、实时连接和可靠推送 tracker；`DotArenaGame` 通过转发属性兼容现有 partial，后续还需继续减少直接状态写入。
+- 已完成第一轮客户端职责拆分：新增 `DotArenaMultiplayerState` 集中保存联机会话身份、认证资料、待处理 UI 请求、重连标记、匹配计时、实时连接和可靠推送/session controller；`DotArenaGame` 通过转发属性兼容现有 partial，后续还需继续减少直接状态写入。
 - 已新增 `DotArenaSinglePlayerController`，负责本地模拟创建、无敌模式选项、本地输入提交、tick catch-up 和模拟推进；`DotArenaGame.SinglePlayer.cs` 改为把单机结果接回现有表现和结算流程的适配层。
 - 已新增 `DotArenaUiFactory` 和 `DotArenaUiStyleCatalog`，将 `DotArenaSceneUiPresenter.Layout*.cs` 与 `Styling.cs` 中重复的运行时文本、按钮、面板、输入框创建和样式逻辑抽到共享工厂/样式目录。
 - 已把 UI 快照构建移动到 `DotArenaGame.UiSnapshot.cs`，让 `DotArenaGame.UiSurface.cs` 更集中于 UI 命令处理。
 - 本轮客户端脚本编译通过：`dotnet build samples/Agar.Unity/Client/SampleClient.Gameplay.csproj --no-restore`，0 警告、0 错误。
 - 尚未达到阶段 6 的最终验收硬指标：`DotArenaGame` 仍有多份 partial 文件和较多转发状态，`DotArenaSceneUiPresenter` 仍未拆成独立面板 presenter；完整单机/联机手动回归仍需在 Unity 游戏视图执行。
+
+### 阶段 7：网关清理语义与框架迁移
+
+- `ULinkGame.Server.Sessions` 已提供 `GameSessionKey`、`SessionEndpointKey`、`IGameSessionDirectory`、in-memory directory、resume decision、token validator hook、authoritative state probe 和 cleanup hosted service。
+- `ULinkGame.Server.ReliablePush` 已提供 session/generation-aware ack outcome、`IReliablePushAckService` 和 `GameSessionKey` owner key 扩展。
+- `ULinkGame.Client` 已提供 `ReliablePushSession`、`ReliablePushInbox`、cursor store、`ClientSessionController` 和 deterministic transition tests。
+- Agar Unity 的 `SessionDirectory` / `PlayerService` 已迁移到框架会话目录：控制端点和实时端点以 endpoint name 绑定 opaque callback，reconnect 通过 framework resume decision 判断 state lost。
+- Agar Unity 的可靠匹配推送已按 `GameSessionKey` 隔离 publish/replay/ack；ack 请求携带 session id/generation，old generation 或未知 sequence 会映射为 state lost / session mismatch。
+- Unity 客户端 reconnect、state-lost 和 reliable push cursor 已接入 `ClientSessionController` / `ReliablePushInbox`，新会话会隔离旧可靠推送序列。
+- 本轮验证通过：`dotnet test Tests/tests.slnx --no-restore`、`dotnet test samples/Agar.Unity/tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj --no-restore`、`dotnet build samples/Agar.Unity/Server/Edge/Edge.csproj --no-restore`、`dotnet build samples/Agar.Unity/Client/SampleClient.Gameplay.csproj --no-restore`。
+- 剩余工作不是重新实现会话可靠性，而是补充 `PlayerService`、`RoomRuntime`、`DotArenaNetworkSession` 和端到端断线/重启路径的生产回归覆盖。
 
 ### 阶段 8：胜利积分与排行榜
 
