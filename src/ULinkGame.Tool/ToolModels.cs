@@ -22,10 +22,8 @@ internal static class ProjectConventions
     }
 }
 
-internal static class ToolPackageVersions
+internal static partial class ToolPackageVersions
 {
-    public const string ULinkGameClient = "0.1.4";
-    public const string ULinkGameServer = "0.1.4";
     public const string ULinkRpcStarter = "0.2.58";
     public const string Orleans = "10.0.0";
 }

@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ulinkgame-tool</ToolCommandName>
     <PackageId>ULinkGame.Tool</PackageId>
-    <Version>0.1.14</Version>
+    <Version>0.1.15</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and code generation workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;codegen</PackageTags>
   </PropertyGroup>
@@ -16,4 +16,41 @@
   <ItemGroup>
     <None Update="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <GeneratedToolPackageVersionsFile>$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)\ToolPackageVersions.g.cs</GeneratedToolPackageVersionsFile>
+  </PropertyGroup>
+
+  <Target Name="GenerateToolPackageVersions" BeforeTargets="CoreCompile">
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Client\ULinkGame.Client.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameClientPackageVersion" />
+    </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Server\ULinkGame.Server.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameServerPackageVersion" />
+    </XmlPeek>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(GeneratedToolPackageVersionsFile)'))" />
+
+    <ItemGroup>
+      <GeneratedToolPackageVersionsLine Include="// &lt;auto-generated /&gt;" />
+      <GeneratedToolPackageVersionsLine Include="internal static partial class ToolPackageVersions" />
+      <GeneratedToolPackageVersionsLine Include="{" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClient = &quot;$(ULinkGameClientPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServer = &quot;$(ULinkGameServerPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="}" />
+    </ItemGroup>
+
+    <WriteLinesToFile
+      File="$(GeneratedToolPackageVersionsFile)"
+      Lines="@(GeneratedToolPackageVersionsLine)"
+      Overwrite="true" />
+
+    <ItemGroup>
+      <Compile Include="$(GeneratedToolPackageVersionsFile)" Link="ToolPackageVersions.g.cs" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -7,6 +7,7 @@
 - `ULinkGame.Abstractions` `0.1.1`
 - `ULinkGame.Client` `0.1.5`
 - `ULinkGame.Server` `0.1.5`
+- `ULinkGame.Tool` `0.1.15`
 
 ### Changed
 
@@ -14,6 +15,7 @@
 - Added `IULinkGameServer` / `AddULinkGameServer()` and `ULinkGameClient` as the recommended single-entry APIs for server and client code.
 - Added typed reliable push overloads on `IULinkGameServer` so recommended server code can deliver through endpoint callbacks without handling `ReliablePushRecord`.
 - Moved shared `GameSessionKey`, `GameEndpointName`, `ReliablePushSequence`, reliable push acknowledgement outcomes, and session resume outcomes out of server/client-only namespaces.
+- Changed `ULinkGame.Tool` to generate its ULinkGame runtime package version constants from the Server and Client project versions during build.
 
 ## 2026-05-11
 
