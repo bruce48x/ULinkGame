@@ -163,6 +163,36 @@ resolve_single_project() {
   esac
 }
 
+resolve_godot_main_scene() {
+  local project_file="$CLIENT_DIR/project.godot"
+  local scene=""
+  local scene_file=""
+
+  if [[ ! -f "$project_file" ]]; then
+    echo "Godot project file not found: $project_file" >&2
+    return 1
+  fi
+
+  scene="$(awk -F'"' '/^[[:space:]]*run\/main_scene[[:space:]]*=/ { print $2; exit }' "$project_file")"
+  if [[ -z "$scene" ]]; then
+    echo "Godot project does not declare application run/main_scene: $project_file" >&2
+    return 1
+  fi
+
+  if [[ "$scene" != res://* ]]; then
+    echo "Unsupported Godot main scene path in $project_file: $scene" >&2
+    return 1
+  fi
+
+  scene_file="$CLIENT_DIR/${scene#res://}"
+  if [[ ! -f "$scene_file" ]]; then
+    echo "Godot main scene does not exist: $scene ($scene_file)" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$scene"
+}
+
 pack_local_package() {
   local project_path="$1"
   dotnet pack "$project_path" -c Release -o "$LOCAL_FEED" --nologo
@@ -203,7 +233,9 @@ dotnet run --project "$ROOT_DIR/src/ULinkGame.Tool/ULinkGame.Tool.csproj" -- \
   --serializer "$SERIALIZER"
 
 CLIENT_PROJECT="$(resolve_single_project "$CLIENT_DIR" "Godot client")"
+GODOT_MAIN_SCENE="$(resolve_godot_main_scene)"
 echo "Using generated Godot client project: $CLIENT_PROJECT"
+echo "Using generated Godot main scene: $GODOT_MAIN_SCENE"
 
 echo "Restoring and building generated server projects"
 dotnet restore "$SILO_PROJECT" --configfile "$CI_NUGET_CONFIG"
@@ -237,7 +269,7 @@ echo "Running generated Godot client headless"
 "$GODOT_BIN" \
   --headless \
   --path "$CLIENT_DIR" \
-  --scene "res://Scenes/Main.tscn" \
+  --scene "$GODOT_MAIN_SCENE" \
   --log-file "$CLIENT_LOG" \
   --verbose \
   --no-header >"$GODOT_STDOUT_LOG" 2>&1 &
