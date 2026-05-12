@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Agar.Godot.Scripts.Networking;
 using Godot;
 using Shared.Interfaces;
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 using ULinkRPC.Client;
 
@@ -135,7 +136,7 @@ public partial class Main : Node2D
                 _localPlayerId = login.PlayerId;
                 _status = "Logged in, matchmaking";
             }
-            _pushInbox.StartSession(new ReliablePushSession(
+            _pushInbox.StartSession(new GameSessionKey(
                 login.PlayerId,
                 string.IsNullOrWhiteSpace(login.Token) ? login.PlayerId : login.Token,
                 generation: 1));
