@@ -22,8 +22,14 @@ internal sealed class ReliableMatchmakingPublisher
 
     public async ValueTask PublishAsync(string playerId, MatchmakingStatusUpdate update, CancellationToken cancellationToken = default)
     {
+        var registration = _sessionDirectory.Get(playerId);
+        if (registration is null)
+        {
+            return;
+        }
+
         await _reliablePushOutbox.PublishAsync(
-            playerId,
+            registration.SessionKey,
             ReliablePushKinds.MatchmakingStatus,
             Clone(update),
             DeliverAsync,
@@ -32,27 +38,35 @@ internal sealed class ReliableMatchmakingPublisher
 
     public ValueTask ReplayPendingAsync(string playerId, CancellationToken cancellationToken = default)
     {
-        return _reliablePushOutbox.ReplayPendingAsync(playerId, DeliverAsync, cancellationToken);
+        var registration = _sessionDirectory.Get(playerId);
+        return registration is null
+            ? ValueTask.CompletedTask
+            : _reliablePushOutbox.ReplayPendingAsync(registration.SessionKey, DeliverAsync, cancellationToken);
     }
 
-    private ValueTask DeliverAsync(ReliablePushRecord record)
+    private async ValueTask DeliverAsync(ReliablePushRecord record)
     {
         if (!string.Equals(record.Kind, ReliablePushKinds.MatchmakingStatus, StringComparison.Ordinal) ||
             record.Payload is not MatchmakingStatusUpdate update)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        var registration = _sessionDirectory.Get(record.OwnerKey);
-        if (registration?.ControlCallback is null)
+        var registration = _sessionDirectory.GetByReliablePushOwnerKey(record.OwnerKey);
+        if (registration is null)
         {
-            return ValueTask.CompletedTask;
+            return;
+        }
+
+        var callback = await _sessionDirectory.GetControlCallbackAsync(registration).ConfigureAwait(false);
+        if (callback is null)
+        {
+            return;
         }
 
         var payload = Clone(update);
         payload.ReliableSequence = record.Sequence;
-        SafeInvoke(registration.ControlCallback, callback => callback.OnMatchmakingStatus(payload));
-        return ValueTask.CompletedTask;
+        SafeInvoke(callback, target => target.OnMatchmakingStatus(payload));
     }
 
     private void SafeInvoke(IPlayerCallback callback, Action<IPlayerCallback> action)

@@ -1,17 +1,23 @@
 using Shared.Interfaces;
+using ULinkGame.Server.Sessions;
 
 namespace Edge.Services;
 
 internal sealed class SessionRegistration
 {
-    public SessionRegistration(string playerId, string sessionToken, string connectionId, IPlayerCallback? controlCallback)
+    public const string ControlEndpointName = "control";
+    public const string RealtimeEndpointName = "realtime";
+
+    public SessionRegistration(GameSessionKey sessionKey, string sessionToken, string connectionId, IPlayerCallback? controlCallback)
     {
-        PlayerId = playerId;
+        SessionKey = sessionKey;
+        PlayerId = sessionKey.OwnerKey;
         SessionToken = sessionToken;
         ConnectionId = connectionId;
         ControlCallback = controlCallback;
     }
 
+    public GameSessionKey SessionKey { get; set; }
     public string PlayerId { get; }
     public string SessionToken { get; set; }
     public string ConnectionId { get; set; }

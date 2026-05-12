@@ -5,6 +5,7 @@ using Orleans.Contracts.Sessions;
 using Edge.Realtime;
 using Shared.Interfaces;
 using ULinkGame.Server.ReliablePush;
+using ULinkGame.Server.Sessions;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 
@@ -20,6 +21,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
     private readonly RoomRuntimeHost _roomRuntimeHost;
     private readonly ReliableMatchmakingPublisher _reliableMatchmakingPublisher;
     private readonly IReliablePushOutbox _reliablePushOutbox;
+    private readonly IReliablePushAckService _reliablePushAckService;
     private readonly ILogger<PlayerService> _logger;
     private bool _disposed;
     private string? _playerId;
@@ -36,6 +38,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         RoomRuntimeHost roomRuntimeHost,
         ReliableMatchmakingPublisher reliableMatchmakingPublisher,
         IReliablePushOutbox reliablePushOutbox,
+        IReliablePushAckService reliablePushAckService,
         ILogger<PlayerService> logger)
     {
         _callback = callback;
@@ -46,6 +49,7 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         _roomRuntimeHost = roomRuntimeHost;
         _reliableMatchmakingPublisher = reliableMatchmakingPublisher;
         _reliablePushOutbox = reliablePushOutbox;
+        _reliablePushAckService = reliablePushAckService;
         _logger = logger;
     }
 
@@ -96,24 +100,29 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         _controlLoggedIn = true;
 
         var sessionGrain = _clusterClient.GetGrain<IPlayerSessionGrain>(loginResult.UserId);
+        GameSessionKey sessionKey;
         if (req.Reconnect)
         {
-            if (!CanReconnect(loginResult.UserId, loginResult.SessionToken))
+            var resumeDecision = await _sessionDirectory
+                .ResumeControlAsync(loginResult.UserId, loginResult.SessionToken, _connectionId, _callback)
+                .ConfigureAwait(false);
+            if (resumeDecision.Status != SessionResumeStatus.Resumed || resumeDecision.Session is null)
             {
                 _playerId = null;
                 _connectionId = null;
                 _controlLoggedIn = false;
-                await _reliablePushOutbox.AckAsync(loginResult.UserId, long.MaxValue).ConfigureAwait(false);
                 return new LoginReply
                 {
                     Code = LoginResultCodes.ReconnectStateLost,
                     PlayerId = loginResult.UserId,
                     Account = account,
-                    Message = "Server session state was lost. Start a new session instead of reconnecting."
+                    Message = string.IsNullOrWhiteSpace(resumeDecision.Reason)
+                        ? "Server session state was lost. Start a new session instead of reconnecting."
+                        : resumeDecision.Reason
                 };
             }
 
-            _sessionDirectory.Register(loginResult.UserId, loginResult.SessionToken, _connectionId, _callback, preserveSessionState: true);
+            sessionKey = resumeDecision.Session.Value;
             await sessionGrain
                 .ReconnectAsync(new PlayerSessionReconnectRequest
                 {
@@ -128,7 +137,9 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         }
         else
         {
-            _sessionDirectory.Register(loginResult.UserId, loginResult.SessionToken, _connectionId, _callback, preserveSessionState: false);
+            sessionKey = await _sessionDirectory
+                .RegisterNewControlAsync(loginResult.UserId, loginResult.SessionToken, _connectionId, _callback)
+                .ConfigureAwait(false);
             await sessionGrain
                 .AttachAsync(new PlayerSessionAttachRequest
             {
@@ -150,7 +161,9 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             WinCount = loginResult.WinCount,
             VictoryPoints = loginResult.VictoryPoints,
             Account = account,
-            Password = req.GuestLogin ? password : string.Empty
+            Password = req.GuestLogin ? password : string.Empty,
+            SessionId = sessionKey.SessionId,
+            SessionGeneration = sessionKey.Generation
         };
     }
 
@@ -255,7 +268,9 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
         _connectionId = Guid.NewGuid().ToString("N");
         _isRealtimeConnection = true;
 
-        var attached = _sessionDirectory.AttachRealtime(req.PlayerId, req.Token, req.RoomId, req.MatchId, _connectionId, _callback);
+        var attached = await _sessionDirectory
+            .AttachRealtimeAsync(req.PlayerId, req.Token, req.RoomId, req.MatchId, _connectionId, _callback)
+            .ConfigureAwait(false);
         if (!attached)
         {
             _playerId = null;
@@ -312,6 +327,11 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             };
         }
 
+        var currentSession = registration.SessionKey;
+        var acknowledgedSession = string.IsNullOrWhiteSpace(req.SessionId) || req.SessionGeneration <= 0
+            ? currentSession
+            : new GameSessionKey(_playerId, req.SessionId, req.SessionGeneration);
+
         if (registration is not null &&
             !string.IsNullOrWhiteSpace(req.Token) &&
             !string.Equals(registration.SessionToken, req.Token, StringComparison.Ordinal))
@@ -323,8 +343,11 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             };
         }
 
-        var serverLastSequence = _reliablePushOutbox.GetLastSequence(_playerId);
-        if (req.Sequence > serverLastSequence)
+        var outcome = await _reliablePushAckService
+            .AckAsync(currentSession, acknowledgedSession, req.Sequence)
+            .ConfigureAwait(false);
+
+        if (outcome.Status == ReliablePushAckStatus.StateLost)
         {
             return new ReliablePushAckReply
             {
@@ -334,7 +357,16 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             };
         }
 
-        await _reliablePushOutbox.AckAsync(_playerId, req.Sequence).ConfigureAwait(false);
+        if (outcome.Status == ReliablePushAckStatus.SessionMismatch)
+        {
+            return new ReliablePushAckReply
+            {
+                Code = ReliablePushAckResultCodes.SessionStateLost,
+                RequiresNewSession = true,
+                Message = "Reliable push ack belongs to a different session generation."
+            };
+        }
+
         return new ReliablePushAckReply { Code = ReliablePushAckResultCodes.Ok };
     }
 
@@ -462,29 +494,17 @@ internal sealed class PlayerService : IPlayerService, IDisposable, IAsyncDisposa
             _logger.LogError(ex, "Failed to mark control disconnect for player {PlayerId} during {Reason}.", playerId, reason);
         }
 
-        _sessionDirectory.MarkControlDisconnected(playerId, connectionId, disconnectedAtUtc);
+        await _sessionDirectory.MarkControlDisconnectedAsync(playerId, connectionId, disconnectedAtUtc).ConfigureAwait(false);
     }
 
     private Task ReleaseRealtimeAsync(string playerId, string reason)
     {
-        _sessionDirectory.DetachRealtime(playerId, _connectionId);
-        return Task.CompletedTask;
+        return _sessionDirectory.DetachRealtimeAsync(playerId, _connectionId).AsTask();
     }
 
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-    }
-
-    private bool CanReconnect(string playerId, string sessionToken)
-    {
-        var registration = _sessionDirectory.Get(playerId);
-        if (registration is null)
-        {
-            return false;
-        }
-
-        return string.Equals(registration.SessionToken, sessionToken, StringComparison.Ordinal);
     }
 
     private static EdgeEndpointDescriptor CloneEdge(EdgeEndpointDescriptor edge)

@@ -2,11 +2,19 @@
 
 using Shared.Interfaces;
 using ULinkGame.Client.ReliablePush;
+using ULinkGame.Client.Sessions;
 
 namespace SampleClient.Gameplay
 {
     internal sealed class DotArenaMultiplayerState
     {
+        private readonly ReliablePushInbox _reliablePushInbox = new();
+
+        public DotArenaMultiplayerState()
+        {
+            SessionController = new ClientSessionController(_reliablePushInbox);
+        }
+
         public SessionMode SessionMode { get; set; } = SessionMode.None;
         public string LocalPlayerId { get; set; } = string.Empty;
         public bool HasAuthenticatedProfile { get; set; }
@@ -16,7 +24,8 @@ namespace SampleClient.Gameplay
         public bool ControlReconnectInProgress { get; set; }
         public float MatchmakingStartedAt { get; set; } = -1f;
         public RealtimeConnectionInfo? LastRealtimeConnection { get; set; }
-        public ReliablePushInbox ReliablePushInbox { get; } = new();
+        public ReliablePushInbox ReliablePushInbox => _reliablePushInbox;
+        public ClientSessionController SessionController { get; }
 
         public bool HasPendingUiRequest => PendingUiRequest != PendingUiRequest.None;
         public bool HasRecoverableLogin => SessionMode == SessionMode.Multiplayer && HasAuthenticatedProfile;
@@ -47,20 +56,20 @@ namespace SampleClient.Gameplay
             LocalWinCount = profile.WinCount;
         }
 
-        public void ApplyMultiplayerLogin(string playerId, string sessionToken, int winCount)
+        public void ApplyMultiplayerLogin(string playerId, string sessionToken, string sessionId, long sessionGeneration, int winCount)
         {
             LocalPlayerId = playerId;
             SessionMode = SessionMode.Multiplayer;
             ApplyAuthenticatedProfile(playerId, winCount);
-            StartReliablePushSession(playerId, sessionToken);
+            StartReliablePushSession(playerId, sessionToken, sessionId, sessionGeneration);
         }
 
-        public void ApplyControlReconnect(string playerId, string sessionToken, int winCount)
+        public void ApplyControlReconnect(string playerId, string sessionToken, string sessionId, long sessionGeneration, int winCount)
         {
             LocalPlayerId = playerId;
             SessionMode = SessionMode.Multiplayer;
             ApplyAuthenticatedProfile(playerId, winCount);
-            StartReliablePushSession(playerId, sessionToken);
+            StartReliablePushSession(playerId, sessionToken, sessionId, sessionGeneration);
         }
 
         public void ClearSession()
@@ -85,14 +94,22 @@ namespace SampleClient.Gameplay
 
             if (resetReliablePush)
             {
-                ReliablePushInbox.Reset();
+                SessionController.EndSession();
             }
         }
 
-        private void StartReliablePushSession(string playerId, string sessionToken)
+        public void MarkSessionStateLost()
         {
-            var sessionId = string.IsNullOrWhiteSpace(sessionToken) ? playerId : sessionToken;
-            ReliablePushInbox.StartSession(new ReliablePushSession(playerId, sessionId, generation: 1));
+            SessionController.MarkStateLost();
+        }
+
+        private void StartReliablePushSession(string playerId, string sessionToken, string sessionId, long sessionGeneration)
+        {
+            var reliableSessionId = string.IsNullOrWhiteSpace(sessionId)
+                ? string.IsNullOrWhiteSpace(sessionToken) ? playerId : sessionToken
+                : sessionId;
+            var generation = sessionGeneration <= 0 ? 1 : sessionGeneration;
+            SessionController.StartSession(new ReliablePushSession(playerId, reliableSessionId, generation));
         }
     }
 

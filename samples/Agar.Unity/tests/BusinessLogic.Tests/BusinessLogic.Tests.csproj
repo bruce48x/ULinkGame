@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Server/Orleans.Contracts/Orleans.Contracts.csproj" />
+    <ProjectReference Include="../../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
     <ProjectReference Include="../../Server/Silo/Silo.csproj">
       <Aliases>SiloAssembly</Aliases>
     </ProjectReference>

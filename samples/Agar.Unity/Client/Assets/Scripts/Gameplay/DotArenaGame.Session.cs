@@ -22,6 +22,7 @@ namespace SampleClient.Gameplay
             _entryMenuState = EntryMenuState.MultiplayerAuth;
             _status = $"正在连接 {Rpc.WebSocketRpcClientFactory.BuildUrl(_host, _port, _path)}";
             _eventMessage = "正在登录联机账号";
+            _multiplayerState.SessionController.MarkConnecting();
 
             try
             {
@@ -38,7 +39,7 @@ namespace SampleClient.Gameplay
                 }
 
                 var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
-                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.WinCount);
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.SessionId, reply.SessionGeneration, reply.WinCount);
                 _localMatch = null;
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
@@ -88,6 +89,7 @@ namespace SampleClient.Gameplay
             _entryMenuState = EntryMenuState.MultiplayerAuth;
             _status = $"正在连接 {Rpc.WebSocketRpcClientFactory.BuildUrl(_host, _port, _path)}";
             _eventMessage = "正在申请游客账号";
+            _multiplayerState.SessionController.MarkConnecting();
 
             try
             {
@@ -106,7 +108,7 @@ namespace SampleClient.Gameplay
                 _account = string.IsNullOrWhiteSpace(reply.Account) ? reply.PlayerId : reply.Account;
                 _password = reply.Password;
                 var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _account : reply.PlayerId;
-                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.WinCount);
+                _multiplayerState.ApplyMultiplayerLogin(playerId, reply.Token, reply.SessionId, reply.SessionGeneration, reply.WinCount);
                 _localMatch = null;
                 EnsureMetaState(_localPlayerId);
                 _ = RefreshLeaderboardAsync();
@@ -162,6 +164,7 @@ namespace SampleClient.Gameplay
             }
 
             _controlReconnectInProgress = true;
+            _multiplayerState.SessionController.MarkReconnecting();
             _status = string.IsNullOrWhiteSpace(disconnectMessage)
                 ? "主连接已断开，正在重连"
                 : $"主连接已断开，正在重连: {disconnectMessage}";
@@ -197,7 +200,7 @@ namespace SampleClient.Gameplay
                         if (reply.Code == LoginResultCodes.Ok)
                         {
                             var playerId = string.IsNullOrWhiteSpace(reply.PlayerId) ? _authenticatedPlayerId : reply.PlayerId;
-                            _multiplayerState.ApplyControlReconnect(playerId, reply.Token, reply.WinCount);
+                            _multiplayerState.ApplyControlReconnect(playerId, reply.Token, reply.SessionId, reply.SessionGeneration, reply.WinCount);
                             EnsureMetaState(_localPlayerId);
                             _ = RefreshLeaderboardAsync();
                             _status = _flowState == FrontendFlowState.InMatch
@@ -252,9 +255,10 @@ namespace SampleClient.Gameplay
         private async Task StartNewConnectionAfterStateLostAsync()
         {
             await NetworkSession.DisposeRealtimeAsync().ConfigureAwait(false);
+            _multiplayerState.MarkSessionStateLost();
             ResetSessionPresentation();
             _callbackInbox.Clear();
-            _multiplayerState.ClearRequestState(resetReliablePush: true);
+            _multiplayerState.ClearRequestState(resetReliablePush: false);
             _flowState = FrontendFlowState.Entry;
             _entryMenuState = EntryMenuState.MultiplayerAuth;
             _multiplayerState.ClearSession();
@@ -610,14 +614,14 @@ namespace SampleClient.Gameplay
             _eventMessage = "请选择单机或联机";
         }
 
-        private void ResetToModeSelect(string status, string eventMessage, string? toastMessage)
+        private void ResetToModeSelect(string status, string eventMessage, string? toastMessage, bool resetReliablePush = true)
         {
             _ = NetworkSession.DisposeRealtimeAsync();
             ResetSessionPresentation();
             _callbackInbox.Clear();
             _settlementSummary = null;
             _lastRewardSummary = null;
-            _multiplayerState.ClearRequestState(resetReliablePush: true);
+            _multiplayerState.ClearRequestState(resetReliablePush);
             _flowState = FrontendFlowState.Entry;
             _entryMenuState = EntryMenuState.ModeSelect;
             _multiplayerState.ClearAuthenticatedProfile();

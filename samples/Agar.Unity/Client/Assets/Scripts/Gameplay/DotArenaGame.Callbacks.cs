@@ -230,7 +230,14 @@ namespace SampleClient.Gameplay
 
                 if (result.Acknowledgement is { Status: ReliablePushAckStatus.StateLost or ReliablePushAckStatus.SessionMismatch } acknowledgement)
                 {
+                    _multiplayerState.SessionController.ApplyAckOutcome(acknowledgement);
                     HandleSessionStateLost(acknowledgement.Reason);
+                    return;
+                }
+
+                if (result.Acknowledgement is { } acknowledgementResult)
+                {
+                    _multiplayerState.SessionController.ApplyAckOutcome(acknowledgementResult);
                 }
             }
             catch (OperationCanceledException)
@@ -311,10 +318,12 @@ namespace SampleClient.Gameplay
 
         private void HandleSessionStateLost(string? message)
         {
+            _multiplayerState.MarkSessionStateLost();
             ResetToModeSelect(
                 status: "联机状态已过期",
                 eventMessage: string.IsNullOrWhiteSpace(message) ? "请重新登录后开始新的联机会话" : message,
-                toastMessage: null);
+                toastMessage: null,
+                resetReliablePush: false);
         }
 
         private async System.Threading.Tasks.Task EnsureRealtimeSessionAsync(RealtimeConnectionInfo realtimeConnection)

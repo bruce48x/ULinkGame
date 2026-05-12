@@ -6,6 +6,7 @@ using Edge.Realtime;
 using Edge.Services;
 using ULinkGame.Server.Hosting;
 using ULinkGame.Server.ReliablePush;
+using ULinkGame.Server.Sessions;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration
@@ -15,6 +16,7 @@ builder.Configuration
 
 builder.AddULinkGameServerOrleansClient();
 
+builder.Services.AddULinkGameServerSessions();
 builder.Services.AddSingleton<SessionDirectory>();
 builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
     EdgeRpcServerOptions.FromConfiguration(

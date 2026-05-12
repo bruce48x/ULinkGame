@@ -17,6 +17,8 @@ namespace SampleClient.Gameplay
         private IPlayerService? _realtimePlayerService;
         private string _playerId = string.Empty;
         private string _token = string.Empty;
+        private string _sessionId = string.Empty;
+        private long _sessionGeneration;
         private string _realtimeRoomId = string.Empty;
         private string _realtimeMatchId = string.Empty;
         private bool _ignoreControlDisconnect;
@@ -82,6 +84,8 @@ namespace SampleClient.Gameplay
 
                 _playerId = reply.PlayerId;
                 _token = reply.Token;
+                _sessionId = reply.SessionId;
+                _sessionGeneration = reply.SessionGeneration;
                 IsConnected = true;
                 return reply;
             }
@@ -153,7 +157,9 @@ namespace SampleClient.Gameplay
             {
                 PlayerId = _playerId,
                 Token = _token,
-                Sequence = sequence
+                Sequence = sequence,
+                SessionId = _sessionId,
+                SessionGeneration = _sessionGeneration
             }).ConfigureAwait(false);
         }
 
@@ -293,6 +299,8 @@ namespace SampleClient.Gameplay
                 {
                     _playerId = string.Empty;
                     _token = string.Empty;
+                    _sessionId = string.Empty;
+                    _sessionGeneration = 0;
                 }
 
                 IsConnected = false;

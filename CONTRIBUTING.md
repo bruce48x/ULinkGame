@@ -1035,7 +1035,7 @@ Status:
 - [x] Add framework result enums and outcome types for reconnect/ack decisions.
 - [x] Add reliable push ack decision helper for accepted, duplicate, session mismatch, and state lost outcomes.
 - [x] Add authoritative state probe abstraction for state refresh versus state lost decisions.
-- [ ] Migrate Agar sample login and ack result mapping to framework outcome types.
+- [x] Migrate Agar sample login and ack result mapping to framework outcome types.
 - [x] Document replay versus refresh versus new-session behavior in package READMEs.
 
 #### Session Lifecycle
@@ -1050,7 +1050,7 @@ Status:
 - [x] Add token validation hook.
 - [x] Add authoritative state probe integration.
 - [x] Add cleanup hosted service helpers after the directory API stabilizes.
-- [ ] Migrate Agar sample `SessionDirectory`/`PlayerService` to the framework directory.
+- [x] Migrate Agar sample `SessionDirectory`/`PlayerService` to the framework directory.
 
 #### Reliable Push
 
@@ -1074,7 +1074,7 @@ Status:
 - [x] Make `StateLost` clear reliable state and remain terminal until `StartSession`.
 - [x] Add deterministic pure transition tests.
 - [x] Add README examples for Unity, Godot, and plain .NET usage.
-- [ ] Migrate sample reconnect/state-lost handling to `ClientSessionController`.
+- [x] Migrate sample reconnect/state-lost handling to `ClientSessionController`.
 
 ### Candidate Framework Work
 

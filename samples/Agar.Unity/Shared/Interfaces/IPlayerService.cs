@@ -84,6 +84,10 @@ namespace Shared.Interfaces
         public string Message { get; set; } = "";
         [MemoryPackOrder(7)]
         public int VictoryPoints { get; set; }
+        [MemoryPackOrder(8)]
+        public string SessionId { get; set; } = "";
+        [MemoryPackOrder(9)]
+        public long SessionGeneration { get; set; }
     }
 
     public static class LoginResultCodes
@@ -139,6 +143,10 @@ namespace Shared.Interfaces
         public string Token { get; set; } = "";
         [MemoryPackOrder(2)]
         public long Sequence { get; set; }
+        [MemoryPackOrder(3)]
+        public string SessionId { get; set; } = "";
+        [MemoryPackOrder(4)]
+        public long SessionGeneration { get; set; }
     }
 
     [MemoryPackable(GenerateType.VersionTolerant)]
