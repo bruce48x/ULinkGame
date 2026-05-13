@@ -12,6 +12,8 @@
 
 ### Changed
 
+- Removed Microsoft Orleans package references and Orleans hosting helpers from `ULinkGame.Server`; the server package now starts from a framework-owned actor runtime.
+- Added `ULinkGame.Server.Actors` with `ActorId`, `Actor`, `IActorRuntime`, a process-local single-mailbox actor runtime, timer registration, and DI registration.
 - Added `ULinkGame.Abstractions` for cross-side framework-owned session, endpoint, reconnect, and reliable push primitives.
 - Added `IULinkGameServer` / `AddULinkGameServer()` and `ULinkGameClient` as the recommended single-entry APIs for server and client code.
 - Added typed reliable push overloads on `IULinkGameServer` so recommended server code can deliver through endpoint callbacks without handling `ReliablePushRecord`.

@@ -115,7 +115,7 @@ internal sealed class CliApplication(
 
             Commands:
               new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
-                  Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and Microsoft Orleans.
+                  Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and the ULinkGame actor runtime.
                   Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
 
               codegen [--config <path>] [--no-restore]
@@ -127,9 +127,8 @@ internal sealed class CliApplication(
     {
         Console.WriteLine("ULinkGame project ready. Next steps:");
         Console.WriteLine($"  1) cd \"{projectRoot}\"");
-        Console.WriteLine("  2) dotnet run --project \"Server/Silo/Silo.csproj\"");
-        Console.WriteLine("  3) dotnet run --project \"Server/Edge/Edge.csproj\"");
-        Console.WriteLine("  4) After changing Shared contracts, run `ulinkgame-tool codegen` from the project root.");
+        Console.WriteLine("  2) dotnet run --project \"Server/Edge/Edge.csproj\"");
+        Console.WriteLine("  3) After changing Shared contracts, run `ulinkgame-tool codegen` from the project root.");
     }
 }
 

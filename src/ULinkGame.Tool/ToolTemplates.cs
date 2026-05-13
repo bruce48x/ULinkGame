@@ -26,7 +26,6 @@ internal static class ToolTemplates
         <Solution>
           <Project Path="../Shared/Shared.csproj" />
           <Project Path="Edge/Edge.csproj" />
-          <Project Path="Silo/Silo.csproj" />
         </Solution>
         """;
     }
@@ -44,6 +43,7 @@ internal static class ToolTemplates
             using Microsoft.Extensions.Hosting;
             using Microsoft.Extensions.Logging;
             using Edge.Hosting;
+            using ULinkGame.Server;
             using ULinkGame.Server.Hosting;
 
             var builder = Host.CreateApplicationBuilder(args);
@@ -54,7 +54,7 @@ internal static class ToolTemplates
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables();
 
-            builder.AddULinkGameServerOrleansClient();
+            builder.Services.AddULinkGameServer();
             builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
                 EdgeRpcServerOptions.FromConfiguration(
                     builder.Configuration,
@@ -82,6 +82,7 @@ internal static class ToolTemplates
         using Microsoft.Extensions.Hosting;
         using Microsoft.Extensions.Logging;
         using Edge.Hosting;
+        using ULinkGame.Server;
         using ULinkGame.Server.Hosting;
 
         var builder = Host.CreateApplicationBuilder(args);
@@ -92,7 +93,7 @@ internal static class ToolTemplates
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
 
-        builder.AddULinkGameServerOrleansClient();
+        builder.Services.AddULinkGameServer();
         builder.Services.AddSingleton(_ =>
             EdgeRpcServerOptions.FromConfiguration(
                 builder.Configuration,
@@ -108,7 +109,7 @@ internal static class ToolTemplates
 
     public static string RenderEdgeProject(NewCommandOptions options)
     {
-        var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: false);
+        var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: true);
 
         return $$"""
         <Project Sdk="Microsoft.NET.Sdk">
@@ -146,16 +147,10 @@ internal static class ToolTemplates
     {
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
-        var orleansPersistence = RenderOrleansPersistenceSettings(options);
-
         if (!ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
             return $$"""
             {
-              "Orleans": {
-                "ClusterId": "dev",
-                "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"{{orleansPersistence}}
-              },
               "Endpoint": {
                 "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
                 "Host": "127.0.0.1",
@@ -168,10 +163,6 @@ internal static class ToolTemplates
 
         return $$"""
         {
-          "Orleans": {
-            "ClusterId": "dev",
-            "ServiceId": "{{TemplateText.SanitizeStringLiteral(options.Name ?? ProjectConventions.DefaultProjectName)}}-Server"{{orleansPersistence}}
-          },
           "ControlPlane": {
             "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
             "Host": "127.0.0.1",
@@ -249,90 +240,6 @@ internal sealed class {typeName}
 
     public EdgeRpcServerOptions Endpoint {{ get; }}
 }}";
-    }
-
-    public static string RenderSiloProject(NewCommandOptions options)
-    {
-        var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: true);
-
-        return $$"""
-        <Project Sdk="Microsoft.NET.Sdk">
-          <PropertyGroup>
-            <OutputType>Exe</OutputType>
-            <TargetFramework>net10.0</TargetFramework>
-            <ImplicitUsings>enable</ImplicitUsings>
-            <Nullable>enable</Nullable>
-            <BuildInParallel>false</BuildInParallel>
-            <RestoreBuildInParallel>false</RestoreBuildInParallel>
-          </PropertyGroup>
-
-          <ItemGroup>
-            <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
-            <PackageReference Include="Microsoft.Orleans.Server" Version="{{ToolPackageVersions.Orleans}}" />
-        {{persistenceReferences}}
-          </ItemGroup>
-
-          <ItemGroup>
-            <None Update="appsettings.json">
-              <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            </None>
-          </ItemGroup>
-        </Project>
-        """;
-    }
-
-    public static string RenderSiloProgram()
-    {
-        return """
-        using Microsoft.Extensions.Configuration;
-        using Microsoft.Extensions.Hosting;
-        using Microsoft.Extensions.Logging;
-        using Orleans.Hosting;
-        using ULinkGame.Server.Hosting;
-
-        var host = Host.CreateDefaultBuilder(args)
-            .ConfigureLogging(logging =>
-            {
-                logging.ClearProviders();
-                logging.AddConsole();
-            })
-            .ConfigureAppConfiguration(configuration =>
-            {
-                configuration
-                    .SetBasePath(AppContext.BaseDirectory)
-                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                    .AddEnvironmentVariables();
-            })
-            .UseULinkGameServerOrleansSilo((context, silo) =>
-            {
-                silo.AddMemoryGrainStorage("users");
-                silo.AddMemoryGrainStorage("sessions");
-                silo.AddMemoryGrainStorage("matchmaking");
-                silo.AddMemoryGrainStorage("rooms");
-            })
-            .Build();
-
-        await host.RunAsync();
-        """;
-    }
-
-    public static string RenderSiloAppSettings(NewCommandOptions options)
-    {
-        var orleansPersistence = RenderOrleansPersistenceSettings(options);
-
-        return """
-        {
-          "Orleans": {
-            "ClusterId": "dev",
-            "ServiceId": "ULinkGame-Server",
-            "SiloPort": 11111,
-            "GatewayPort": 30000
-          }
-        }
-        """.Replace(
-            "\"GatewayPort\": 30000",
-            $"\"GatewayPort\": 30000{orleansPersistence}",
-            StringComparison.Ordinal);
     }
 
     public static string RenderDefaultConfigurator(NewCommandOptions options)
@@ -457,27 +364,6 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             : $"""<PackageReference Include="Npgsql" Version="{ToolPackageVersions.Npgsql}" />""");
 
         return TemplateText.IndentBlock(string.Join(Environment.NewLine, references), 3);
-    }
-
-    private static string RenderOrleansPersistenceSettings(NewCommandOptions options)
-    {
-        if (!ProjectConventions.UsesExternalPersistence(options.Persistence))
-        {
-            return string.Empty;
-        }
-
-        var (invariant, connectionString) = GetPersistenceDefaults(options);
-        return $",{Environment.NewLine}" +
-            $"    \"Invariant\": \"{TemplateText.SanitizeStringLiteral(invariant)}\",{Environment.NewLine}" +
-            $"    \"ConnectionString\": \"{TemplateText.SanitizeStringLiteral(connectionString)}\"";
-    }
-
-    private static (string Invariant, string ConnectionString) GetPersistenceDefaults(NewCommandOptions options)
-    {
-        var databaseName = TemplateText.SanitizeCSharpIdentifier(options.Name ?? ProjectConventions.DefaultProjectName).ToLowerInvariant();
-        return string.Equals(options.Persistence, "mysql", StringComparison.OrdinalIgnoreCase)
-            ? ("MySqlConnector", $"Server=127.0.0.1;Port=3306;Database={databaseName};User ID=ulinkgame;Password=ulinkgame;")
-            : ("Npgsql", $"Host=127.0.0.1;Port=5432;Database={databaseName};Username=ulinkgame;Password=ulinkgame;");
     }
 
     private static string RenderDefaultAcceptor(string transport)

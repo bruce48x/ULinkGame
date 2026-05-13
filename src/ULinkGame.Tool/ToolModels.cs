@@ -42,7 +42,6 @@ internal static partial class ToolPackageVersions
     public const string Dapper = "2.1.72";
     public const string MySqlConnector = "2.5.0";
     public const string Npgsql = "10.0.2";
-    public const string Orleans = "10.0.0";
 }
 
 internal sealed class ToolConfig

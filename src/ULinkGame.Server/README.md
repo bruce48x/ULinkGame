@@ -1,6 +1,6 @@
 # ULinkGame.Server
 
-`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, Microsoft Orleans, session lifecycle, and reliable business push.
+`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, ULinkGame actors, session lifecycle, and reliable business push.
 
 ## Install
 
@@ -55,43 +55,48 @@ public sealed class ControlPlaneRpcServerConfigurator : IULinkRpcServerConfigura
 
 `Name` only identifies the hosted RPC server inside the process. Register another configurator if you need another endpoint.
 
-## Connect to Orleans
+## Run Actors
 
-For a gateway or API process that needs an Orleans client:
+Register the built-in actor runtime when your server owns game state or realtime battle state:
 
 ```csharp
-using ULinkGame.Server.Hosting;
+using ULinkGame.Server.Actors;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.AddULinkGameServerOrleansClient();
+builder.Services.AddULinkGameServerActors();
 ```
 
-For a silo process:
+Use `IActorRuntime` to address an actor by type and id. Messages for the same actor are processed through one mailbox, so actor state can be written without locks:
 
 ```csharp
-using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
-using ULinkGame.Server.Hosting;
+using ULinkGame.Server.Actors;
 
-var host = Host.CreateDefaultBuilder(args)
-    .UseULinkGameServerOrleansSilo((context, silo) =>
+public sealed class RoomActor : Actor
+{
+    private int _joinedPlayers;
+
+    public ValueTask JoinAsync(CancellationToken cancellationToken)
     {
-        silo.AddMemoryGrainStorage("sessions");
-    })
-    .Build();
+        _joinedPlayers++;
+        return ValueTask.CompletedTask;
+    }
 
-await host.RunAsync();
+    public int JoinedPlayers => _joinedPlayers;
+}
+
+var runtime = builder.Services.BuildServiceProvider().GetRequiredService<IActorRuntime>();
+var roomId = ActorId.From("room/alpha");
+
+await runtime.TellAsync<RoomActor>(
+    roomId,
+    static (room, ct) => room.JoinAsync(ct));
+
+var joinedPlayers = await runtime.AskAsync<RoomActor, int>(
+    roomId,
+    static (room, _) => ValueTask.FromResult(room.JoinedPlayers));
 ```
 
-The helper reads these optional configuration keys:
-
-- `Orleans:ClusterId`
-- `Orleans:ServiceId`
-- `Orleans:SiloPort`
-- `Orleans:GatewayPort`
-- `Orleans:AdvertisedIPAddress`
-
-The default clustering setup is for local development. Configure Orleans storage and production clustering in your project.
+The first runtime is process-local and intentionally explicit. Distributed actor RPC, placement, and storage adapters are framework work that builds on this execution model instead of wrapping Orleans.
 
 ## Main Server API
 

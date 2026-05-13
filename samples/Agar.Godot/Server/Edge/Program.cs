@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Edge.Hosting;
 using Edge.Realtime;
 using Edge.Services;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using ULinkGame.Server.Hosting;
 using ULinkGame.Server.ReliablePush;
 
@@ -16,7 +18,33 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.AddULinkGameServerOrleansClient();
+builder.UseOrleansClient(client =>
+{
+    var configuration = builder.Configuration;
+    var clusterId = configuration["Orleans:ClusterId"] ?? "dev";
+    var serviceId = configuration["Orleans:ServiceId"] ?? "ULinkGame-Server";
+    var connectionString = configuration["Orleans:ConnectionString"];
+    var invariant = configuration["Orleans:Invariant"] ?? "Npgsql";
+
+    client.Configure<ClusterOptions>(options =>
+    {
+        options.ClusterId = clusterId;
+        options.ServiceId = serviceId;
+    });
+
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        client.UseAdoNetClustering(options =>
+        {
+            options.Invariant = invariant;
+            options.ConnectionString = connectionString;
+        });
+    }
+    else
+    {
+        client.UseLocalhostClustering(serviceId: serviceId, clusterId: clusterId);
+    }
+});
 
 builder.Services.AddSingleton<SessionDirectory>();
 builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(

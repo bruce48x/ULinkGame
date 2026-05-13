@@ -7,7 +7,7 @@ This document is for people working on the ULinkGame repository itself. User-fac
 ```txt
 src/
   ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
-  ULinkGame.Server/       Server-side hosting, Microsoft Orleans integration, reliable push outbox
+  ULinkGame.Server/       Server-side actor runtime, RPC hosting, session lifecycle, reliable push outbox
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Tool/         Project management tool entry point
 
@@ -26,7 +26,7 @@ docs/
   Hugo blog and user-facing article source
 ```
 
-User-facing articles live in the Hugo site under root `docs/`. Repository-level architectural decisions and package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
+User-facing articles live in the Hugo site under root `docs/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `docs/`; keep standalone repository architecture drafts at the repository root and cross-cutting package decisions in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
 
 ## Package Boundaries
 
@@ -36,7 +36,7 @@ User-facing articles live in the Hugo site under root `docs/`. Repository-level 
 
 - the `IULinkGameServer` main entry point for session, endpoint, and reliable push workflows
 - hosting helpers for ULinkRPC server lifecycle
-- Orleans client and silo integration helpers
+- a framework-owned actor runtime for process-local game state execution
 - a generic reliable push outbox for business-level server push delivery
 - extension points for project-specific RPC server configurators
 
@@ -86,7 +86,7 @@ In this repository's tool documentation, `starter` means `ulinkrpc-starter`, not
 When `ulinkgame-tool new` augments a generated project, it should preserve starter output and add only ULinkGame-owned infrastructure:
 
 - `ULinkGame.Server` and `ULinkGame.Client` package references when needed
-- Orleans silo/edge hosting projects and configuration
+- ULinkGame actor host and edge hosting projects and configuration
 - ULinkGame-specific server startup, gateway, and tool configuration
 - project maintenance commands that delegate code generation back to the starter toolchain
 
@@ -96,7 +96,7 @@ If a generated project needs a different `ULinkRPC.*` package version or client 
 
 ### Background
 
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Reliable business push changes that boundary. The framework now owns mechanics that must be understood by both sides of a game session:
+The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. The project is now being rebuilt around a framework-owned actor runtime so realtime battle state can live directly on edge processes without splitting game logic between gateway code and Orleans grains. Reliable business push already moved the boundary upward; actor execution and distributed actor RPC are now framework-owned infrastructure too.
 
 - reconnect versus new-session decisions
 - business push sequencing
@@ -125,8 +125,8 @@ Do not introduce `ULinkGame.Unity` yet.
 `ULinkGame` clearly communicates that this layer is above raw RPC and standalone actor hosting, and is intended for game networking workflows. The relationship should be:
 
 - `ULinkRPC`: transport, serialization, RPC calls, and generated bindings
-- `Microsoft Orleans`: distributed actors, clustering, placement, and grain state
-- `ULinkGame`: game-session infrastructure that integrates ULinkRPC and Microsoft Orleans
+- `ULinkGame.Server.Actors`: actor identity, mailbox execution, timers, and eventually distributed actor RPC/routing
+- `ULinkGame`: game-session infrastructure that integrates ULinkRPC, actor execution, reconnect, realtime endpoint hosting, and reliable push
 - user game code: matchmaking, room rules, gameplay state, rewards, inventory, and other domain features
 
 This keeps the product line understandable without forcing a thick game framework.

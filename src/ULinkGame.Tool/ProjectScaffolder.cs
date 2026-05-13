@@ -10,9 +10,6 @@ internal sealed class ProjectScaffolder
         await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteSiloProjectAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteSiloProgramAsync(projectRoot).ConfigureAwait(false);
-        await WriteSiloAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
     }
 
     private static Task WriteClientPackageReferenceAsync(string projectRoot, NewCommandOptions options)
@@ -183,7 +180,7 @@ internal sealed class ProjectScaffolder
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
-        EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: false);
+        EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: true);
         EnsureNoneUpdate(project, "appsettings.json", "PreserveNewest");
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
@@ -212,23 +209,6 @@ internal sealed class ProjectScaffolder
         return Task.WhenAll(
             WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
             WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options)));
-    }
-
-    private static Task WriteSiloProjectAsync(string projectRoot, NewCommandOptions options)
-    {
-        var siloDirectory = Path.Combine(projectRoot, "Server", "Silo");
-        Directory.CreateDirectory(siloDirectory);
-        return WriteAsync(Path.Combine(siloDirectory, "Silo.csproj"), ToolTemplates.RenderSiloProject(options));
-    }
-
-    private static Task WriteSiloProgramAsync(string projectRoot)
-    {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Silo", "Program.cs"), ToolTemplates.RenderSiloProgram());
-    }
-
-    private static Task WriteSiloAppSettingsAsync(string projectRoot, NewCommandOptions options)
-    {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Silo", "appsettings.json"), ToolTemplates.RenderSiloAppSettings(options));
     }
 
     private static Task WriteAsync(string path, string content)

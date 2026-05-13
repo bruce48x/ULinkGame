@@ -1,8 +1,8 @@
 # ULinkGame
 
-ULinkGame is a game-session infrastructure layer that integrates [ULinkRPC](https://github.com/bruce48x/ulinkrpc) and [Microsoft Orleans](https://github.com/dotnet/orleans) for online game servers and clients.
+ULinkGame is a game-session infrastructure layer that combines [ULinkRPC](https://github.com/bruce48x/ulinkrpc), a framework-owned actor runtime, and session/reconnect primitives for online game servers and clients.
 
-ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. Microsoft Orleans provides distributed actors, clustering, placement, and grain state. ULinkGame starts at the integration layer between them: it helps a game client and a .NET game server stay consistent across login, reconnect, realtime traffic, Microsoft Orleans hosting, and reliable business push messages.
+ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkGame owns the higher-level server runtime: actor execution, game session lifecycle, endpoint callback binding, reconnect semantics, realtime-friendly server structure, and reliable business push messages.
 
 ## Why ULinkGame
 
@@ -12,7 +12,7 @@ Online games need more than a request/response RPC pipe. A typical project quick
 - How do I combine a control connection with realtime traffic?
 - How do I reconnect without losing important business notifications?
 - How do I keep Unity, Godot, and plain .NET clients from duplicating the same session-state bookkeeping?
-- How do I use Orleans without wiring the same host/bootstrap code in every game?
+- How do I run realtime battle state on the edge process without splitting gameplay across two frameworks?
 
 ULinkGame packages those repeatable pieces while leaving your actual game rules in your project.
 
@@ -29,8 +29,8 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 `ULinkGame.Server` provides server-side hosting helpers:
 
 - one main server entry point for sessions, endpoint bindings, and reliable push
+- a process-local actor runtime with single-mailbox execution
 - ULinkRPC server lifecycle integration with .NET hosting
-- Orleans client and silo integration helpers
 - multiple named RPC server configurators for control/realtime endpoints
 - a generic reliable push outbox for business-level notifications
 - extension points that keep transport and serializer choices in your app
@@ -44,8 +44,8 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 
 `ULinkGame.Tool` provides project scaffolding and maintenance commands:
 
-- creates a ULinkRPC-based project through a pinned starter tool and prepares it for Microsoft Orleans hosting
-- augments the generated project with ULinkGame server hosting and Microsoft Orleans configuration
+- creates a ULinkRPC-based project through a pinned starter tool and prepares it for ULinkGame server hosting
+- augments the generated project with ULinkGame server/client runtime packages
 - writes a local tool manifest for repeatable code generation
 
 ## What It Does Not Do
@@ -71,7 +71,7 @@ dotnet tool install --global ULinkGame.Tool
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --persistence none
 ```
 
-The tool creates a ULinkRPC-based project, prepares Microsoft Orleans hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation. By default it generates one RPC endpoint using the selected transport; pass `--network-profile realtime` when you want separate control and realtime endpoints.
+The tool creates a ULinkRPC-based project, prepares ULinkGame server hosting, adds ULinkGame server/client integration, and writes a local tool manifest for repeatable code generation. By default it generates one RPC endpoint using the selected transport; pass `--network-profile realtime` when you want separate control and realtime endpoints.
 
 Run code generation later from the generated project:
 
@@ -85,7 +85,7 @@ For the full walkthrough, see [ULinkGame getting started](https://bruce48x.githu
 
 Use `ULinkGame.Abstractions` in shared code when you need framework-owned session and reliable push primitives.
 
-Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, Microsoft Orleans integration, session lifecycle, endpoint callback bindings, or reliable push delivery.
+Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, actor execution, session lifecycle, endpoint callback bindings, or reliable push delivery.
 
 Use `ULinkGame.Client` in client-side code when you need reconnect state and reliable push tracking independent of Unity or Godot.
 
