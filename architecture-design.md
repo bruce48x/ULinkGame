@@ -9,7 +9,7 @@
 
 ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft Orleans 处理分布式 actor、集群、放置和有状态 grain。对于低延迟实时多人游戏来说，这种拆分很别扭：
 
-- Edge 进程拥有客户端连接和实时传输。
+- ClientFacing 进程拥有客户端连接和实时传输。
 - Orleans grain 拥有大量权威服务端状态。
 - 实时战斗执行要么跨过额外的进程/运行时边界，要么在 edge 代码和 grain 代码之间重复概念。
 - 放置、路由、背压和失败语义被隐藏在高层 actor 抽象之后，而这个抽象并不是为高频游戏循环量身设计的。
@@ -26,7 +26,7 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 核心决策：
 
 - 用 ULinkGame 自有 actor runtime 和分布式 actor RPC 栈替换 Orleans。
-- 主要服务端进程是 edge actor host：接受 ULinkRPC 连接，拥有会话状态，可本地运行实时战斗 actor，并在需要时把 actor 消息路由到其他节点。
+- 主要服务端进程是 actor host。它可以按网络暴露面配置为 ClientFacing 或 InternalOnly：ClientFacing host 接受 ULinkRPC 客户端连接并拥有会话状态；任意 actor host 都可以运行实时战斗 actor，并在需要时把 actor 消息路由到其他节点。
 - 不做 Orleans 兼容层。现有样例和模板应该迁移，而不是通过 compatibility shim 保留。
 
 目标能力：
@@ -90,16 +90,13 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 ```text
 Client
   ⇅ external transport: WebSocket / TCP / KCP / UDP
-EdgeNode / GateNode
+ClientFacing ActorHost
   ⇅ internal RPC / Actor Router
 Game Cluster
-  ├── AccountNode
-  ├── PlayerNode
-  ├── MatchNode
-  ├── BattleNode
-  ├── ChatNode
-  ├── RankingNode
-  └── RegistryNode
+  ├── ClientFacing ActorHost
+  ├── InternalOnly ActorHost
+  ├── RegistryHost
+  └── Storage / External Services
 ```
 
 运行时分为两个平面：
@@ -133,16 +130,16 @@ Game Cluster
 实时战斗流量应该避免不必要的中间跳转。对于 MOBA 类玩法，理想路径是：
 
 ```text
-Client ⇄ BattleNode
+Client ⇄ ClientFacing ActorHost that owns the BattleActor
 ```
 
 而不是：
 
 ```text
-Client → EdgeNode → BattleNode → EdgeNode → Client
+Client → ClientFacing Gateway → InternalOnly ActorHost(labels: battle) → ClientFacing Gateway → Client
 ```
 
-EdgeNode 仍然可以用于认证、路由、大厅和非战斗会话。
+ClientFacing Gateway 仍然可以用于认证、路由、大厅和非战斗会话。是否把战斗 host 也配置成 ClientFacing，是业务部署策略，不是 Core 的 Node 类型。
 
 ### 3.3 包职责
 
@@ -174,14 +171,12 @@ Node
 
 `Node` 是参与 ULinkGame 集群的服务端进程。
 
-示例：
+Core 不定义 `EdgeNode`、`BattleNode`、`MatchNode`、`ChatNode` 这类业务角色。Node 的框架级分类只描述网络暴露面：
 
-- `EdgeNode`
-- `BattleNode`
-- `PlayerNode`
-- `MatchNode`
-- `ChatNode`
-- `RegistryNode`
+- `ClientFacing`：开放客户端连接端口，允许 Unity、Godot 或其他客户端直连。
+- `InternalOnly`：只开放集群内部 RPC、actor RPC、registry、metrics 等内部端口。
+
+账号、匹配、战斗、聊天、排行榜等职责由业务层通过部署配置、Actor 类型、Actor 元数据和调度策略决定。
 
 职责：
 
@@ -217,6 +212,50 @@ public readonly record struct NodeIdentity(
 
 这可以防止陈旧消息被错误投递到新的进程实例。
 
+### 5.3 Node 暴露面和能力
+
+推荐用 `NodeExposure` 描述框架必须知道的网络边界：
+
+```csharp
+public enum NodeExposure
+{
+    InternalOnly,
+    ClientFacing
+}
+```
+
+推荐用 capability 表达框架能力，而不是用业务 NodeType 枚举表达“这个节点是战斗服还是匹配服”：
+
+```csharp
+[Flags]
+public enum NodeCapabilities
+{
+    None = 0,
+    ActorHost = 1 << 0,
+    ClientSessionHost = 1 << 1,
+    ReliablePushHost = 1 << 2,
+    SchedulerHost = 1 << 3,
+    RegistryHost = 1 << 4
+}
+
+public sealed record NodeDescriptor(
+    NodeIdentity Identity,
+    NodeExposure Exposure,
+    NodeCapabilities Capabilities,
+    IReadOnlyList<EndpointDescriptor> Endpoints,
+    IReadOnlyDictionary<string, string> Labels);
+```
+
+`Labels` 可以承载业务部署标签，例如 `battle`、`match`、`chat`，但 ULinkGame Core 不依赖这些标签做类型判断。
+
+推荐约束：
+
+- 只有 `ClientFacing` Node 可以注册客户端监听端点。
+- `InternalOnly` Node 不应接受客户端直连。
+- 两类 Node 都可以承载 Actor。
+- 是否把某类业务 Actor 放到 `ClientFacing` Node 上，由业务部署策略决定。
+- 集群调度可以读取 capability 和 label，但 Core API 不应该出现 `BattleNode`、`MatchNode` 这种业务 Node 类型。
+
 ---
 
 ## 6. LogicThread
@@ -239,7 +278,7 @@ LogicThread 具备以下特征：
 一个 Actor 在任意时刻只属于一个 LogicThread。
 
 ```text
-ActorId → NodeId + NodeEpoch + LogicThreadId
+ActorId → ActorAddress(NodeId + NodeEpoch + LogicThreadId + ActorInstanceId)
 ```
 
 在同一个 LogicThread 内，可以在该 LogicThread 拥有的对象之间进行直接同步调用。
@@ -275,7 +314,7 @@ GuildLogicThread   - guild actors
 SystemLogicThread  - registry, control, scheduler
 ```
 
-这些不一定是 Core 类。它们可以由每种 Node 类型自行实现。
+这些不一定是 Core 类。它们可以由业务层按部署配置和 Actor 类型自行实现。
 
 ---
 
@@ -306,15 +345,83 @@ ULinkGame 不应该硬编码游戏业务 actor 类型，但文档和模板可以
 - `BattleActor`：实时 tick、输入应用、快照生成、结算触发。
 - `LeaderboardActor`：排行榜周期和后端存储查询的协调。
 
-实时战斗状态通常应该位于拥有该房间的 edge/BattleNode 上的 `BattleActor` 中。低频协调可以通过 actor RPC 调用其他 actor。
+实时战斗状态通常应该位于拥有该房间的 actor host 上的 `BattleActor` 中。这个 host 可以是 ClientFacing，也可以是 InternalOnly；是否允许客户端直连由业务部署策略决定。低频协调可以通过 actor RPC 调用其他 actor。
 
-### 7.3 最小 Actor Runtime API
+### 7.3 ActorId、ActorInstanceId 和 ActorAddress
+
+`ActorId` 是运行时使用的稳定逻辑身份，只用于寻址和一致性判断，不承载业务类型、业务 Key、Node、LogicThread 或连接信息。
+
+推荐第一版把 `ActorId` 设计成 opaque 数值：
+
+```csharp
+public readonly record struct ActorId(ulong Value);
+
+public readonly record struct ActorInstanceId(ulong Value);
+
+public readonly record struct ActorAddress(
+    ActorId ActorId,
+    ActorInstanceId InstanceId,
+    NodeIdentity Node,
+    int LogicThreadId,
+    long LocationVersion);
+```
+
+三者职责不同：
+
+- `ActorId`：稳定逻辑身份。只回答“目标是哪一个 Actor”。
+- `ActorInstanceId`：运行时 incarnation。Actor 每次激活、迁移、恢复或重建时都应该变化，用于拒绝 stale message。
+- `ActorAddress`：当前物理位置。它是 Location 查询结果，可以缓存，但必须允许过期和重新解析。
+
+这个分层参考 ET 的 `Entity.Id` 和 `Entity.InstanceId` 思路：
+
+```text
+ET Entity.Id         ≈ ULinkGame ActorId
+ET Entity.InstanceId ≈ ULinkGame ActorInstanceId / ActorAddress
+ET Location Server   ≈ ULinkGame LocationRegistry
+```
+
+ET 用稳定的 `Entity.Id` 表示逻辑身份，用会变化的 `InstanceId` 表示当前实例位置，并通过 Location Server 维护 `Entity.Id -> InstanceId`。ULinkGame 保留这个两层模型，但把“实例身份”和“物理地址”拆得更明确：
+
+```text
+ActorId -> LocationRegistry -> ActorAddress(ActorInstanceId + Node + LogicThread)
+```
+
+`ActorId` 不携带位置，`ActorInstanceId` 也不作为唯一的路由依据。路由必须通过 `LocationRegistry` 解析到 `ActorAddress`，这样可以避免把进程、线程和业务部署细节写死进稳定身份。
+
+Actor 类型、业务索引和调试名称不进入 `ActorId` 结构。它们由 Actor 元数据或业务层映射维护，例如：
+
+```csharp
+public sealed record ActorDescriptor(
+    ActorId Id,
+    string ActorType,
+    string? BusinessKey,
+    string? DebugName);
+```
+
+这样可以保持 runtime 的热路径足够简单：消息路由、hash、序列化和日志压缩都只处理固定大小的 ActorId。代价是激活 Actor 时不能从 Id 本身推导类型，必须依赖 `ActorRegistry`、持久化元数据、显式 Spawn 记录或业务层索引。
+
+ActorId 分配建议：
+
+- `ActorId` 由 ULinkGame runtime 的 `IActorIdGenerator` 分配，业务层不直接拼接 Id。
+- 第一版可以使用 Snowflake 风格的 `timestamp + allocator id + sequence` 生成全局唯一 `ulong`，其中 allocator id 由 Registry 在 Node lease 内分配。
+- `ActorId` 的 bit layout 是实现细节，不进入 Router、Location、业务逻辑和持久化查询语义。
+- 业务对象需要稳定映射时，例如 `PlayerId -> ActorId`、`BattleId -> ActorId`，由业务表或 Actor 元数据维护；不要从 `PlayerId` 直接推导 `ActorId`。
+- `ActorInstanceId` 在每次 Actor 激活时由 owner host 分配，可以使用 `NodeEpoch + LogicThreadId + local sequence` 或同一个 Id generator，但只用于 fencing 和 stale message 检查。
+- Actor 创建、恢复或迁移成功后，owner host 必须向 `LocationRegistry` 注册新的 `ActorId + ActorInstanceId + ActorAddress`。
+
+推荐约束：
+
+- `ActorId` 必须在集群范围内唯一。
+- `ActorId` 不编码 NodeId、LogicThreadId、端口、连接或业务分类。
+- Runtime 日志应该同时打印 `ActorId` 和可选调试元数据，避免纯数值 Id 难以排查。
+- 需要按 Player、Battle、Room 等维度统计、限流或分区时，从 Actor 元数据读取，不从 `ActorId` 解析。
+- 跨节点消息可以携带目标 `ActorInstanceId`；目标节点发现实例不匹配时，应返回 stale route 或重新 resolve，而不是投递到新实例。
+
+### 7.4 最小 Actor Runtime API
 
 第一版 actor runtime API 应该刻意保持很小：
 
 ```csharp
-public readonly record struct ActorId(string Value);
-
 public interface IActor;
 
 public interface IActorRuntime
@@ -335,7 +442,7 @@ public interface IActorRuntime
 
 之后可以引入 actor reference，但第一版设计应该避免让远程调用看起来太像普通方法调用。远程 actor 调用可能因为路由、超时、过载、owner 迁移或序列化问题失败。这些结果应该是可见的。
 
-### 7.4 Mailbox 设计
+### 7.5 Mailbox 设计
 
 推荐每个 Actor 一个逻辑 mailbox，但底层由所属 LogicThread 统一队列和调度器承载。
 
@@ -367,6 +474,7 @@ public interface IActorRuntime
 ```csharp
 public sealed record ActorEnvelope(
     ActorId Target,
+    ActorInstanceId? TargetInstanceId,
     ActorId? Sender,
     string MessageName,
     object Payload,
@@ -376,7 +484,7 @@ public sealed record ActorEnvelope(
     string? CorrelationId = null);
 ```
 
-`EnqueuedAt` 用于统计排队延迟，`Deadline` 用于控制过期消息，`CorrelationId` 用于 request/reply、日志追踪和跨节点诊断。
+`TargetInstanceId` 用于防止 stale message 投递到 Actor 的新 incarnation；本地新消息可以为空，跨节点缓存路由消息建议携带。`EnqueuedAt` 用于统计排队延迟，`Deadline` 用于控制过期消息，`CorrelationId` 用于 request/reply、日志追踪和跨节点诊断。
 
 Actor handler 不应该在 LogicThread 上等待外部 I/O。需要外部 I/O 时，应把请求交给外部异步组件，I/O 完成后通过新消息回投 Actor。这样可以保持 LogicThread 简单、稳定，并避免一个 Actor 的 I/O 等待阻塞同一 LogicThread 上的其他 Actor。
 
@@ -503,10 +611,10 @@ Location 把逻辑对象标识符映射到物理地址。
 
 ```csharp
 public readonly record struct ActorAddress(
-    string NodeId,
-    long NodeEpoch,
+    ActorId ActorId,
+    ActorInstanceId InstanceId,
+    NodeIdentity Node,
     int LogicThreadId,
-    long ActorId,
     long LocationVersion
 );
 ```
@@ -514,9 +622,11 @@ public readonly record struct ActorAddress(
 示例：
 
 ```text
-PlayerId:10001 → player-node-1@epoch-17 / logic-thread-2 / actor-10001
-BattleId:90001 → battle-node-2@epoch-9 / logic-thread-5 / actor-90001
+ActorId:128392018233 → player-node-1@epoch-17 / logic-thread-2 / instance-501
+ActorId:128392019001 → battle-node-2@epoch-9 / logic-thread-5 / instance-913
 ```
+
+业务层可以另外维护 `PlayerId -> ActorId`、`BattleId -> ActorId` 这类索引，但 Location 层只以 `ActorId` 作为逻辑寻址键。
 
 ### 10.2 Router
 
@@ -529,7 +639,7 @@ Sender
   → Router.Resolve(targetActorId)
   → LocationService
   → ActorAddress
-  → NodeTransport.Send(address.NodeId, envelope)
+  → NodeTransport.Send(address.Node, envelope)
   → TargetNode
   → TargetLogicThread mailbox
   → TargetActor handler
@@ -552,13 +662,13 @@ Router 可以缓存 Location 结果以提升性能。
 
 Actor Location 不等于客户端连接 Location。
 
-Session Location 把玩家映射到当前 Edge/Gate 连接。
+Session Location 把玩家映射到当前 ClientFacing 连接 host。
 
 ```csharp
 public readonly record struct SessionAddress(
     long PlayerId,
-    string EdgeNodeId,
-    long EdgeNodeEpoch,
+    string ClientNodeId,
+    long ClientNodeEpoch,
     long SessionId,
     long LoginVersion
 );
@@ -645,9 +755,11 @@ public interface INodeTransport
 核心概念：
 
 - `NodeId`：稳定的运行时节点身份。
-- `ActorAddress`：actor 类型/类别加 `ActorId`。
+- `ActorId`：稳定、opaque、全局唯一的逻辑 Actor 身份。
+- `ActorInstanceId`：Actor 当前激活实例的 incarnation 标识，用于拒绝 stale message。
+- `ActorAddress`：`ActorId` 当前所在 Node、LogicThread、InstanceId 和 LocationVersion。
 - `RouteOwner`：当前负责某个 actor 或 route key 的节点。
-- `ActorEnvelope`：序列化后的消息 payload、目标 actor address、correlation id、deadline。
+- `ActorEnvelope`：序列化后的消息 payload、目标 ActorId、可选目标 InstanceId、correlation id、deadline。
 - `ActorRpcResult`：accepted、completed、timeout、no owner、overloaded、stale route、failed。
 
 路由必须保持显式：
@@ -672,7 +784,7 @@ Registry 维护：
 2. Actor location registry
 3. Session registry
 
-它可以实现为专用的 `RegistryNode` 服务。
+它可以实现为具备 `RegistryHost` capability 的 InternalOnly Node。
 
 分阶段存储选项：
 
@@ -686,7 +798,7 @@ Phase 3: replicated registry / leader election if needed
 
 ```text
 1. Node starts
-2. Node reads ClusterName / NodeType / endpoints
+2. Node reads ClusterName / NodeExposure / capabilities / endpoints / labels
 3. Node connects to Registry
 4. Node calls RegisterNode
 5. Registry assigns NodeEpoch and lease
@@ -725,8 +837,8 @@ Ready → Suspect → Dead
 
 - 不应该再给它分配新 actor；
 - 现有 session 可以继续直到完成；
-- battle node 可以等待现有 battle 结束；
-- edge node 可以拒绝新登录或重定向新登录。
+- 承载战斗 Actor 的节点可以等待现有 battle 结束；
+- ClientFacing 节点可以拒绝新登录或重定向新登录。
 
 ---
 
@@ -795,10 +907,10 @@ Stable State + Hotfix Logic
 
 ### 15.1 战斗放置
 
-一场战斗应该直接运行在 BattleNode 上，最好位于固定 tick 的 BattleLogicThread 中。
+一场战斗应该直接运行在拥有该 `BattleActor` 的 actor host 上，最好位于固定 tick 的 BattleLogicThread 中。
 
 ```text
-BattleNode
+ActorHost(labels: battle)
  ├── BattleLogicThread-1
  │    ├── BattleRoom-1001
  │    └── BattleRoom-1002
@@ -812,22 +924,22 @@ BattleNode
 最佳实时路径：
 
 ```text
-Client ⇄ BattleNode
+Client ⇄ ClientFacing ActorHost(labels: battle)
 ```
 
 控制路径：
 
 ```text
-Client → EdgeNode → MatchNode → BattleNode allocation
+Client → ClientFacing Gateway → ActorHost(labels: match) → ActorHost(labels: battle) allocation
 ```
 
-分配完成后，客户端可以使用 battle token 直接连接到 BattleNode。
+分配完成后，如果承载 BattleActor 的 host 是 ClientFacing，客户端可以使用 battle token 直接连接到该 host。否则实时流量需要经由 ClientFacing Gateway 转发，但这不是低延迟玩法的首选路径。
 
 ### 15.3 战斗失败
 
 第一版不应该尝试 live battle migration。
 
-BattleNode 失败时：
+承载 BattleActor 的节点失败时：
 
 - 标记节点为 Dead；
 - 标记受影响 battle 为 Aborted；
@@ -840,7 +952,7 @@ BattleNode 失败时：
 - input log；
 - deterministic replay；
 - periodic snapshot；
-- 在另一个 BattleNode 上恢复。
+- 在另一个 actor host 上恢复。
 
 ---
 
@@ -852,7 +964,8 @@ BattleNode 失败时：
 classDiagram
     class Node {
         +NodeIdentity Identity
-        +NodeType Type
+        +NodeExposure Exposure
+        +NodeCapabilities Capabilities
         +StartAsync()
         +StopAsync()
         +ReportHeartbeatAsync()
@@ -866,7 +979,8 @@ classDiagram
     }
 
     class Actor {
-        +long ActorId
+        +ActorId ActorId
+        +ActorInstanceId InstanceId
         +ActorAddress Address
         +OnActivateAsync()
         +OnDeactivateAsync()
@@ -874,7 +988,7 @@ classDiagram
     }
 
     class ComponentState {
-        +long OwnerActorId
+        +ActorId OwnerActorId
         +Serialize()
         +Deserialize()
     }
@@ -916,23 +1030,24 @@ classDiagram
     class NodeInfo {
         +string NodeId
         +long NodeEpoch
-        +NodeType Type
+        +NodeExposure Exposure
+        +NodeCapabilities Capabilities
         +NodeStatus Status
         +NodeLoad Load
     }
 
     class ActorAddress {
-        +string NodeId
-        +long NodeEpoch
+        +ActorId ActorId
+        +ActorInstanceId InstanceId
+        +NodeIdentity Node
         +int LogicThreadId
-        +long ActorId
         +long LocationVersion
     }
 
     class SessionAddress {
         +long PlayerId
-        +string EdgeNodeId
-        +long EdgeNodeEpoch
+        +string ClientNodeId
+        +long ClientNodeEpoch
         +long SessionId
         +long LoginVersion
     }
@@ -946,7 +1061,7 @@ classDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Sender as Sender Actor/Edge
+    participant Sender as Sender Actor/ClientFacing Host
     participant Router as ActorRouter
     participant Location as LocationRegistry
     participant Transport as NodeTransport
@@ -957,7 +1072,7 @@ sequenceDiagram
     Sender->>Router: Send(targetActorId, message)
     Router->>Location: ResolveActor(targetActorId)
     Location-->>Router: ActorAddress
-    Router->>Transport: Send(NodeId, ActorEnvelope)
+    Router->>Transport: Send(address.Node, ActorEnvelope)
     Transport->>Node: Deliver envelope
     Node->>LT: Post to mailbox
     LT->>Actor: Handle(message)
@@ -968,19 +1083,19 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Edge as EdgeNode
-    participant Account as AccountNode
+    participant Gateway as ClientFacing Gateway
+    participant Account as Account Host
     participant Session as SessionRegistry
     participant Player as PlayerActor
     participant Location as LocationRegistry
 
-    Client->>Edge: Login(token)
-    Edge->>Account: Authenticate(token)
-    Account-->>Edge: PlayerId
-    Edge->>Session: RegisterSession(PlayerId, EdgeNode, SessionId, LoginVersion)
-    Edge->>Player: LoadOrCreatePlayerActor(PlayerId)
-    Player->>Location: RegisterActor(PlayerId, ActorAddress)
-    Edge-->>Client: LoginSuccess
+    Client->>Gateway: Login(token)
+    Gateway->>Account: Authenticate(token)
+    Account-->>Gateway: PlayerId
+    Gateway->>Session: RegisterSession(PlayerId, ClientNode, SessionId, LoginVersion)
+    Gateway->>Player: LoadOrCreatePlayerActor(PlayerId)
+    Player->>Location: RegisterActor(PlayerActorId, ActorAddress)
+    Gateway-->>Client: LoginSuccess
 ```
 
 ### 16.5 战斗分配
@@ -988,21 +1103,21 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Edge as EdgeNode
-    participant Match as MatchNode
+    participant Gateway as ClientFacing Gateway
+    participant Match as ActorHost(labels: match)
     participant Registry as ClusterRegistry
-    participant Battle as BattleNode
+    participant Battle as ActorHost(labels: battle)
     participant Location as LocationRegistry
 
-    Client->>Edge: StartMatchmaking
-    Edge->>Match: JoinQueue(PlayerId)
-    Match->>Registry: GetAvailableBattleNodes()
-    Registry-->>Match: BattleNode list
+    Client->>Gateway: StartMatchmaking
+    Gateway->>Match: JoinQueue(PlayerId)
+    Match->>Registry: GetAvailableActorHosts(labels: battle)
+    Registry-->>Match: Candidate host list
     Match->>Battle: CreateBattle(players)
-    Battle->>Location: RegisterActor(BattleId, ActorAddress)
+    Battle->>Location: RegisterActor(BattleActorId, ActorAddress)
     Battle-->>Match: BattleEndpoint + BattleToken
-    Match-->>Edge: BattleAllocated
-    Edge-->>Client: ConnectToBattle(BattleEndpoint, BattleToken)
+    Match-->>Gateway: BattleAllocated
+    Gateway-->>Client: ConnectToBattle(BattleEndpoint, BattleToken)
     Client->>Battle: ConnectBattle(BattleToken)
 ```
 
@@ -1087,19 +1202,18 @@ src/
     HandlerRegistry
     SystemRegistry
 
-  ULinkGame.Edge/
-    EdgeNode host
+  ULinkGame.Hosting/
+    ActorHost
+    ClientFacing host configuration
+    InternalOnly host configuration
     Session management
     Client gateway
-
-  ULinkGame.Battle/
-    BattleNode host
-    BattleLogicThread sample
-    BattleRoom sample
 
   ULinkGame.Samples/
     MinimalLogin
     MinimalBattle
+    BattleLogicThread sample
+    BattleRoom sample
     MinimalChat
 ```
 
@@ -1109,11 +1223,12 @@ src/
 
 ```text
 Server/
-  Edge/
-    Edge.csproj
+  Host/
+    Host.csproj
     Program.cs
     Hosting/
     Actors/
+    appsettings.json  // NodeExposure, capabilities, endpoints, labels
 Shared/
 Client/
 ```
@@ -1171,7 +1286,6 @@ Persistence profile：
 - ULinkGame.Matchmaking
 - ULinkGame.AOI
 - ULinkGame.Chat
-- ULinkGame.Battle.Sample
 - ULinkGame.World.Sample
 
 这些应该保持可选，不污染 Core。
