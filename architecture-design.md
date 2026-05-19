@@ -28,6 +28,7 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 - 用 ULinkGame 自有 actor runtime 和分布式 actor RPC 栈替换 Orleans。
 - 主要服务端进程是 actor host。它可以按网络暴露面配置为 ClientFacing 或 InternalOnly：ClientFacing host 接受 ULinkRPC 客户端连接并拥有会话状态；任意 actor host 都可以运行实时战斗 actor，并在需要时把 actor 消息路由到其他节点。
 - 不做 Orleans 兼容层。现有样例和模板应该迁移，而不是通过 compatibility shim 保留。
+- Actor runtime 的长期目标是 skynet 风格的轻量工程化消息运行时，而不是 Orleans/Akka 风格的重型通用 actor framework。
 
 目标能力：
 
@@ -40,7 +41,9 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 非目标：
 
 - 不重建一个完整的 Orleans 克隆。
+- 不做重型 actor 模型。这个边界不是第一版取舍，而是长期设计约束。
 - 不提供隐藏失败、延迟和背压的透明分布式对象。
+- 不提供透明远程对象、通用 actor supervisor tree、自动持久化 actor、自动迁移 actor 或分布式事务。
 - 不让每个 actor 默认自动持久化。
 - 不把账号系统、匹配规则、房间规则、排行榜策略、背包、奖励或玩法 DTO 放进 ULinkGame Core。
 - 不要求每个游戏都使用独立的控制端点和实时端点。
@@ -69,10 +72,11 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 - `Timer`：延迟任务、超时检测、周期性逻辑和 Tick 调度。
 - `Session`：客户端连接和玩家绑定的逻辑抽象。
 - `Cluster Registry`：Node 注册、心跳、节点状态和服务发现。
-- `ComponentState` / `ComponentSystem`：状态和逻辑分离的基础抽象。
 - `Hotfix loading boundary`：热更代码和稳定 Runtime 之间的隔离边界。
 - `Internal RPC abstraction`：集群内部通信抽象层。
 - `Metrics` / `Logging`：运行时监控和日志接口。
+
+其中 `Actor`、`Mailbox`、`Router`、`Location`、`Timer` 和 `Internal RPC abstraction` 构成轻量 Actor Core。`ComponentState`、`ComponentSystem`、Persistence、Hotfix 和 Codegen 是 Actor Core 之上的工程能力，不属于 Actor Core 的定义本身。
 
 不推荐进入 Core：
 
@@ -82,6 +86,61 @@ ULinkGame 原本使用 ULinkRPC 处理客户端/服务端 RPC，使用 Microsoft
 - Skill/Buff/Quest/Inventory/Guild 实现
 - Matchmaking 实现
 - AOI 实现
+
+---
+
+## 2.1 轻量 Actor Core 的永久边界
+
+ULinkGame Actor Core 永远保持轻量，目标是类似 skynet 的工程化 actor/service 运行时，而不是理论上完整、通用、可透明分布的 actor 模型。
+
+Actor Core 只负责：
+
+- 分配和识别 Actor；
+- 创建和销毁 Actor；
+- 投递消息；
+- 串行执行 Mailbox；
+- 管理 Timer 和 Tick 入口；
+- 显式 `send` / `call`；
+- 通过 Location 解析远程目标；
+- 通过 Transport 发送跨 Node 消息；
+- 暴露超时、过载、stale route、no owner 等失败结果。
+
+Actor Core 不负责：
+
+- 透明远程对象；
+- 把远程调用伪装成本地方法调用；
+- 自动持久化；
+- 自动迁移；
+- 通用 supervisor tree；
+- 分布式事务；
+- exactly-once RPC；
+- 强制 Entity/Component 模型；
+- 业务 Actor 类型体系；
+- 业务对象关系建模。
+
+推荐心智模型：
+
+```text
+Actor = ActorId + Mailbox + Handler + Context
+```
+
+推荐接口心智：
+
+```text
+Tell(actorId, message)
+Call(actorId, request, deadline)
+Spawn(actorModule, args)
+RegisterName(name, actorId)
+```
+
+不推荐的核心心智：
+
+```text
+playerActor.DoSomethingAsync()
+runtime.AskAsync<PlayerActor, TResult>(id, actor => actor.DoSomething())
+```
+
+后者可以作为本地测试或进程内快捷 API 存在，但不能成为跨 LogicThread、跨 Node 或文档中的核心 actor 模型。
 
 ---
 
@@ -324,7 +383,15 @@ Actor 是一个有稳定 Id 的消息处理对象。
 
 在 ULinkGame 中，Actor 由所属 LogicThread 执行，并通过 Mailbox 串行处理消息，以避免并发状态竞争并保证同一 Actor 内的执行顺序可推理。
 
-Actor 不是线程，也不是网络连接。它是由所属 LogicThread 执行的消息目标。
+Actor 不是线程，也不是网络连接，也不是透明远程对象。它是由所属 LogicThread 执行的轻量消息目标。
+
+Actor Core 的最小组成是：
+
+```text
+Actor = ActorId + Mailbox + Handler + Context
+```
+
+业务可以在 Actor 内组合 ComponentState、Entity、Persistence、Hotfix handler 或 generated stub，但这些都是 Actor Core 之上的工程能力，不改变 Actor Core 的轻量边界。
 
 ### 7.1 Actor 规则
 
@@ -419,28 +486,31 @@ ActorId 分配建议：
 
 ### 7.4 最小 Actor Runtime API
 
-第一版 actor runtime API 应该刻意保持很小：
+第一版 actor runtime API 应该刻意保持很小，并以显式消息为核心：
 
 ```csharp
+public interface IActorMessage;
+
 public interface IActor;
 
 public interface IActorRuntime
 {
-    ValueTask TellAsync<TActor>(
-        ActorId id,
-        Func<TActor, CancellationToken, ValueTask> message,
-        CancellationToken cancellationToken = default)
-        where TActor : class, IActor;
+    ValueTask<ActorSendResult> TellAsync(
+        ActorId target,
+        IActorMessage message,
+        CancellationToken cancellationToken = default);
 
-    ValueTask<TResult> AskAsync<TActor, TResult>(
-        ActorId id,
-        Func<TActor, CancellationToken, ValueTask<TResult>> message,
-        CancellationToken cancellationToken = default)
-        where TActor : class, IActor;
+    ValueTask<ActorCallResult<TReply>> CallAsync<TReply>(
+        ActorId target,
+        IActorMessage request,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken = default);
 }
 ```
 
-之后可以引入 actor reference，但第一版设计应该避免让远程调用看起来太像普通方法调用。远程 actor 调用可能因为路由、超时、过载、owner 迁移或序列化问题失败。这些结果应该是可见的。
+本地同 LogicThread 内部可以提供更直接的低层 API，但跨 LogicThread 或跨 Node 的 actor 通信必须走显式 message/envelope。`Func<TActor, ...>` 这类 delegate 调用只能作为本地测试或进程内快捷入口，不能作为分布式 actor 模型。
+
+之后可以引入 generated actor stub，但 stub 只是消息封装器，不是透明远程对象。远程 actor 调用可能因为路由、超时、过载、owner 迁移或序列化问题失败。这些结果必须以 `ActorSendResult` / `ActorCallResult` 显式暴露，而不是被包装成普通方法调用异常。
 
 ### 7.5 Mailbox 设计
 
@@ -1254,8 +1324,8 @@ Persistence profile：
 - 验证 LogicThread；
 - 验证 Actor mailbox；
 - 验证 timer；
-- 验证 component state；
-- 在进程内验证 hotfix boundary。
+- 验证显式 Tell/Call；
+- 验证 mailbox 背压、deadline 和失败结果。
 
 ### Phase 2：多进程集群
 
@@ -1268,7 +1338,8 @@ Persistence profile：
 
 - 支持可替换业务逻辑 DLL；
 - 保留稳定状态；
-- 安全切换 handler registry。
+- 安全切换 handler registry；
+- 明确 Hotfix 是 Actor Core 之上的工程能力，不反向污染 Actor Core。
 
 ### Phase 4：可观测性和运维
 
@@ -1320,7 +1391,7 @@ Persistence profile：
 
 当前初始倾向：
 
-- 跨节点调用优先使用生成的强类型 actor stub，同时保留低层 envelope API。
+- 跨节点调用优先使用显式 message/envelope；生成的强类型 actor stub 只能作为消息封装器，不能伪装成透明远程对象。
 - 优先本地 actor runtime，然后 distributed RPC loopback，然后一个生产 transport。
 - 对预期内的分布式失败，优先使用显式 `ActorRpcResult` status，而不是 exception。
 - route registry 优先 pluggable，并提供 in-memory default。
