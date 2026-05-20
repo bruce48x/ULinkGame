@@ -22,11 +22,11 @@ Tests/
   ULinkGame.Client.Tests/ Client package unit tests
   ULinkGame.Server.Tests/ Server package unit tests
 
-docs/
+blog/
   Hugo blog and user-facing article source
 ```
 
-User-facing articles live in the Hugo site under root `docs/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `docs/`; keep standalone repository architecture drafts at the repository root and cross-cutting package decisions in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
+User-facing articles live in the Hugo site under root `blog/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `blog/`; keep standalone repository architecture drafts at the repository root and cross-cutting package decisions in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
 
 ## Package Boundaries
 

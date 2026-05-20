@@ -5,14 +5,14 @@ This directory contains the Hugo site for ULinkGame documentation and blog-style
 ## Local Usage
 
 ```bash
-cd docs
+cd blog
 hugo server
 ```
 
 ## Build
 
 ```bash
-cd docs
+cd blog
 hugo
 ```
 
@@ -22,4 +22,4 @@ The site is configured as a repository project site:
 
 - `https://bruce48x.github.io/ULinkGame/`
 
-If the deployment target changes, update `baseURL` in `docs/hugo.toml`.
+If the deployment target changes, update `baseURL` in `blog/hugo.toml`.
