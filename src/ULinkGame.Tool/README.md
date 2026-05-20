@@ -21,16 +21,17 @@
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network-profile simple --serializer memorypack --persistence none --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 `ULinkGame.Server` actor/runtime 宿主设施与 `ULinkGame.Client` 客户端包引用，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
+该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 `ULinkGame.Server` 宿主设施、`ULinkActor` 进程内 actor runtime 根基引用与 `ULinkGame.Client` 客户端包引用，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
 
 - `src/ULinkGame.Server/`
 - `src/ULinkGame.Client/`
 - `Server/Edge/` in generated sample projects
-- 基于 `ULinkGame.Server` 的 edge actor host 启动代码
+- 基于 `ULinkGame.Server` 的 edge host 启动代码
+- 使用独立的 `ULinkActor` / `ULinkActor.SourceGenerator` 包作为服务端 actor 执行根基
 - 客户端项目中的 `ULinkGame.Client` 包引用
 - `ulinkgame.tool.json`
 
-默认生成项目使用进程内 actor runtime，不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。需要数据库基础设施时，显式传入：
+默认生成项目不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。需要数据库基础设施时，显式传入：
 
 ```bash
 ulinkgame-tool new --name MyGame --persistence postgres

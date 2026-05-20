@@ -12,8 +12,9 @@
 
 ### Changed
 
-- Removed Microsoft Orleans package references and Orleans hosting helpers from `ULinkGame.Server`; the server package now starts from a framework-owned actor runtime.
-- Added `ULinkGame.Server.Actors` with `ActorId`, `Actor`, `IActorRuntime`, a process-local single-mailbox actor runtime, timer registration, and DI registration.
+- Documented the package boundary after publishing `ULinkActor` and `ULinkActor.SourceGenerator` as standalone NuGet packages.
+- Clarified that `ULinkActor` is the actor/mailbox runtime foundation for ULinkGame; `ULinkGame.Server` builds on it for game-session infrastructure, ULinkRPC hosting, endpoint binding, reconnect, and reliable push integration.
+- Clarified that ULinkGame is not an Orleans wrapper; Orleans-style distributed actor hosting is too heavy for the targeted lightweight game-server execution model.
 - Added `ULinkGame.Abstractions` for cross-side framework-owned session, endpoint, reconnect, and reliable push primitives.
 - Added `IULinkGameServer` / `AddULinkGameServer()` and `ULinkGameClient` as the recommended single-entry APIs for server and client code.
 - Added typed reliable push overloads on `IULinkGameServer` so recommended server code can deliver through endpoint callbacks without handling `ReliablePushRecord`.
@@ -68,7 +69,7 @@
 - Updated Godot sample projects and generated tool templates to avoid MSBuild multi-target project races during default restore/build.
 - Limited Godot server logging to console output to avoid Windows EventLog permission failures in non-elevated runs.
 - Updated Godot client generation in `ULinkGame.Tool` to preserve generated RPC clients and create a real networked Ping example.
-- Updated `ULinkGame.Tool` project scaffolding to expose the generated client-facing server as `Server/Edge/Edge.csproj` instead of `Server/Server/Server.csproj`, while keeping `Server/Silo/Silo.csproj` for Orleans grains.
+- Updated `ULinkGame.Tool` project scaffolding to expose the generated client-facing server as `Server/Edge/Edge.csproj` instead of `Server/Server/Server.csproj`, while keeping the then-current `Server/Silo/Silo.csproj` state-process layout.
 
 ## 2026-05-08
 

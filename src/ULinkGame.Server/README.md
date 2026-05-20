@@ -1,6 +1,8 @@
 # ULinkGame.Server
 
-`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, ULinkGame actors, session lifecycle, and reliable business push.
+`ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, ULinkActor-based game-state execution, session lifecycle, endpoint callback binding, and reliable business push.
+
+It builds on ULinkActor because ULinkGame targets lightweight game-server execution, not Orleans-style distributed actor hosting. Room, battle, and service state should be able to run with predictable process-local mailbox behavior on the edge process.
 
 ## Install
 
@@ -55,48 +57,49 @@ public sealed class ControlPlaneRpcServerConfigurator : IULinkRpcServerConfigura
 
 `Name` only identifies the hosted RPC server inside the process. Register another configurator if you need another endpoint.
 
-## Run Actors
+## Use Actors
 
-Register the built-in actor runtime when your server owns game state or realtime battle state:
+ULinkGame's server-side actor execution model is built on the standalone `ULinkActor` packages:
 
-```csharp
-using ULinkGame.Server.Actors;
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddULinkGameServerActors();
+```powershell
+dotnet add package ULinkActor
+dotnet add package ULinkActor.SourceGenerator
 ```
 
-Use `IActorRuntime` to address an actor by type and id. Messages for the same actor are processed through one mailbox, so actor state can be written without locks:
+Register and use `ULinkActor` in the same .NET host that runs your ULinkGame gateway services:
 
 ```csharp
-using ULinkGame.Server.Actors;
+using ULinkActor;
 
-public sealed class RoomActor : Actor
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddSingleton<ActorSystem>();
+```
+
+Messages for the same actor are processed through one mailbox, so actor state can be written without locks:
+
+```csharp
+using ULinkActor;
+
+public readonly record struct JoinRoom(long PlayerId);
+
+public sealed class RoomActor : IActor<JoinRoom>
 {
     private int _joinedPlayers;
 
-    public ValueTask JoinAsync(CancellationToken cancellationToken)
+    public ValueTask OnMessage(ActorContext ctx, JoinRoom message)
     {
         _joinedPlayers++;
         return ValueTask.CompletedTask;
     }
-
-    public int JoinedPlayers => _joinedPlayers;
 }
 
-var runtime = builder.Services.BuildServiceProvider().GetRequiredService<IActorRuntime>();
-var roomId = ActorId.From("room/alpha");
+var system = builder.Services.BuildServiceProvider().GetRequiredService<ActorSystem>();
+var room = system.Spawn("room/alpha", new RoomActor());
 
-await runtime.TellAsync<RoomActor>(
-    roomId,
-    static (room, ct) => room.JoinAsync(ct));
-
-var joinedPlayers = await runtime.AskAsync<RoomActor, int>(
-    roomId,
-    static (room, _) => ValueTask.FromResult(room.JoinedPlayers));
+await room.Send(new JoinRoom(10001));
 ```
 
-The first runtime is process-local and intentionally explicit. Distributed actor RPC, placement, and storage adapters are framework work that builds on this execution model instead of wrapping Orleans.
+ULinkActor is the foundation for actor/mailbox runtime concerns. ULinkGame.Server builds on it and keeps the game-session layer focused on session identity, endpoint binding, reconnect, and reliable push integration.
 
 ## Main Server API
 

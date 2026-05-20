@@ -7,7 +7,7 @@ This document is for people working on the ULinkGame repository itself. User-fac
 ```txt
 src/
   ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
-  ULinkGame.Server/       Server-side actor runtime, RPC hosting, session lifecycle, reliable push outbox
+  ULinkGame.Server/       Server-side RPC hosting, session lifecycle, reliable push outbox, and ULinkActor-based execution
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Tool/         Project management tool entry point
 
@@ -36,11 +36,11 @@ User-facing articles live in the Hugo site under root `docs/`. Do not put intern
 
 - the `IULinkGameServer` main entry point for session, endpoint, and reliable push workflows
 - hosting helpers for ULinkRPC server lifecycle
-- a framework-owned actor runtime for process-local game state execution
+- ULinkActor-based process-local game state execution integration
 - a generic reliable push outbox for business-level server push delivery
 - extension points for project-specific RPC server configurators
 
-It should stay infrastructure-oriented. Matchmaking rules, room rules, user DTOs, and gameplay state belong in the game project or sample, not in the framework core.
+It should stay infrastructure-oriented. `ULinkActor` is a foundational runtime dependency for ULinkGame's actor execution model, while matchmaking rules, room rules, user DTOs, and gameplay state belong in the game project or sample, not in the framework core.
 
 ### ULinkGame.Client
 
@@ -86,7 +86,8 @@ In this repository's tool documentation, `starter` means `ulinkrpc-starter`, not
 When `ulinkgame-tool new` augments a generated project, it should preserve starter output and add only ULinkGame-owned infrastructure:
 
 - `ULinkGame.Server` and `ULinkGame.Client` package references when needed
-- ULinkGame actor host and edge hosting projects and configuration
+- ULinkGame edge hosting projects and configuration
+- `ULinkActor` package references for process-local actor execution
 - ULinkGame-specific server startup, gateway, and tool configuration
 - project maintenance commands that delegate code generation back to the starter toolchain
 
@@ -96,7 +97,7 @@ If a generated project needs a different `ULinkRPC.*` package version or client 
 
 ### Background
 
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. The project is now being rebuilt around a framework-owned actor runtime so realtime battle state can live directly on edge processes without splitting game logic between gateway code and Orleans grains. Reliable business push already moved the boundary upward; actor execution and distributed actor RPC are now framework-owned infrastructure too.
+The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Orleans proved too heavy and too enterprise-oriented for the game server workflows this project targets, especially process-local room, battle, and service state that should run with predictable mailbox execution on edge processes. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
 
 - reconnect versus new-session decisions
 - business push sequencing
@@ -125,8 +126,8 @@ Do not introduce `ULinkGame.Unity` yet.
 `ULinkGame` clearly communicates that this layer is above raw RPC and standalone actor hosting, and is intended for game networking workflows. The relationship should be:
 
 - `ULinkRPC`: transport, serialization, RPC calls, and generated bindings
-- `ULinkGame.Server.Actors`: actor identity, mailbox execution, timers, and eventually distributed actor RPC/routing
-- `ULinkGame`: game-session infrastructure that integrates ULinkRPC, actor execution, reconnect, realtime endpoint hosting, and reliable push
+- `ULinkActor`: process-local actor identity, mailbox execution, timers, backpressure, diagnostics, and source-generated typed spawn helpers
+- `ULinkGame`: game-session infrastructure that integrates ULinkRPC, ULinkActor execution, reconnect, realtime endpoint hosting, and reliable push
 - user game code: matchmaking, room rules, gameplay state, rewards, inventory, and other domain features
 
 This keeps the product line understandable without forcing a thick game framework.
@@ -210,7 +211,7 @@ The repository currently contains two sample clients:
 ```txt
 samples/Agar.Unity/
   Shared/  MemoryPack contracts and shared gameplay kernel
-  Server/  .NET server, Orleans silo, WebSocket control plane, KCP realtime plane
+  Server/  .NET server, ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
   Client/  Unity client
 
 samples/Agar.Godot/
@@ -822,12 +823,12 @@ public interface IRealtimeMessageRouter
 
 Guidance:
 
-- Do not serialize live RPC callback objects into Redis, Orleans state, streams, or route records.
+- Do not serialize live RPC callback objects into Redis, durable state, streams, or route records.
 - Payload serialization belongs to the application or adapter. The framework route layer can move bytes plus metadata.
 - Ordering should be scoped by an explicit key such as player id or route id, not globally.
 - Expiration is mandatory for high-frequency realtime messages; stale inputs and stale snapshots should be dropped, not replayed indefinitely.
 - Backpressure must be visible through return values and metrics.
-- Provide adapters later, for example Orleans streams, Redis pub/sub, or in-process loopback. Start with an in-memory adapter for tests.
+- Provide adapters later, for example Redis pub/sub, custom message buses, or in-process loopback. Start with an in-memory adapter for tests.
 
 Implementation order:
 
@@ -953,8 +954,8 @@ Suggested metrics:
 
 Suggested health checks:
 
-- Orleans client connected for gateway processes
-- Orleans silo started for silo processes
+- ULinkActor state runtime is registered for gateway/state processes that own actor execution
+- configured state runtime services have started for state processes
 - configured RPC endpoints have started listening
 - reliable push outbox service is registered
 - optional route backend is reachable
@@ -970,7 +971,7 @@ Implementation order:
 
 1. Add stable event ids and log scopes for RPC endpoint startup/shutdown/failure.
 2. Add reliable push counters and pending gauge.
-3. Add health checks for Orleans client/silo and endpoint hosted service state.
+3. Add health checks for ULinkActor state runtime services and endpoint hosted service state.
 4. Add session and routing metrics when those packages exist.
 5. Update tool templates to register health checks in generated server projects.
 
@@ -985,7 +986,7 @@ Test requirements:
 
 Goal: generate production-ready infrastructure scaffolding without taking ownership of ULinkRPC starter output or game business code.
 
-The tool currently creates an Edge/Silo layout and unconditionally generates control and realtime endpoints. Future work should split templates by project shape:
+The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should split templates by project shape and avoid carrying Orleans-oriented naming into new game-runtime templates:
 
 - simple online game: one session endpoint
 - realtime multiplayer game: session/control endpoint plus optional realtime endpoint
@@ -994,10 +995,10 @@ The tool currently creates an Edge/Silo layout and unconditionally generates con
 Template-owned additions:
 
 - `ULinkGame.Server` and `ULinkGame.Client` package references
-- Edge/Silo host startup using ULinkGame helpers
+- Edge/state host startup using ULinkGame helpers
 - environment-variable driven `appsettings.json`
 - `.env.example` with development-only defaults
-- optional Dockerfile and compose/override files for Edge and Silo
+- optional Dockerfile and compose/override files for Edge and state runtime processes
 - health check registration and endpoint
 - local tool manifest and codegen command wiring
 - README next steps that match the selected project shape

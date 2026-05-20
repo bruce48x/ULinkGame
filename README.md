@@ -1,8 +1,10 @@
 # ULinkGame
 
-ULinkGame is a game-session infrastructure layer that combines [ULinkRPC](https://github.com/bruce48x/ulinkrpc), a framework-owned actor runtime, and session/reconnect primitives for online game servers and clients.
+ULinkGame is a game-session infrastructure layer built on [ULinkRPC](https://github.com/bruce48x/ulinkrpc), [ULinkActor](https://www.nuget.org/packages/ULinkActor), and session/reconnect primitives for online game servers and clients.
 
-ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkGame owns the higher-level server runtime: actor execution, game session lifecycle, endpoint callback binding, reconnect semantics, realtime-friendly server structure, and reliable business push messages.
+ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkActor provides the foundational process-local actor/mailbox runtime and source-generated typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame owns the higher-level game infrastructure: session lifecycle, endpoint callback binding, reconnect semantics, realtime-friendly server structure, and reliable business push messages.
+
+ULinkGame is not an Orleans wrapper. It exists because Orleans-style distributed actor hosting is too heavy and too enterprise-oriented for the game server workflows this framework targets: process-local rooms, battles, matchmaking queues, and short-path state execution that need predictable mailbox behavior on edge processes.
 
 ## Why ULinkGame
 
@@ -29,7 +31,7 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 `ULinkGame.Server` provides server-side hosting helpers:
 
 - one main server entry point for sessions, endpoint bindings, and reliable push
-- a process-local actor runtime with single-mailbox execution
+- ULinkActor-based process-local game state execution for room, battle, and service runtime code
 - ULinkRPC server lifecycle integration with .NET hosting
 - multiple named RPC server configurators for control/realtime endpoints
 - a generic reliable push outbox for business-level notifications
@@ -85,7 +87,7 @@ For the full walkthrough, see [ULinkGame getting started](https://bruce48x.githu
 
 Use `ULinkGame.Abstractions` in shared code when you need framework-owned session and reliable push primitives.
 
-Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, actor execution, session lifecycle, endpoint callback bindings, or reliable push delivery.
+Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, ULinkActor-based game-state execution, session lifecycle, endpoint callback bindings, or reliable push delivery.
 
 Use `ULinkGame.Client` in client-side code when you need reconnect state and reliable push tracking independent of Unity or Godot.
 
