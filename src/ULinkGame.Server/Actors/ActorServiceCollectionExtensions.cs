@@ -13,7 +13,7 @@ public static class ActorServiceCollectionExtensions
         configure?.Invoke(options);
 
         services.TryAddSingleton(options);
-        services.TryAddSingleton<IActorRuntime, InMemoryActorRuntime>();
+        services.TryAddSingleton<IActorRuntime, ULinkActorRuntime>();
         return services;
     }
 }

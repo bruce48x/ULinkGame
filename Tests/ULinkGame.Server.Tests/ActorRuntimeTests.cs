@@ -7,6 +7,16 @@ namespace ULinkGame.Server.Tests;
 public sealed class ActorRuntimeTests
 {
     [Fact]
+    public void AddULinkGameServerActors_registers_ULinkActor_backed_runtime()
+    {
+        using var provider = new ServiceCollection()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+
+        Assert.IsType<ULinkActorRuntime>(provider.GetRequiredService<IActorRuntime>());
+    }
+
+    [Fact]
     public async Task AskAsync_runs_messages_serially_for_same_actor()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

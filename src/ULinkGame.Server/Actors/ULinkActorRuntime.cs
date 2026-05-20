@@ -1,21 +1,25 @@
 using System.Collections.Concurrent;
-using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ULinkGame.Server.Actors;
 
-public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
+public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDisposable
 {
     private static readonly AsyncLocal<ActorCell?> CurrentCell = new();
 
     private readonly ConcurrentDictionary<ActorId, ActorCell> _actors = new();
     private readonly IServiceProvider _services;
     private readonly ActorRuntimeOptions _options;
+    private readonly global::ULinkActor.ActorSystem _actorSystem;
 
-    public InMemoryActorRuntime(IServiceProvider services, ActorRuntimeOptions options)
+    public ULinkActorRuntime(IServiceProvider services, ActorRuntimeOptions options)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _actorSystem = new global::ULinkActor.ActorSystem(new global::ULinkActor.ActorSystemOptions
+        {
+            MailboxCapacity = Math.Max(1, options.MailboxCapacity)
+        });
     }
 
     public async ValueTask<TActor> GetOrCreateAsync<TActor>(
@@ -24,7 +28,7 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
         where TActor : class, IActor
     {
         var cell = GetOrCreateCell<TActor>(id);
-        await cell.EnsureStartedAsync(cancellationToken).ConfigureAwait(false);
+        await cell.EnsureActivatedAsync(cancellationToken).ConfigureAwait(false);
         return (TActor)cell.Actor;
     }
 
@@ -37,11 +41,11 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(message);
 
         var cell = GetOrCreateCell<TActor>(id);
-        await cell.EnqueueAsync(
+        await cell.InvokeAsync(
             static async (actor, state, ct) =>
             {
-                var typedState = ((Func<TActor, CancellationToken, ValueTask>)state);
-                await typedState((TActor)actor, ct).ConfigureAwait(false);
+                var callback = (Func<TActor, CancellationToken, ValueTask>)state;
+                await callback((TActor)actor, ct).ConfigureAwait(false);
                 return null;
             },
             message,
@@ -57,11 +61,11 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(message);
 
         var cell = GetOrCreateCell<TActor>(id);
-        var result = await cell.EnqueueAsync(
+        var result = await cell.InvokeAsync(
             static async (actor, state, ct) =>
             {
-                var typedState = ((Func<TActor, CancellationToken, ValueTask<TResult>>)state);
-                return await typedState((TActor)actor, ct).ConfigureAwait(false);
+                var callback = (Func<TActor, CancellationToken, ValueTask<TResult>>)state;
+                return await callback((TActor)actor, ct).ConfigureAwait(false);
             },
             message,
             cancellationToken).ConfigureAwait(false);
@@ -85,12 +89,14 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var cell in _actors.Values)
-        {
-            await cell.DisposeAsync().ConfigureAwait(false);
-        }
-
         _actors.Clear();
+        await _actorSystem.DisposeAsync().ConfigureAwait(false);
+    }
+
+    public void Dispose()
+    {
+        _actors.Clear();
+        _actorSystem.Dispose();
     }
 
     private ActorCell GetOrCreateCell<TActor>(ActorId id)
@@ -100,8 +106,16 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
         {
             var runtime = state.Runtime;
             var actor = ActivatorUtilities.CreateInstance<TActor>(runtime._services);
-            var capacity = Math.Max(1, runtime._options.MailboxCapacity);
-            return new ActorCell(actorId, actor, typeof(TActor), runtime._services, runtime, capacity);
+            var cell = new ActorCell(actorId, actor, typeof(TActor), runtime._services, runtime, runtime._options);
+            var actorRef = runtime._actorSystem.Spawn(
+                actorId.Value,
+                new ActorAdapter(cell),
+                new global::ULinkActor.ActorSpawnOptions
+                {
+                    MailboxCapacity = Math.Max(1, runtime._options.MailboxCapacity)
+                });
+            cell.Bind(actorRef);
+            return cell;
         }, new RuntimeState(this));
 
         if (!cell.ActorType.IsAssignableTo(typeof(TActor)) && !typeof(TActor).IsAssignableFrom(cell.ActorType))
@@ -113,18 +127,16 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
         return cell;
     }
 
-    private readonly record struct RuntimeState(InMemoryActorRuntime Runtime);
+    private readonly record struct RuntimeState(ULinkActorRuntime Runtime);
 
-    private sealed class ActorCell : IAsyncDisposable
+    private sealed class ActorCell
     {
-        private readonly Channel<ActorWorkItem> _mailbox;
-        private readonly CancellationTokenSource _stopping = new();
         private readonly ActorId _id;
         private readonly IServiceProvider _services;
         private readonly IActorRuntime _runtime;
-        private readonly object _startGate = new();
-        private Task? _loop;
-        private bool _started;
+        private readonly ActorRuntimeOptions _runtimeOptions;
+        private global::ULinkActor.ActorRef<ActorRuntimeEnvelope>? _actorRef;
+        private bool _activated;
 
         public ActorCell(
             ActorId id,
@@ -132,156 +144,130 @@ public sealed class InMemoryActorRuntime : IActorRuntime, IAsyncDisposable
             Type actorType,
             IServiceProvider services,
             IActorRuntime runtime,
-            int mailboxCapacity)
+            ActorRuntimeOptions runtimeOptions)
         {
             _id = id;
-            _services = services;
-            _runtime = runtime;
             Actor = actor;
             ActorType = actorType;
-            _mailbox = Channel.CreateBounded<ActorWorkItem>(new BoundedChannelOptions(mailboxCapacity)
-            {
-                SingleReader = true,
-                SingleWriter = false,
-                FullMode = BoundedChannelFullMode.Wait
-            });
+            _services = services;
+            _runtime = runtime;
+            _runtimeOptions = runtimeOptions;
         }
 
         public IActor Actor { get; }
 
         public Type ActorType { get; }
 
-        public async ValueTask EnsureStartedAsync(CancellationToken cancellationToken)
+        public void Bind(global::ULinkActor.ActorRef<ActorRuntimeEnvelope> actorRef)
         {
-            if (!_started)
-            {
-                lock (_startGate)
-                {
-                    if (!_started)
-                    {
-                        _started = true;
-                        _loop = Task.Run(RunAsync);
-                    }
-                }
-            }
-
-            if (Actor is Actor actor)
-            {
-                await EnqueueAsync(
-                    static async (target, state, ct) =>
-                    {
-                        var typedActor = (Actor)target;
-                        var typedState = ((ActorCell Cell, IServiceProvider Services, IActorRuntime Runtime))state;
-                        if (ReferenceEquals(typedActor.Context, ActorContext.Uninitialized))
-                        {
-                            await typedActor.ActivateAsync(
-                                new ActorContext(typedState.Cell._id, typedState.Services, typedState.Runtime),
-                                ct).ConfigureAwait(false);
-                        }
-
-                        return null;
-                    },
-                    (this, _services, _runtime),
-                    cancellationToken).ConfigureAwait(false);
-            }
+            _actorRef = actorRef;
         }
 
-        public async ValueTask<object?> EnqueueAsync(
+        public async ValueTask EnsureActivatedAsync(CancellationToken cancellationToken)
+        {
+            if (_activated)
+            {
+                return;
+            }
+
+            await InvokeAsync(
+                static async (actor, state, ct) =>
+                {
+                    var cell = (ActorCell)state;
+                    await cell.ActivateCoreAsync(actor, ct).ConfigureAwait(false);
+                    return null;
+                },
+                this,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        public async ValueTask<object?> InvokeAsync(
             Func<IActor, object, CancellationToken, ValueTask<object?>> callback,
             object state,
             CancellationToken cancellationToken)
         {
             if (ReferenceEquals(CurrentCell.Value, this))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return await callback(Actor, state, cancellationToken).ConfigureAwait(false);
             }
 
-            await EnsureStartedCoreAsync(cancellationToken).ConfigureAwait(false);
-
-            var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var item = new ActorWorkItem(callback, state, completion, cancellationToken);
-            await _mailbox.Writer.WriteAsync(item, cancellationToken).ConfigureAwait(false);
-            return await completion.Task.ConfigureAwait(false);
+            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var envelope = new ActorRuntimeEnvelope(callback, state, cancellationToken);
+            return await actorRef.Call<object?>(envelope, _runtimeOptions.CallTimeout, cancellationToken).ConfigureAwait(false);
         }
 
-        public async ValueTask DisposeAsync()
+        public async ValueTask<object?> DispatchAsync(ActorRuntimeEnvelope envelope)
         {
-            await _stopping.CancelAsync().ConfigureAwait(false);
-            _mailbox.Writer.TryComplete();
-
-            if (_loop is not null)
+            if (envelope.CancellationToken.IsCancellationRequested)
             {
-                try
-                {
-                    await _loop.ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                throw new OperationCanceledException(envelope.CancellationToken);
             }
 
-            _stopping.Dispose();
+            try
+            {
+                CurrentCell.Value = this;
+                await ActivateCoreAsync(Actor, envelope.CancellationToken).ConfigureAwait(false);
+                return await envelope.Callback(Actor, envelope.State, envelope.CancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                CurrentCell.Value = null;
+            }
         }
 
-        private ValueTask EnsureStartedCoreAsync(CancellationToken cancellationToken)
+        private async ValueTask ActivateCoreAsync(IActor actor, CancellationToken cancellationToken)
         {
-            if (!_started)
+            if (_activated)
             {
-                return EnsureStartedAsync(cancellationToken);
+                return;
             }
 
-            return ValueTask.CompletedTask;
-        }
-
-        private async Task RunAsync()
-        {
-            await foreach (var item in _mailbox.Reader.ReadAllAsync(_stopping.Token).ConfigureAwait(false))
+            if (actor is Actor typedActor)
             {
-                if (item.CancellationToken.IsCancellationRequested)
-                {
-                    item.Completion.TrySetCanceled(item.CancellationToken);
-                    continue;
-                }
-
-                try
-                {
-                    CurrentCell.Value = this;
-                    var result = await item.Callback(Actor, item.State, item.CancellationToken).ConfigureAwait(false);
-                    item.Completion.TrySetResult(result);
-                }
-                catch (OperationCanceledException ex) when (ex.CancellationToken == item.CancellationToken)
-                {
-                    item.Completion.TrySetCanceled(item.CancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    item.Completion.TrySetException(ex);
-                }
-                finally
-                {
-                    CurrentCell.Value = null;
-                }
+                await typedActor.ActivateAsync(
+                    new ActorContext(_id, _services, _runtime),
+                    cancellationToken).ConfigureAwait(false);
             }
+
+            _activated = true;
         }
     }
 
-    private sealed record ActorWorkItem(
+    private sealed record ActorRuntimeEnvelope(
         Func<IActor, object, CancellationToken, ValueTask<object?>> Callback,
         object State,
-        TaskCompletionSource<object?> Completion,
         CancellationToken CancellationToken);
+
+    private sealed class ActorAdapter : global::ULinkActor.IActor<ActorRuntimeEnvelope>
+    {
+        private readonly ActorCell _cell;
+
+        public ActorAdapter(ActorCell cell)
+        {
+            _cell = cell;
+        }
+
+        public async ValueTask OnMessage(
+            global::ULinkActor.ActorContext<ActorRuntimeEnvelope> ctx,
+            ActorRuntimeEnvelope message)
+        {
+            var result = await _cell.DispatchAsync(message).ConfigureAwait(false);
+            ctx.Respond(result);
+        }
+    }
 
     private sealed class ActorTimer<TActor> : IAsyncDisposable
         where TActor : class, IActor
     {
-        private readonly InMemoryActorRuntime _runtime;
+        private readonly ULinkActorRuntime _runtime;
         private readonly ActorId _id;
         private readonly Func<TActor, CancellationToken, ValueTask> _callback;
         private readonly Timer _timer;
         private int _disposed;
 
         public ActorTimer(
-            InMemoryActorRuntime runtime,
+            ULinkActorRuntime runtime,
             ActorId id,
             TimeSpan dueTime,
             TimeSpan? period,
