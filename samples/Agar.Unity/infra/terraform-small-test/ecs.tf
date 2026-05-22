@@ -62,31 +62,31 @@ resource "alicloud_instance" "silo" {
   depends_on = [alicloud_instance.data]
 }
 
-resource "alicloud_instance" "edge" {
-  count                      = var.edge_count
+resource "alicloud_instance" "gateway" {
+  count                      = var.gateway_count
   availability_zone          = alicloud_vswitch.default.zone_id
   security_groups            = [alicloud_security_group.app.id]
-  instance_type              = var.edge_instance_type
+  instance_type              = var.gateway_instance_type
   image_id                   = var.image_id
   instance_charge_type       = "PostPaid"
-  instance_name              = "${var.project_name}-edge-${count.index + 1}"
-  host_name                  = "agar-edge-${count.index + 1}"
+  instance_name              = "${var.project_name}-gateway-${count.index + 1}"
+  host_name                  = "agar-gateway-${count.index + 1}"
   resource_group_id          = alicloud_resource_manager_resource_group.default.id
   vswitch_id                 = alicloud_vswitch.default.id
   internet_max_bandwidth_out = var.internet_max_bandwidth_out
   system_disk_size           = var.system_disk_size
 
-  user_data = templatefile("${path.module}/user-data-edge.sh.tftpl", {
-    edge_image                 = var.edge_image
+  user_data = templatefile("${path.module}/user-data-gateway.sh.tftpl", {
+    gateway_image                 = var.gateway_image
     cluster_id                 = jsonencode(var.cluster_id)
     service_id                 = jsonencode(var.service_id)
     postgres_connection_string = jsonencode(local.postgres_connection_string)
-    node_id                    = jsonencode("edge-${count.index + 1}")
+    node_id                    = jsonencode("gateway-${count.index + 1}")
   })
 
   tags = {
     Project = var.project_name
-    Role    = "edge"
+    Role    = "gateway"
   }
 
   depends_on = [alicloud_instance.silo]
@@ -94,7 +94,7 @@ resource "alicloud_instance" "edge" {
 
 resource "alicloud_ecs_key_pair_attachment" "all" {
   key_pair_name = local.effective_key_pair_name
-  instance_ids  = concat([alicloud_instance.data.id], alicloud_instance.silo[*].id, alicloud_instance.edge[*].id)
+  instance_ids  = concat([alicloud_instance.data.id], alicloud_instance.silo[*].id, alicloud_instance.gateway[*].id)
 
   lifecycle {
     precondition {

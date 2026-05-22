@@ -23,7 +23,7 @@
 - 跨网关实时路由尚未完成，活跃房间模拟和世界状态扇出仍局限在单个网关进程。
 - 断线、登出、取消匹配、离房和空房间释放已有框架会话基础，但仍需要生产场景回归和补测试。
 - Unity 客户端主流程仍有较高维护风险，`DotArenaGame` 和 `DotArenaSceneUiPresenter` 还没有完全收敛到清晰边界。
-- 生产基础设施还停留在只启动 PostgreSQL/Redis 的本地 compose 和开发配置，缺少 Edge/Silo 镜像、生产 compose、真实环境配置、密钥、日志、监控、告警和发布流水线。
+- 生产基础设施还停留在只启动 PostgreSQL/Redis 的本地 compose 和开发配置，缺少 Gateway/Silo 镜像、生产 compose、真实环境配置、密钥、日志、监控、告警和发布流水线。
 - 自动化测试覆盖了模拟、匹配策略、排行榜、框架会话可靠性和部分 sample 会话清理，但缺少房间运行时、网络会话生命周期、客户端流程和端到端回归。
 
 ## 必须补齐的玩家功能
@@ -59,9 +59,9 @@
 
 验收门槛：
 
-- 两个 Edge 实例运行时，玩家控制连接、实时连接和房间 runtime 可以分布在不同网关。
+- 两个 gateway 实例运行时，玩家控制连接、实时连接和房间 runtime 可以分布在不同网关。
 - 玩家输入能到达 runtime owner，世界状态能回到正确客户端。
-- 关闭其中一个 Edge 后，受影响玩家得到明确失败/重连体验，其他房间不受影响。
+- 关闭其中一个 gateway 后，受影响玩家得到明确失败/重连体验，其他房间不受影响。
 
 ### 清理与恢复语义
 
@@ -146,14 +146,14 @@
 - 单机完整一局：开始、移动、吃食物、吞噬、死亡、复活、结算、再来一局、返回入口。
 - 联机完整一局：登录、匹配、实时绑定、移动、世界同步、结算、积分发放、排行榜刷新。
 - 断线场景：匹配中断线、对局中控制连接断开、实时连接断开、服务端重启、重复登录顶号。
-- 多网关场景：两个 Edge、一个 Silo，玩家分布在不同 Edge 完成一局。
+- 多网关场景：两个 gateway、一个 Silo，玩家分布在不同 gateway 完成一局。
 - 视觉场景：1200x600、960x540 和目标发布分辨率。
 
 上线候选版本的硬门槛：
 
 - `dotnet build Shared/Shared.csproj -f net10.0` 通过。
 - `dotnet build Server/Silo/Silo.csproj` 通过。
-- `dotnet build Server/Edge/Edge.csproj` 通过。
+- `dotnet build Server/Gateway/Gateway.csproj` 通过。
 - `dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj` 通过。
 - Unity 脚本编译无错误。
 - 单机和联机主链路人工回归通过。
@@ -163,13 +163,13 @@
 
 上线前必须补齐以下非功能工作：
 
-- Docker 部署拓扑：Edge、Silo、PostgreSQL、Redis、反向代理或负载均衡、开放端口、Docker network、volume、健康检查和重启策略。
-- 镜像产物：为 Edge 和 Silo 提供独立 Dockerfile 或统一多目标 Dockerfile，固定 .NET 运行时版本，使用非 root 用户，镜像 tag 包含版本号和 git commit。
-- Compose 文件：保留本地 `docker-compose.yml` 作为开发基础设施；新增生产 compose 或 compose override，纳入 Edge、Silo、PostgreSQL、Redis、反向代理、env 文件和持久化 volume。
+- Docker 部署拓扑：gateway、Silo、PostgreSQL、Redis、反向代理或负载均衡、开放端口、Docker network、volume、健康检查和重启策略。
+- 镜像产物：为 gateway 和 Silo 提供独立 Dockerfile 或统一多目标 Dockerfile，固定 .NET 运行时版本，使用非 root 用户，镜像 tag 包含版本号和 git commit。
+- Compose 文件：保留本地 `docker-compose.yml` 作为开发基础设施；新增生产 compose 或 compose override，纳入 gateway、Silo、PostgreSQL、Redis、反向代理、env 文件和持久化 volume。
 - 配置管理：环境变量、密钥、连接串、节点 id、公网 host、KCP 端口、榜单时区和日志级别。
 - 日志：登录、匹配、房间创建、实时绑定、输入投递失败、世界状态广播失败、结算、积分发放、排行榜重置。
 - 指标：在线人数、匹配队列长度、房间数、输入延迟、快照广播频率、断线率、RPC 错误率、数据库错误率。
-- 告警：Edge 不健康、Silo 不健康、PostgreSQL/Redis 不可用、匹配队列积压、房间 runtime 异常退出、错误率升高。
+- 告警：gateway 不健康、Silo 不健康、PostgreSQL/Redis 不可用、匹配队列积压、房间 runtime 异常退出、错误率升高。
 - 数据备份：PostgreSQL 备份、恢复演练、排行榜归档策略。
 - 发布流水线：服务端构建、镜像或可执行包产物、Unity 客户端构建、版本号、变更记录和回滚步骤。
 - 灰度策略：先内部房间，再小规模外部测试，最后扩大流量。
@@ -186,7 +186,7 @@
 
 - 完成客户端主流程拆分和 UI 状态补齐。
 - 完成清理语义和房间 runtime 测试。
-- 单 Edge + 单 Silo + PostgreSQL 可以连续完成联机回归。
+- 单 gateway + 单 Silo + PostgreSQL 可以连续完成联机回归。
 
 ### M2：生产基础设施版本
 
@@ -198,7 +198,7 @@
 ### M3：多网关版本
 
 - 完成跨网关实时路由。
-- 两个 Edge 场景下完成匹配、输入、世界广播、断线和结算回归。
+- 两个 gateway 场景下完成匹配、输入、世界广播、断线和结算回归。
 - 多网关失败场景有明确日志和玩家体验。
 
 ### M4：上线候选版本

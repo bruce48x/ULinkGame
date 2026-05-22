@@ -1,11 +1,9 @@
-extern alias SiloAssembly;
-
-using SiloAssembly::ULinkGame.Sample.Silo.Leaderboard;
+using Agar.Sample.State.Leaderboard;
 using Xunit;
 
 namespace Agar.Unity.Tests;
 
-public sealed class LeaderboardGrainTests
+public sealed class LeaderboardActorTests
 {
     private static readonly TimeZoneInfo ChinaTimeZone = FindChinaTimeZone();
 

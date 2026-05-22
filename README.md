@@ -4,7 +4,7 @@ ULinkGame is a game-session infrastructure layer built on [ULinkRPC](https://git
 
 ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkActor provides the foundational process-local actor/mailbox runtime and source-generated typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame owns the higher-level game infrastructure: session lifecycle, endpoint callback binding, reconnect semantics, realtime-friendly server structure, and reliable business push messages.
 
-ULinkGame is not an Orleans wrapper. It exists because Orleans-style distributed actor hosting is too heavy and too enterprise-oriented for the game server workflows this framework targets: process-local rooms, battles, matchmaking queues, and short-path state execution that need predictable mailbox behavior on edge processes.
+ULinkGame is not an Orleans wrapper. It exists because Orleans-style distributed actor hosting is too heavy and too enterprise-oriented for the game server workflows this framework targets: process-local rooms, battles, matchmaking queues, and short-path state execution that need predictable mailbox behavior on gateway processes.
 
 ## Why ULinkGame
 
@@ -14,7 +14,7 @@ Online games need more than a request/response RPC pipe. A typical project quick
 - How do I combine a control connection with realtime traffic?
 - How do I reconnect without losing important business notifications?
 - How do I keep Unity, Godot, and plain .NET clients from duplicating the same session-state bookkeeping?
-- How do I run realtime battle state on the edge process without splitting gameplay across two frameworks?
+- How do I run realtime battle state on the gateway process without splitting gameplay across two frameworks?
 
 ULinkGame packages those repeatable pieces while leaving your actual game rules in your project.
 

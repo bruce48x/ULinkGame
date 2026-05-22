@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Gateway</RootNamespace>
+    <BuildInParallel>false</BuildInParallel>
+    <RestoreBuildInParallel>false</RestoreBuildInParallel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Shared.csproj" TargetFramework="net10.0">
+      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
+    </ProjectReference>
+    <ProjectReference Include="../State.Contracts/State.Contracts.csproj" />
+    <ProjectReference Include="../State/State.csproj" />
+    <ProjectReference Include="..\..\..\..\src\ULinkGame.Server\ULinkGame.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ULinkRPC.Server" Version="0.11.7" />
+    <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.3" />
+    <PackageReference Include="ULinkRPC.Transport.WebSocket" Version="0.11.3" />
+    <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Agar.Godot.Sample.State</RootNamespace>
+        <BuildInParallel>false</BuildInParallel>
+        <RestoreBuildInParallel>false</RestoreBuildInParallel>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
+        <ProjectReference Include="../State.Contracts/State.Contracts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Remove="Program.cs" />
+        <None Remove="appsettings.json" />
+    </ItemGroup>
+
+</Project>

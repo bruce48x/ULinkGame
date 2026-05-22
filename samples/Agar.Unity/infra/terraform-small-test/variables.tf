@@ -34,8 +34,8 @@ variable "silo_instance_type" {
   default     = "ecs.c8a.large"
 }
 
-variable "edge_instance_type" {
-  description = "ECS instance type for Edge nodes."
+variable "gateway_instance_type" {
+  description = "ECS instance type for gateway nodes."
   type        = string
   default     = "ecs.c8a.large"
 }
@@ -46,8 +46,8 @@ variable "silo_count" {
   default     = 2
 }
 
-variable "edge_count" {
-  description = "Number of Edge ECS instances."
+variable "gateway_count" {
+  description = "Number of gateway ECS instances."
   type        = number
   default     = 2
 }
@@ -86,8 +86,8 @@ variable "ssh_public_key" {
   default     = ""
 }
 
-variable "edge_image" {
-  description = "Docker image for samples/Agar.Unity Server/Dockerfile edge target. Must include the ADO.NET clustering changes."
+variable "gateway_image" {
+  description = "Docker image for samples/Agar.Unity Server/Dockerfile gateway target. Must include the ADO.NET clustering changes."
   type        = string
 }
 

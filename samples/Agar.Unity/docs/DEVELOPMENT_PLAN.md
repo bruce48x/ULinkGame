@@ -24,7 +24,7 @@ ulinkgame-tool codegen
 ```powershell
 dotnet build Shared/Shared.csproj -f net10.0
 dotnet build Server/Silo/Silo.csproj
-dotnet build Server/Edge/Edge.csproj
+dotnet build Server/Gateway/Gateway.csproj
 dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ```
 
@@ -163,7 +163,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 待办：
 
 - 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
-- 在 Silo 和 Edge 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
+- 在 Silo 和 gateway 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
 - 验证联机大厅不展示 DEBUG 信息，不保留调试面板、连接端点、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
 - 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量；表头、行内容和排序都不出现“分数”。
 - 验证右侧实时排名面板背景已改为低遮挡半透明，不再因为背景框过深或过实影响游戏画面可读性。
@@ -314,7 +314,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 待办：
 
-- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/Silo/Silo.csproj`、`Server/Edge/Edge.csproj`。
+- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/Silo/Silo.csproj`、`Server/Gateway/Gateway.csproj`。
 - 每轮触碰业务逻辑后，运行已有自动化测试和新增测试。
 - 每轮触碰 Unity 客户端脚本或资源后，触发 Unity 资源刷新/脚本编译并检查控制台错误。
 - 每轮发布前，手动冒烟测试单机和联机流程。
@@ -333,7 +333,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 将胜利积分排行榜的排序索引从 `LeaderboardGrain` 内部状态迁移到 Redis sorted set。
 - 继续保留 `IPlayerService.GetLeaderboardAsync` 作为客户端唯一查询入口，不让 Unity 客户端直接依赖 Redis。
-- 让排行榜实现更接近 Docker 生产部署形态，为后续多 Edge 和生产上线计划打基础。
+- 让排行榜实现更接近 Docker 生产部署形态，为后续多 gateway 和生产上线计划打基础。
 
 设计原则：
 
@@ -356,7 +356,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
   - 查询时从 points zset 取候选集合，再按胜利积分、胜场和玩家标识在服务端内存中做最终稳定排序。
   - 明确候选 overfetch 规则，避免 top N 边界处大量同分玩家导致排序不稳定；必要时用 Lua 脚本或更大的候选窗口保证确定性。
 - 增加 Redis 配置：
-  - 在 Edge/Silo 配置中增加 Redis connection string、password、database、key prefix、operation timeout。
+  - 在 Gateway/Silo 配置中增加 Redis connection string、password、database、key prefix、operation timeout。
   - 本地 compose 继续使用现有 Redis；生产 compose 在生产上线追加计划中补齐持久化和密码。
   - Redis 不可用时，排行榜写入和查询要返回明确错误或降级结果，不能影响对局结算主流程崩溃。
 - 调整服务端实现：
@@ -423,23 +423,23 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 目标：
 
-- 为 Silo 和 Edge 生成可复现、可部署、可回滚的 Docker 镜像。
+- 为 Silo 和 gateway 生成可复现、可部署、可回滚的 Docker 镜像。
 
 具体任务：
 
-- P1.1：决定 Dockerfile 结构：两个独立 Dockerfile，或一个支持 `silo` / `edge` target 的多目标 Dockerfile。
+- P1.1：决定 Dockerfile 结构：两个独立 Dockerfile，或一个支持 `silo` / `gateway` target 的多目标 Dockerfile。
 - P1.2：固定 .NET SDK 和 runtime 镜像版本，不使用 floating tag 作为生产基线。
 - P1.3：把 restore、build、publish 和 runtime 分成多阶段构建。
 - P1.4：确保 build context 不依赖开发机绝对路径、`bin`、`obj` 或本地 NuGet 缓存。
 - P1.5：运行容器使用非 root 用户。
 - P1.6：镜像只复制发布产物和必要配置，不把源码、测试产物或本地 secrets 带进 runtime 层。
-- P1.7：定义镜像 tag 规则：`agar-silo:<version>-<sha>`、`agar-edge:<version>-<sha>`。
+- P1.7：定义镜像 tag 规则：`agar-silo:<version>-<sha>`、`agar-gateway:<version>-<sha>`。
 - P1.8：写出本地构建命令和 CI 构建命令。
 
 验收标准：
 
-- 干净环境可以构建 Silo 和 Edge 镜像。
-- Silo 和 Edge 镜像可以打印版本信息或启动到配置校验阶段。
+- 干净环境可以构建 Silo 和 gateway 镜像。
+- Silo 和 gateway 镜像可以打印版本信息或启动到配置校验阶段。
 - 镜像不包含生产 secrets，不依赖本地绝对路径。
 
 #### P2：Docker Compose 拓扑
@@ -451,19 +451,19 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P2.1：保留现有 `docker-compose.yml` 作为本地 PostgreSQL/Redis 开发基础设施。
-- P2.2：新增生产 compose 或 compose override，加入 `silo`、`edge`、`postgres`、`redis` 和可选反向代理。
+- P2.2：新增生产 compose 或 compose override，加入 `silo`、`gateway`、`postgres`、`redis` 和可选反向代理。
 - P2.3：为 PostgreSQL 和 Redis 配置持久化 volume。
 - P2.4：定义 Docker network，区分容器内端口和公网暴露端口。
 - P2.5：明确控制面 WebSocket 端口暴露方式。
 - P2.6：明确 KCP 实时端口暴露方式，按实际传输要求配置 UDP/TCP。
-- P2.7：为 `silo`、`edge`、`postgres`、`redis` 配置 restart 策略。
+- P2.7：为 `silo`、`gateway`、`postgres`、`redis` 配置 restart 策略。
 - P2.8：为服务之间的启动顺序增加 healthcheck 或显式等待策略，避免只依赖容器启动顺序。
-- P2.9：提供单 Silo + 单 Edge 的 compose 启动命令。
-- P2.10：提供单 Silo + 双 Edge 的 compose 启动命令或 scale 说明。
+- P2.9：提供单 Silo + 单 gateway 的 compose 启动命令。
+- P2.10：提供单 Silo + 双 gateway 的 compose 启动命令或 scale 说明。
 
 验收标准：
 
-- 一条 Docker Compose 命令可以启动 PostgreSQL、Redis、Silo 和 Edge。
+- 一条 Docker Compose 命令可以启动 PostgreSQL、Redis、Silo 和 gateway。
 - PostgreSQL/Redis 数据写入持久化 volume。
 - 容器重启后服务可以恢复到可连接状态。
 
@@ -476,7 +476,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P3.1：梳理 Silo 必填配置：PostgreSQL 连接串、Orleans ClusterId、ServiceId、AdvertisedIPAddress、SiloPort、GatewayPort。
-- P3.2：梳理 Edge 必填配置：Orleans ClusterId、ServiceId、Edge NodeId、控制面端口、Realtime Host、Realtime Port、Realtime Path。
+- P3.2：梳理 gateway 必填配置：Orleans ClusterId、ServiceId、gateway NodeId、控制面端口、Realtime Host、Realtime Port、Realtime Path。
 - P3.3：梳理业务配置：房间容量、匹配超时、断线保留时间、可靠 push 保留时间、排行榜时区、排行榜归档周期。
 - P3.4：新增或更新 `.env.example`，仅保留开发默认值。
 - P3.5：新增生产 env 模板，所有密码、token secret、公网 host、连接串都要求显式填写。
@@ -498,16 +498,16 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P4.1：为 Silo 定义健康检查：进程存活、配置有效、PostgreSQL 可连接、Orleans 可启动。
-- P4.2：为 Edge 定义健康检查：进程存活、Orleans client 可连接、控制面 RPC server 可监听、实时端口可监听。
-- P4.3：在 compose 中接入 Silo 和 Edge healthcheck。
+- P4.2：为 gateway 定义健康检查：进程存活、Orleans client 可连接、控制面 RPC server 可监听、实时端口可监听。
+- P4.3：在 compose 中接入 Silo 和 gateway healthcheck。
 - P4.4：定义优雅停止行为：收到 SIGTERM 后停止接受新连接、清理本地会话、释放房间 runtime。
 - P4.5：验证容器 restart 后不会留下不可恢复的 Orleans membership 或本地注册状态。
 
 验收标准：
 
 - `docker compose ps` 能看到关键容器进入 healthy。
-- 关闭 Edge 容器后，日志中能看到清理路径。
-- 重启 Edge 后可以重新登录并进入匹配。
+- 关闭 gateway 容器后，日志中能看到清理路径。
+- 重启 gateway 后可以重新登录并进入匹配。
 
 #### P5：PostgreSQL 迁移、备份与恢复
 
@@ -613,7 +613,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P9.5：补实时绑定、输入投递失败、世界状态广播失败日志。
 - P9.6：补结算、胜利积分发放、排行榜查询和周重置日志。
 - P9.7：定义指标：在线人数、匹配队列长度、房间数、输入延迟、快照频率、断线率、RPC 错误率、数据库错误率。
-- P9.8：定义告警：Edge/Silo unhealthy、PostgreSQL/Redis 不可用、匹配积压、房间异常退出、错误率升高。
+- P9.8：定义告警：Gateway/Silo unhealthy、PostgreSQL/Redis 不可用、匹配积压、房间异常退出、错误率升高。
 - P9.9：确认 `docker logs` 能完成最小排障；后续可接入集中日志系统。
 
 验收标准：
@@ -649,37 +649,37 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 目标：
 
-- 在 Docker 单 Edge 拓扑下完成主链路回归。
+- 在 Docker 单 gateway 拓扑下完成主链路回归。
 
 具体任务：
 
-- P11.1：用生产 compose 启动 PostgreSQL、Redis、Silo、Edge。
+- P11.1：用生产 compose 启动 PostgreSQL、Redis、Silo、gateway。
 - P11.2：启动 Unity 客户端，完成游客登录。
 - P11.3：完成匹配、实时绑定和一局对战。
 - P11.4：验证结算和胜利积分发放。
 - P11.5：验证排行榜刷新，并确认排行榜数据来自 Redis sorted set 索引。
-- P11.6：重启 Edge，验证玩家重新登录和匹配。
+- P11.6：重启 gateway，验证玩家重新登录和匹配。
 - P11.7：重启 Silo，验证服务恢复策略和日志。
 - P11.8：导出本轮日志，确认排障字段齐全。
 
 验收标准：
 
 - Docker 单网关联机完整一局通过。
-- Edge/Silo 重启后的玩家体验符合设计。
+- Gateway/Silo 重启后的玩家体验符合设计。
 - 日志能定位本轮对局的关键事件。
 
 #### P12：跨网关实时路由设计
 
 目标：
 
-- 在实现前明确多 Edge 下输入、世界状态和断线事件的所有权。
+- 在实现前明确多 gateway 下输入、世界状态和断线事件的所有权。
 
 具体任务：
 
 - P12.1：选择网关间事件机制：Orleans stream、Orleans observer 或 Redis 发布订阅。
 - P12.2：定义 room runtime owner 的创建、续租、过期和释放规则。
-- P12.3：定义输入从非 owner Edge 转发到 owner Edge 的消息格式。
-- P12.4：定义世界状态从 owner Edge 扇出到玩家所在 Edge 的消息格式。
+- P12.3：定义输入从非 owner gateway 转发到 owner gateway 的消息格式。
+- P12.4：定义世界状态从 owner gateway 扇出到玩家所在 gateway 的消息格式。
 - P12.5：定义断线、登出、取消匹配、离房在跨网关下的事件顺序。
 - P12.6：定义背压策略：输入过期、队列满、慢客户端、广播失败。
 - P12.7：定义重试策略和不可恢复失败的玩家体验。
@@ -687,7 +687,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 验收标准：
 
-- 设计能解释控制连接在 Edge A、runtime 在 Edge B 的完整路径。
+- 设计能解释控制连接在 gateway A、runtime 在 gateway B 的完整路径。
 - 失败行为足够明确，可以编写测试和手动回归步骤。
 - 没有要求序列化实时 RPC callback 对象。
 
@@ -695,7 +695,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 目标：
 
-- 支持两个 Edge 部署下的真实联机对局。
+- 支持两个 gateway 部署下的真实联机对局。
 
 具体任务：
 
@@ -710,9 +710,9 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 验收标准：
 
-- 两个 Edge 下，玩家可以分别连接不同 Edge 并完成一局。
-- 世界状态能送达不同 Edge 上的玩家。
-- 关闭一个 Edge 时，受影响玩家有明确失败或重连体验，其他房间不受影响。
+- 两个 gateway 下，玩家可以分别连接不同 gateway 并完成一局。
+- 世界状态能送达不同 gateway 上的玩家。
+- 关闭一个 gateway 时，受影响玩家有明确失败或重连体验，其他房间不受影响。
 
 #### P14：发布产物与回滚
 
@@ -723,7 +723,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P14.1：确定服务端版本号来源。
-- P14.2：生成 Silo 和 Edge 镜像 tag。
+- P14.2：生成 Silo 和 gateway 镜像 tag。
 - P14.3：写出 Docker build 命令。
 - P14.4：写出 Docker push/pull 命令。
 - P14.5：写出生产 compose up/down 命令。
@@ -748,13 +748,13 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - P15.1：运行 `dotnet build Shared/Shared.csproj -f net10.0`。
 - P15.2：运行 `dotnet build Server/Silo/Silo.csproj`。
-- P15.3：运行 `dotnet build Server/Edge/Edge.csproj`。
+- P15.3：运行 `dotnet build Server/Gateway/Gateway.csproj`。
 - P15.4：运行 `dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj`。
 - P15.5：执行 Unity 脚本编译检查。
 - P15.6：完成单机完整一局人工回归。
 - P15.7：完成 Docker 单网关联机完整一局人工回归。
-- P15.8：完成 Docker 双 Edge 联机完整一局人工回归。
-- P15.9：完成断线场景回归：匹配中断线、控制连接断开、实时连接断开、Edge 重启、Silo 重启、重复登录。
+- P15.8：完成 Docker 双 gateway 联机完整一局人工回归。
+- P15.9：完成断线场景回归：匹配中断线、控制连接断开、实时连接断开、gateway 重启、Silo 重启、重复登录。
 - P15.10：完成视觉验收：入口、登录、匹配、大厅、HUD、局内排名、结算、排行榜。
 - P15.11：确认素材、字体和第三方资源许可。
 - P15.12：确认 README、`PRODUCTION_LAUNCH_PLAN.md`、`GAMEPLAY_DESIGN.md` 和功能文档与实现一致。
@@ -856,7 +856,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - Agar Unity 的 `SessionDirectory` / `PlayerService` 已迁移到框架会话目录：控制端点和实时端点以 endpoint name 绑定 opaque callback，reconnect 通过 framework resume decision 判断 state lost。
 - Agar Unity 的可靠匹配推送已按 `GameSessionKey` 隔离 publish/replay/ack；ack 请求携带 session id/generation，old generation 或未知 sequence 会映射为 state lost / session mismatch。
 - Unity 客户端 reconnect、state-lost 和 reliable push cursor 已接入 `ClientSessionController` / `ReliablePushInbox`，新会话会隔离旧可靠推送序列。
-- 本轮验证通过：`dotnet test Tests/tests.slnx --no-restore`、`dotnet test samples/Agar.Unity/tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj --no-restore`、`dotnet build samples/Agar.Unity/Server/Edge/Edge.csproj --no-restore`、`dotnet build samples/Agar.Unity/Client/SampleClient.Gameplay.csproj --no-restore`。
+- 本轮验证通过：`dotnet test Tests/tests.slnx --no-restore`、`dotnet test samples/Agar.Unity/tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj --no-restore`、`dotnet build samples/Agar.Unity/Server/Gateway/Gateway.csproj --no-restore`、`dotnet build samples/Agar.Unity/Client/SampleClient.Gameplay.csproj --no-restore`。
 - 剩余工作不是重新实现会话可靠性，而是补充 `PlayerService`、`RoomRuntime`、`DotArenaNetworkSession` 和端到端断线/重启路径的生产回归覆盖。
 
 ### 阶段 8：胜利积分与排行榜
@@ -886,7 +886,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 本轮已通过 `Shared/Shared.csproj` 构建。
 - 本轮已通过 `Server/Silo/Silo.csproj` 构建。
-- 本轮已通过 `Server/Edge/Edge.csproj` 构建。
+- 本轮已通过 `Server/Gateway/Gateway.csproj` 构建。
 - 本轮已通过已有自动化测试，31/31。
 - Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍需按待办执行。
 - README 已同步到当时的命令、端口和架构事实。

@@ -6,12 +6,12 @@ Topology:
 
 - 1 data ECS instance running PostgreSQL and Redis in Docker Compose
 - `silo_count` Silo ECS instances
-- `edge_count` Edge ECS instances
-- Public Edge control-plane WebSocket on TCP `20000`
-- Public Edge realtime KCP on UDP `20001`
+- `gateway_count` gateway ECS instances
+- Public gateway control-plane WebSocket on TCP `20000`
+- Public gateway realtime KCP on UDP `20001`
 - Orleans membership shared through PostgreSQL ADO.NET clustering
 
-This is a distributed test topology for validating cross-machine Silo/Edge behavior. It is still not a production topology: PostgreSQL and Redis run on a single ECS instance, there is no ALB/TLS/autoscaling, and clients connect directly to one of the Edge public IPs.
+This is a distributed test topology for validating cross-machine Silo/Gateway behavior. It is still not a production topology: PostgreSQL and Redis run on a single ECS instance, there is no ALB/TLS/autoscaling, and clients connect directly to one of the gateway public IPs.
 
 ## Prerequisites
 
@@ -26,9 +26,9 @@ $env:ALICLOUD_REGION="cn-hangzhou"
 Build and push the two server images from the repository root:
 
 ```powershell
-docker build -f samples/Agar.Unity/Server/Dockerfile --target edge -t registry.example.com/ulinkgame/agar-edge:small-test .
+docker build -f samples/Agar.Unity/Server/Dockerfile --target gateway -t registry.example.com/ulinkgame/agar-gateway:small-test .
 docker build -f samples/Agar.Unity/Server/Dockerfile --target silo -t registry.example.com/ulinkgame/agar-silo:small-test .
-docker push registry.example.com/ulinkgame/agar-edge:small-test
+docker push registry.example.com/ulinkgame/agar-gateway:small-test
 docker push registry.example.com/ulinkgame/agar-silo:small-test
 ```
 
@@ -37,7 +37,7 @@ Copy `terraform.tfvars.example` to `terraform.tfvars`, then fill in:
 - `image_id`
 - `ssh_allowed_cidr`
 - `key_pair_name` or `ssh_public_key`
-- `edge_image`
+- `gateway_image`
 - `silo_image`
 - `postgres_password`
 - `redis_password`
@@ -54,8 +54,8 @@ terraform apply
 
 Useful outputs:
 
-- `control_plane_url`: Unity WebSocket control endpoints, one per Edge
-- `realtime_endpoint`: Unity KCP endpoints, one per Edge
+- `control_plane_url`: Unity WebSocket control endpoints, one per gateway
+- `realtime_endpoint`: Unity KCP endpoints, one per gateway
 - `silo_private_ips`: private Silo node addresses
 - `ssh_command`: SSH commands for all nodes
 
@@ -67,12 +67,12 @@ docker compose ps
 docker compose logs -f postgres redis
 ```
 
-On Silo or Edge nodes, inspect containers with:
+On Silo or gateway nodes, inspect containers with:
 
 ```bash
 docker ps
 docker logs -f agar-silo
-docker logs -f agar-edge
+docker logs -f agar-gateway
 ```
 
 ## Notes

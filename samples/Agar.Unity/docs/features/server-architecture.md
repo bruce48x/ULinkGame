@@ -4,7 +4,7 @@
 
 ## 服务端边界
 
-`samples/Agar.Unity/Server/Edge` 是 RPC 网关和房间运行时宿主。
+`samples/Agar.Unity/Server/Gateway` 是 RPC 网关和房间运行时宿主。
 
 当前职责：
 
@@ -38,12 +38,12 @@ PostgreSQL 是 grain 状态的持久化后端，Silo 通过 sample-local Dapper 
 
 ## Docker 部署边界
 
-生产环境目标使用 Docker 部署。当前 `docker-compose.yml` 只作为本地开发基础设施，负责启动 PostgreSQL 和 Redis；生产部署还需要补齐 Edge 和 Silo 服务镜像、生产 compose 配置、健康检查、日志、密钥和回滚流程。
+生产环境目标使用 Docker 部署。当前 `docker-compose.yml` 只作为本地开发基础设施，负责启动 PostgreSQL 和 Redis；生产部署还需要补齐 gateway 和 Silo 服务镜像、生产 compose 配置、健康检查、日志、密钥和回滚流程。
 
 生产 Docker 拓扑的目标形态：
 
 - `silo` 容器运行 `Server/Silo/Silo.csproj` 的发布产物，承载 Orleans grains。
-- `edge` 容器运行 `Server/Edge/Edge.csproj` 的发布产物，承载控制面 RPC、实时 RPC 和房间运行时。
+- `gateway` 容器运行 `Server/Gateway/Gateway.csproj` 的发布产物，承载控制面 RPC、实时 RPC 和房间运行时。
 - `postgres` 容器或托管 PostgreSQL 保存 Orleans grain 状态，必须使用持久化 volume 或外部数据库。
 - `redis` 容器或托管 Redis 用于胜利积分排行榜 sorted set；后续也可承载跨网关路由或在线状态，必须启用密码和持久化策略。
 - 可选反向代理或负载均衡负责 WebSocket/TLS 入口；KCP 实时端口需要按传输要求单独暴露。

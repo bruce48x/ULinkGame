@@ -86,7 +86,7 @@ In this repository's tool documentation, `starter` means `ulinkrpc-starter`, not
 When `ulinkgame-tool new` augments a generated project, it should preserve starter output and add only ULinkGame-owned infrastructure:
 
 - `ULinkGame.Server` and `ULinkGame.Client` package references when needed
-- ULinkGame edge hosting projects and configuration
+- ULinkGame gateway hosting projects and configuration
 - `ULinkActor` package references for process-local actor execution
 - ULinkGame-specific server startup, gateway, and tool configuration
 - project maintenance commands that delegate code generation back to the starter toolchain
@@ -97,7 +97,7 @@ If a generated project needs a different `ULinkRPC.*` package version or client 
 
 ### Background
 
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Orleans proved too heavy and too enterprise-oriented for the game server workflows this project targets, especially process-local room, battle, and service state that should run with predictable mailbox execution on edge processes. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
+The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Orleans proved too heavy and too enterprise-oriented for the game server workflows this project targets, especially process-local room, battle, and service state that should run with predictable mailbox execution on gateway processes. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
 
 - reconnect versus new-session decisions
 - business push sequencing
@@ -211,7 +211,7 @@ The repository currently contains two sample clients:
 ```txt
 samples/Agar.Unity/
   Shared/  MemoryPack contracts and shared gameplay kernel
-  Server/  .NET server, ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
+  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
   Client/  Unity client
 
 samples/Agar.Godot/
@@ -239,11 +239,10 @@ Sample-specific documentation and local infrastructure live with the sample:
 - `samples/Agar.Unity/dotnet-tools.json`
 - `samples/Agar.Unity/infra/`
 
-Run the sample server pieces separately:
+Run the sample server:
 
 ```powershell
-dotnet run --project samples/Agar.Unity/Server/Silo/Silo.csproj
-dotnet run --project samples/Agar.Unity/Server/Edge/Edge.csproj
+dotnet run --project samples/Agar.Unity/Server/Gateway/Gateway.csproj
 ```
 
 Open `samples/Agar.Unity/Client` in Unity for the client.
@@ -986,7 +985,7 @@ Test requirements:
 
 Goal: generate production-ready infrastructure scaffolding without taking ownership of ULinkRPC starter output or game business code.
 
-The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should split templates by project shape and avoid carrying Orleans-oriented naming into new game-runtime templates:
+The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should use Gateway/State naming, split templates by project shape, and avoid carrying Orleans-oriented naming into new game-runtime templates:
 
 - simple online game: one session endpoint
 - realtime multiplayer game: session/control endpoint plus optional realtime endpoint
@@ -995,10 +994,10 @@ The tool has historically created an Edge/Silo layout and unconditionally genera
 Template-owned additions:
 
 - `ULinkGame.Server` and `ULinkGame.Client` package references
-- Edge/state host startup using ULinkGame helpers
+- Gateway/state host startup using ULinkGame helpers
 - environment-variable driven `appsettings.json`
 - `.env.example` with development-only defaults
-- optional Dockerfile and compose/override files for Edge and state runtime processes
+- optional Dockerfile and compose/override files for Gateway and state runtime processes
 - health check registration and endpoint
 - local tool manifest and codegen command wiring
 - README next steps that match the selected project shape

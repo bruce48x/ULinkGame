@@ -1,6 +1,6 @@
 # ULinkGame 游戏样例
 
-这个样例用于验证 ULinkGame 在轻量多人对战游戏中的接入方式。它同时包含本地单机、RPC 联机、控制连接、实时连接、可靠业务推送和分布式部署的基础路径。
+这个样例用于验证 ULinkGame 在轻量多人对战游戏中的接入方式。它同时包含本地单机、RPC 联机、控制连接、实时连接、可靠业务推送，以及基于 ULinkActor 的进程内状态执行路径。
 
 ## 文档入口
 
@@ -35,16 +35,19 @@ samples/Agar.Unity
  │  └─ Interfaces
  │     └─ IPlayerService.cs
  ├─ Server
- │  ├─ Orleans.Contracts
+ │  ├─ State.Contracts
  │  │  └─ Leaderboard
- │  ├─ Edge
+ │  ├─ State
+ │  │  ├─ Leaderboard
+ │  │  ├─ Matchmaking
+ │  │  ├─ Rooms
+ │  │  ├─ Sessions
+ │  │  └─ Users
+ │  ├─ Gateway
  │  │  ├─ Realtime
  │  │  │  └─ RoomRuntime.cs
  │  │  └─ Services
  │  │     └─ PlayerService.cs
- │  └─ Silo
- │     ├─ Leaderboard
- │     └─ Users
  ├─ Client
  │  └─ Assets
  │     └─ Scripts
@@ -60,52 +63,25 @@ samples/Agar.Unity
 
 - `Shared/Gameplay/ArenaSimulation.cs`：玩法规则内核，单机和联机共用。
 - `Shared/Interfaces/IPlayerService.cs`：客户端和服务端共用的 RPC 协议。
-- `Server/Edge/Services/PlayerService.cs`：控制面 RPC 网关服务。
-- `Server/Edge/Realtime/RoomRuntime.cs`：服务端房间模拟和世界状态广播。
-- `Server/Silo/Program.cs`：Orleans Silo 启动入口。
-- `Server/Silo/Users/UserGrain.cs`：用户登录、资料和胜利积分持久化。
-- `Server/Silo/Leaderboard/LeaderboardGrain.cs`：胜利积分排行榜周期、排序和归档。
+- `Server/Gateway/Services/PlayerService.cs`：控制面 RPC 网关服务。
+- `Server/Gateway/Realtime/RoomRuntime.cs`：服务端房间模拟和世界状态广播。
+- `Server/State/StateStores.cs`：把 sample 业务状态接入 ULinkActor actor runtime。
+- `Server/State/Users/UserActor.cs`：用户登录、资料和胜利积分状态。
+- `Server/State/Leaderboard/LeaderboardActor.cs`：胜利积分排行榜周期、排序和归档。
 - `Client/Assets/Scripts/Gameplay/DotArenaGame.cs`：客户端主流程、输入、渲染、模式切换和网络会话编排。
 - `Client/Assets/Scripts/Gameplay/DotArenaNetworkSession.cs`：客户端控制连接、实时连接和重连参数封装。
 
 相关单元测试位于 `samples/Agar.Unity/tests/BusinessLogic.Tests`。仓库根目录 `Tests` 目录只包含 ULinkGame 框架测试。
 
-## 本地基础设施
-
-样例自带 PostgreSQL 和 Redis 的本地配置：
-
-- `docker-compose.yml`
-- `.env.example`
-- `infra/postgres/init/001-orleans.sql`
-- `infra/postgres/init/002-dapper-grain-storage.sql`
-
-从 `samples/Agar.Unity` 目录启动：
-
-```powershell
-docker compose --env-file .env.example up -d
-```
-
-PostgreSQL 当前用于 Dapper-backed Orleans grain 状态持久化。Redis 只是为后续路由、在线状态或发布订阅预留，当前实时玩法路径还不依赖 Redis。
-
 ## 运行方式
 
-启动本地基础设施后，分别启动 Silo 和网关服务：
+启动网关服务即可。用户、会话、匹配、房间和排行榜状态当前都在同一个 Gateway 进程内通过 ULinkActor 串行执行。
 
 ```powershell
-dotnet run --project Server/Silo/Silo.csproj
-dotnet run --project Server/Edge/Edge.csproj
+dotnet run --project Server/Gateway/Gateway.csproj
 ```
 
 然后用 Unity 打开 `Client` 目录，运行游戏场景。
-
-本地开发时，Silo 默认在 `Server/Silo/appsettings.json` 中把 `Orleans:AdvertisedIPAddress` 固定为 `127.0.0.1`。这是为了避免 Windows、WSL 或 Docker 多网卡环境把 `172.*` 这类虚拟网卡地址写入 Orleans 成员表，导致同一台机器上的客户端、网关或新 Silo 连接旧地址失败。
-
-如果遇到本机连接旧地址的问题，停止 Silo 和网关后清理当前开发集群的成员记录：
-
-```sql
-DELETE FROM OrleansMembershipTable WHERE DeploymentId = 'dev';
-DELETE FROM OrleansMembershipVersionTable WHERE DeploymentId = 'dev';
-```
 
 ## 开发命令
 
@@ -119,8 +95,8 @@ ulinkgame-tool codegen
 
 ```powershell
 dotnet build Shared/Shared.csproj -f net10.0
-dotnet build Server/Silo/Silo.csproj
-dotnet build Server/Edge/Edge.csproj
+dotnet build Server/State/State.csproj
+dotnet build Server/Gateway/Gateway.csproj
 dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ```
 
@@ -135,7 +111,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 登录重连参数、可靠业务推送和玩家碰撞表现。
 - 旧 dash / buff 协议清理，输入只保留移动方向和 tick。
 - 服务端胜利积分、周榜查询、最近两周归档和客户端真实排行榜展示。
-- 自动化测试 20 个，覆盖模拟规则、匹配队列和胜利积分基础规则。
+- 自动化测试 31 个，覆盖模拟规则、匹配队列、会话清理和胜利积分基础规则。
 
 仍需继续验证：
 

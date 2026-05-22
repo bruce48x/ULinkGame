@@ -16,11 +16,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../Server/Orleans.Contracts/Orleans.Contracts.csproj" />
+    <ProjectReference Include="../../Server/State.Contracts/State.Contracts.csproj" />
     <ProjectReference Include="../../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
-    <ProjectReference Include="../../Server/Silo/Silo.csproj">
-      <Aliases>SiloAssembly</Aliases>
-    </ProjectReference>
+    <ProjectReference Include="../../Server/State/State.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,8 +26,7 @@
     <Compile Include="../../Shared/Gameplay/ArenaSimulation.cs" Link="TestHooks/Shared/Gameplay/ArenaSimulation.cs" />
     <Compile Include="../../Shared/Gameplay/VictoryPointAwards.cs" Link="TestHooks/Shared/Gameplay/VictoryPointAwards.cs" />
     <Compile Include="../../Shared/Interfaces/IPlayerService.cs" Link="TestHooks/Shared/Interfaces/IPlayerService.cs" />
-    <Compile Include="../../Server/Silo/Matchmaking/MatchmakingQueuePolicy.cs" Link="TestHooks/MatchmakingQueuePolicy.cs" />
-    <Compile Include="../../Server/Edge/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
-    <Compile Include="../../Server/Edge/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
+    <Compile Include="../../Server/Gateway/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
+    <Compile Include="../../Server/Gateway/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
   </ItemGroup>
 </Project>
