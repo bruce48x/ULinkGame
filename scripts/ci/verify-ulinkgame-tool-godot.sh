@@ -17,9 +17,7 @@ PROJECT_NAME="ULinkGameGodot${TRANSPORT_LABEL}${SERIALIZER_LABEL}"
 PROJECT_DIR="$GENERATED_ROOT/$PROJECT_NAME"
 CLIENT_DIR="$PROJECT_DIR/Client"
 CLIENT_PROJECT=""
-SILO_PROJECT="$PROJECT_DIR/Server/Silo/Silo.csproj"
 SERVER_PROJECT="$PROJECT_DIR/Server/Edge/Edge.csproj"
-SILO_LOG="$LOG_DIR/silo.log"
 SERVER_LOG="$LOG_DIR/server.log"
 CLIENT_LOG="$LOG_DIR/client.log"
 GODOT_STDOUT_LOG="$LOG_DIR/godot.stdout.log"
@@ -70,13 +68,12 @@ terminate_process() {
 cleanup() {
   terminate_process "${GODOT_PID:-}" "godot"
   terminate_process "${SERVER_PID:-}" "server"
-  terminate_process "${SILO_PID:-}" "silo"
 }
 
 trap cleanup EXIT
 
 print_logs() {
-  for log in "$SILO_LOG" "$SERVER_LOG" "$CLIENT_LOG" "$GODOT_STDOUT_LOG"; do
+  for log in "$SERVER_LOG" "$CLIENT_LOG" "$GODOT_STDOUT_LOG"; do
     if [[ -f "$log" ]]; then
       echo "===== $log =====" >&2
       cat "$log" >&2
@@ -237,26 +234,15 @@ GODOT_MAIN_SCENE="$(resolve_godot_main_scene)"
 echo "Using generated Godot client project: $CLIENT_PROJECT"
 echo "Using generated Godot main scene: $GODOT_MAIN_SCENE"
 
-echo "Restoring and building generated server projects"
-dotnet restore "$SILO_PROJECT" --configfile "$CI_NUGET_CONFIG"
+echo "Restoring and building generated server project"
 dotnet restore "$SERVER_PROJECT" --configfile "$CI_NUGET_CONFIG"
-dotnet build "$SILO_PROJECT" -c Release --no-restore
 dotnet build "$SERVER_PROJECT" -c Release --no-restore
 
 echo "Restoring and building generated Godot client"
 dotnet restore "$CLIENT_PROJECT" --configfile "$CI_NUGET_CONFIG"
 dotnet build "$CLIENT_PROJECT" -c Debug --no-restore
 
-echo "Starting generated Orleans silo"
-dotnet run --project "$SILO_PROJECT" -c Release --no-build >"$SILO_LOG" 2>&1 &
-SILO_PID=$!
-
-if ! wait_for_port 127.0.0.1 30000 60; then
-  print_logs
-  exit 1
-fi
-
-echo "Starting generated edge server"
+echo "Starting generated server"
 dotnet run --project "$SERVER_PROJECT" -c Release --no-build >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
