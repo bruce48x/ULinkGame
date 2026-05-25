@@ -3,8 +3,11 @@ using System.Text.Json;
 internal sealed class CliApplication(
     ToolProcessRunner processRunner,
     ProjectScaffolder projectScaffolder,
-    ToolConfigStore configStore)
+    ToolConfigStore configStore,
+    ToolText? text = null)
 {
+    private readonly ToolText text = text ?? ToolText.Current;
+
     public async Task<int> RunAsync(string[] args)
     {
         try
@@ -24,21 +27,21 @@ internal sealed class CliApplication(
         }
         catch (CliUsageException ex)
         {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            Console.Error.WriteLine("Run `ulinkgame-tool help` for usage.");
+            Console.Error.WriteLine($"{text.ErrorPrefix}: {ex.Message}");
+            Console.Error.WriteLine(text.RunHelpForUsage);
             return 1;
         }
     }
 
-    private static int HelpResult()
+    private int HelpResult()
     {
         PrintHelp();
         return 0;
     }
 
-    private static int UnknownCommand(string command)
+    private int UnknownCommand(string command)
     {
-        Console.Error.WriteLine($"Unknown command: {command}");
+        Console.Error.WriteLine(text.UnknownCommand(command));
         Console.Error.WriteLine();
         PrintHelp();
         return 1;
@@ -46,7 +49,7 @@ internal sealed class CliApplication(
 
     private async Task<int> NewAsync(string[] args)
     {
-        var options = CliParser.ParseNewOptions(args);
+        var options = CliParser.ParseNewOptions(args, text);
         var outputDirectory = Path.GetFullPath(options.OutputPath ?? Directory.GetCurrentDirectory());
         Directory.CreateDirectory(outputDirectory);
 
@@ -61,7 +64,7 @@ internal sealed class CliApplication(
 
         if (!Directory.Exists(projectRoot))
         {
-            Console.Error.WriteLine($"Generated project root not found: {projectRoot}");
+            Console.Error.WriteLine(text.GeneratedProjectRootNotFound(projectRoot));
             return 1;
         }
 
@@ -70,35 +73,27 @@ internal sealed class CliApplication(
         var configPath = Path.Combine(projectRoot, ProjectConventions.ConfigFileName);
         if (File.Exists(configPath))
         {
-            Console.Error.WriteLine($"Config already exists: {configPath}");
+            Console.Error.WriteLine(text.ConfigAlreadyExists(configPath));
             return 1;
         }
 
         await configStore.SaveAsync(configPath, ToolConfig.CreateDefault(projectName, options)).ConfigureAwait(false);
-        Console.WriteLine($"Created tool config: {configPath}");
+        Console.WriteLine(text.CreatedToolConfig(configPath));
         PrintNewProjectNextSteps(projectRoot);
         return 0;
     }
 
-    private static void PrintHelp()
+    private void PrintHelp()
     {
-        Console.WriteLine(
-            """
-            ULinkGame.Tool
-
-            Commands:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
-                  Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and the ULinkGame actor runtime.
-                  Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
-            """);
+        Console.WriteLine(text.HelpText);
     }
 
-    private static void PrintNewProjectNextSteps(string projectRoot)
+    private void PrintNewProjectNextSteps(string projectRoot)
     {
-        Console.WriteLine("ULinkGame project ready. Next steps:");
+        Console.WriteLine(text.NewProjectReadyHeader);
         Console.WriteLine($"  1) cd \"{projectRoot}\"");
-        Console.WriteLine("  2) dotnet run --project \"Server/Edge/Edge.csproj\"");
-        Console.WriteLine("  3) After changing Shared contracts, rebuild the server or reopen/recompile the client so ULinkRPC.Analyzers regenerates RPC glue.");
+        Console.WriteLine(text.StartServerStep);
+        Console.WriteLine(text.RebuildContractsStep);
     }
 }
 

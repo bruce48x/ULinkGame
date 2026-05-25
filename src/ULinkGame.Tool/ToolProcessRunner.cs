@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Diagnostics;
 
-internal sealed class ToolProcessRunner
+internal sealed class ToolProcessRunner(ToolText? text = null)
 {
+    private readonly ToolText text = text ?? ToolText.Current;
+
     public async Task<int> RunStarterNewAsync(string projectName, string outputDirectory, NewCommandOptions options)
     {
         var arguments = new[]
@@ -31,8 +33,8 @@ internal sealed class ToolProcessRunner
             }
         }
 
-        Console.Error.WriteLine("Unable to locate `ulinkrpc-starter`.");
-        Console.Error.WriteLine("Install it globally or expose it on PATH before running `ulinkgame-tool new`.");
+        Console.Error.WriteLine(text.UnableToLocateStarter);
+        Console.Error.WriteLine(text.InstallStarterBeforeNew);
         return 1;
     }
 

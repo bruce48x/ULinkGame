@@ -12,7 +12,9 @@ internal static class CliParser
         "--nugetforunity-source"
     ];
 
-    public static NewCommandOptions ParseNewOptions(string[] args)
+    public static NewCommandOptions ParseNewOptions(string[] args) => ParseNewOptions(args, ToolText.Current);
+
+    internal static NewCommandOptions ParseNewOptions(string[] args, ToolText text)
     {
         string? name = null;
         string? outputPath = null;
@@ -28,48 +30,48 @@ internal static class CliParser
             switch (args[index])
             {
                 case "--name":
-                    name = ReadOptionValue(args, ref index, "--name");
+                    name = ReadOptionValue(args, ref index, "--name", text);
                     break;
                 case "--output":
-                    outputPath = ReadOptionValue(args, ref index, "--output");
+                    outputPath = ReadOptionValue(args, ref index, "--output", text);
                     break;
                 case "--client-engine":
-                    clientEngine = ValidateChoice("--client-engine", ReadOptionValue(args, ref index, "--client-engine"), ProjectConventions.SupportedClientEngines);
+                    clientEngine = ValidateChoice("--client-engine", ReadOptionValue(args, ref index, "--client-engine", text), ProjectConventions.SupportedClientEngines, text);
                     break;
                 case "--transport":
-                    transport = ValidateChoice("--transport", ReadOptionValue(args, ref index, "--transport"), ProjectConventions.SupportedTransports);
+                    transport = ValidateChoice("--transport", ReadOptionValue(args, ref index, "--transport", text), ProjectConventions.SupportedTransports, text);
                     break;
                 case "--network-profile":
-                    networkProfile = ValidateChoice("--network-profile", ReadOptionValue(args, ref index, "--network-profile"), ProjectConventions.SupportedNetworkProfiles);
+                    networkProfile = ValidateChoice("--network-profile", ReadOptionValue(args, ref index, "--network-profile", text), ProjectConventions.SupportedNetworkProfiles, text);
                     break;
                 case "--serializer":
-                    serializer = ValidateChoice("--serializer", ReadOptionValue(args, ref index, "--serializer"), ProjectConventions.SupportedSerializers);
+                    serializer = ValidateChoice("--serializer", ReadOptionValue(args, ref index, "--serializer", text), ProjectConventions.SupportedSerializers, text);
                     break;
                 case "--persistence":
-                    persistence = ValidateChoice("--persistence", ReadOptionValue(args, ref index, "--persistence"), ProjectConventions.SupportedPersistence);
+                    persistence = ValidateChoice("--persistence", ReadOptionValue(args, ref index, "--persistence", text), ProjectConventions.SupportedPersistence, text);
                     break;
                 case "--nugetforunity-source":
-                    nuGetForUnitySource = ValidateChoice("--nugetforunity-source", ReadOptionValue(args, ref index, "--nugetforunity-source"), ProjectConventions.SupportedNuGetForUnitySources);
+                    nuGetForUnitySource = ValidateChoice("--nugetforunity-source", ReadOptionValue(args, ref index, "--nugetforunity-source", text), ProjectConventions.SupportedNuGetForUnitySources, text);
                     break;
                 default:
-                    throw CreateUnsupportedArgumentException(args[index], NewOptions);
+                    throw CreateUnsupportedArgumentException(args[index], NewOptions, text);
             }
         }
 
         return new NewCommandOptions(name, outputPath, clientEngine, transport, networkProfile, serializer, persistence, nuGetForUnitySource);
     }
 
-    private static string ReadOptionValue(string[] args, ref int index, string optionName)
+    private static string ReadOptionValue(string[] args, ref int index, string optionName, ToolText text)
     {
         if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
         {
-            throw new CliUsageException($"Missing value for {optionName}.");
+            throw new CliUsageException(text.MissingValue(optionName));
         }
 
         return args[++index];
     }
 
-    private static string ValidateChoice(string optionName, string value, IReadOnlyCollection<string> supportedValues)
+    private static string ValidateChoice(string optionName, string value, IReadOnlyCollection<string> supportedValues, ToolText text)
     {
         var normalized = value.Trim().ToLowerInvariant();
         if (supportedValues.Contains(normalized))
@@ -78,30 +80,18 @@ internal static class CliParser
         }
 
         var suggestion = GetValueSuggestion(optionName, normalized, supportedValues);
-        var message = $"Unsupported value '{value}' for {optionName}. Expected one of: {string.Join("|", supportedValues)}.";
-        if (suggestion is not null)
-        {
-            message += $" Did you mean '{suggestion}'?";
-        }
-
-        throw new CliUsageException(message);
+        throw new CliUsageException(text.UnsupportedValue(value, optionName, supportedValues, suggestion));
     }
 
-    private static CliUsageException CreateUnsupportedArgumentException(string argument, IReadOnlyList<string> supportedOptions)
+    private static CliUsageException CreateUnsupportedArgumentException(string argument, IReadOnlyList<string> supportedOptions, ToolText text)
     {
         if (!argument.StartsWith("--", StringComparison.Ordinal))
         {
-            return new CliUsageException($"Unexpected argument: {argument}.");
+            return new CliUsageException(text.UnexpectedArgument(argument));
         }
 
         var suggestion = GetClosestMatch(argument, supportedOptions);
-        var message = $"Unsupported option: {argument}.";
-        if (suggestion is not null)
-        {
-            message += $" Did you mean {suggestion}?";
-        }
-
-        return new CliUsageException(message);
+        return new CliUsageException(text.UnsupportedOption(argument, suggestion));
     }
 
     private static string? GetValueSuggestion(string optionName, string value, IReadOnlyCollection<string> supportedValues)

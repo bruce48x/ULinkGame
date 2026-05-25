@@ -1,7 +1,9 @@
+var text = ToolText.Current;
 var exitCode = await new CliApplication(
-        new ToolProcessRunner(),
+        new ToolProcessRunner(text),
         new ProjectScaffolder(),
-        new ToolConfigStore())
+        new ToolConfigStore(),
+        text)
     .RunAsync(args)
     .ConfigureAwait(false);
 
