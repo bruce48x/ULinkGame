@@ -3,20 +3,9 @@
     "name": "Sample-Agar.Godot",
     "clientEngine": "godot",
     "transport": "websocket",
+    "networkProfile": "realtime",
     "serializer": "memorypack",
+    "persistence": "none",
     "nuGetForUnitySource": "embedded"
-  },
-  "codegen": {
-    "contractsPath": "Shared",
-    "server": {
-      "projectPath": "Server/Gateway",
-      "outputPath": "Generated",
-      "namespace": "Gateway.Generated"
-    },
-    "unityClient": {
-      "projectPath": "Client",
-      "outputPath": "Scripts/Rpc/Generated",
-      "namespace": "Rpc.Generated"
-    }
   }
 }

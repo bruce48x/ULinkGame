@@ -4,7 +4,6 @@
   "references": [
     "Shared",
     "SampleClient.Rpc",
-    "ULinkRPC.Generated",
     "ULinkGame.Client",
     "Unity.TextMeshPro",
     "UnityEngine.UI",

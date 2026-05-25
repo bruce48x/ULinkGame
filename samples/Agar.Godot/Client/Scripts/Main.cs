@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Agar.Godot.Scripts.Networking;
 using Godot;
+using Rpc.Generated;
 using Shared.Interfaces;
 using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;

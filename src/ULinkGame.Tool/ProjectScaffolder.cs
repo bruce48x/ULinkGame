@@ -4,7 +4,6 @@ internal sealed class ProjectScaffolder
     {
         await MoveStarterServerProjectToEdgeAsync(projectRoot).ConfigureAwait(false);
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteDotNetToolManifestAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteEdgeProgramAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
@@ -73,13 +72,6 @@ internal sealed class ProjectScaffolder
         EnsureNuGetForUnityPackage(packages, "ULinkGame.Client", ToolPackageVersions.ULinkGameClient);
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
-    }
-
-    private static Task WriteDotNetToolManifestAsync(string projectRoot)
-    {
-        var toolManifestDirectory = Path.Combine(projectRoot, ".config");
-        Directory.CreateDirectory(toolManifestDirectory);
-        return WriteAsync(Path.Combine(toolManifestDirectory, "dotnet-tools.json"), ToolTemplates.RenderDotNetToolManifest());
     }
 
     private static Task WriteServerSolutionAsync(string projectRoot)
@@ -177,6 +169,8 @@ internal sealed class ProjectScaffolder
         SetProperty(project, "RootNamespace", "Edge");
         SetProperty(project, "BuildInParallel", "false");
         SetProperty(project, "RestoreBuildInParallel", "false");
+        SetProperty(project, "ULinkRPCGenerateServer", "true");
+        SetProperty(project, "ULinkRPCServerGeneratedNamespace", ProjectConventions.EdgeGeneratedNamespace);
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);

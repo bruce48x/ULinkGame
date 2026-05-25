@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using Rpc.Generated;
 using ULinkRPC.Client;
 using ULinkRPC.Core;
 using ULinkRPC.Serializer.MemoryPack;

@@ -80,7 +80,7 @@ In this repository's tool documentation, `starter` means `ulinkrpc-starter`, not
 
 - `ULinkRPC.*` package references and versions
 - Unity, Tuanjie, Godot, or plain .NET client project structure
-- generated RPC binding output locations, except through `ulinkgame.tool.json` codegen settings
+- ULinkRPC source-generator package references and generated namespace settings
 - serializer and transport package selection beyond forwarding the user's `new` command options to `ulinkrpc-starter`
 
 When `ulinkgame-tool new` augments a generated project, it should preserve starter output and add only ULinkGame-owned infrastructure:
@@ -89,7 +89,7 @@ When `ulinkgame-tool new` augments a generated project, it should preserve start
 - ULinkGame gateway hosting projects and configuration
 - `ULinkActor` package references for process-local actor execution
 - ULinkGame-specific server startup, gateway, and tool configuration
-- project maintenance commands that delegate code generation back to the starter toolchain
+- project metadata that keeps ULinkGame-owned options visible without reintroducing manual RPC code generation
 
 If a generated project needs a different `ULinkRPC.*` package version or client layout, fix `ulinkrpc-starter` first and then update the `ulinkrpc-starter` version consumed by `ULinkGame.Tool`.
 
@@ -236,7 +236,6 @@ Sample-specific documentation and local infrastructure live with the sample:
 - `samples/Agar.Unity/docs/DEVELOPMENT_PLAN.md`
 - `samples/Agar.Unity/docker-compose.yml`
 - `samples/Agar.Unity/.env.example`
-- `samples/Agar.Unity/dotnet-tools.json`
 - `samples/Agar.Unity/infra/`
 
 Run the sample server:
@@ -999,7 +998,7 @@ Template-owned additions:
 - `.env.example` with development-only defaults
 - optional Dockerfile and compose/override files for Gateway and state runtime processes
 - health check registration and endpoint
-- local tool manifest and codegen command wiring
+- ULinkRPC source-generator properties and generation marker files when the selected client shape needs them
 - README next steps that match the selected project shape
 
 Template non-goals:
@@ -1032,7 +1031,7 @@ Test requirements:
 
 - simple profile generates exactly one endpoint configurator
 - realtime profile generates separate session/control and realtime configurators
-- generated projects build after codegen
+- generated projects build and regenerate RPC glue through `ULinkRPC.Analyzers`
 - generated appsettings can be overridden by environment variables
 - Docker template does not contain secrets
 - tool still preserves starter-owned package references and generated layout

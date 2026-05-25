@@ -38,7 +38,7 @@ internal static class ProjectConventions
 
 internal static partial class ToolPackageVersions
 {
-    public const string ULinkRpcStarter = "0.2.58";
+    public const string ULinkRpcStarter = "0.3.0";
     public const string Dapper = "2.1.72";
     public const string MySqlConnector = "2.5.0";
     public const string Npgsql = "10.0.2";
@@ -47,7 +47,6 @@ internal static partial class ToolPackageVersions
 internal sealed class ToolConfig
 {
     public ProjectConfig Project { get; set; } = new();
-    public CodegenConfig Codegen { get; set; } = new();
 
     public static ToolConfig CreateDefault(string projectName, NewCommandOptions options)
     {
@@ -62,32 +61,9 @@ internal sealed class ToolConfig
                 Serializer = options.Serializer,
                 Persistence = options.Persistence,
                 NuGetForUnitySource = options.NuGetForUnitySource
-            },
-            Codegen = new CodegenConfig
-            {
-                ContractsPath = "Shared",
-                Server = new CodegenTargetConfig
-                {
-                    ProjectPath = ProjectConventions.EdgeProjectPath,
-                    OutputPath = "Generated",
-                    Namespace = ProjectConventions.EdgeGeneratedNamespace
-                },
-                UnityClient = new CodegenTargetConfig
-                {
-                    ProjectPath = "Client",
-                    OutputPath = ProjectConventions.IsGodot(options.ClientEngine) ? "Scripts/Rpc/Generated" : "Assets/Scripts/Rpc/Generated",
-                    Namespace = "Rpc.Generated"
-                }
             }
         };
     }
-}
-
-internal sealed class CodegenConfig
-{
-    public string ContractsPath { get; set; } = "Shared";
-    public CodegenTargetConfig? Server { get; set; }
-    public CodegenTargetConfig? UnityClient { get; set; }
 }
 
 internal sealed class ProjectConfig
@@ -101,13 +77,6 @@ internal sealed class ProjectConfig
     public string NuGetForUnitySource { get; set; } = ProjectConventions.DefaultNuGetForUnitySource;
 }
 
-internal sealed class CodegenTargetConfig
-{
-    public string ProjectPath { get; set; } = "";
-    public string OutputPath { get; set; } = "";
-    public string Namespace { get; set; } = "";
-}
-
 internal readonly record struct NewCommandOptions(
     string? Name,
     string? OutputPath,
@@ -117,8 +86,6 @@ internal readonly record struct NewCommandOptions(
     string Serializer,
     string Persistence,
     string NuGetForUnitySource);
-
-internal readonly record struct RegenerateCodeOptions(string? ConfigPath, bool NoRestore);
 
 internal readonly record struct ProcessInvocation(string FileName, IReadOnlyList<string> Arguments, bool CanFallback);
 

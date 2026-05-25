@@ -19,7 +19,6 @@ internal sealed class CliApplication(
             {
                 "help" or "--help" or "-h" => HelpResult(),
                 "new" or "init" => await NewAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
-                "codegen" => await RegenerateCodeAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -81,32 +80,6 @@ internal sealed class CliApplication(
         return 0;
     }
 
-    private async Task<int> RegenerateCodeAsync(string[] args)
-    {
-        var options = CliParser.ParseRegenerateCodeOptions(args);
-        var configPath = options.ConfigPath ?? Path.Combine(Directory.GetCurrentDirectory(), ProjectConventions.ConfigFileName);
-
-        if (!File.Exists(configPath))
-        {
-            Console.Error.WriteLine($"Missing tool config: {configPath}");
-            Console.Error.WriteLine("Run `ulinkgame-tool new` first or pass --config <path>.");
-            return 1;
-        }
-
-        var config = await configStore.LoadAsync(configPath).ConfigureAwait(false);
-        var rootPath = Path.GetDirectoryName(Path.GetFullPath(configPath))
-            ?? Directory.GetCurrentDirectory();
-
-        var starterExitCode = await processRunner.RunCodegenAsync(rootPath, config, options.NoRestore).ConfigureAwait(false);
-        if (starterExitCode != 0)
-        {
-            return starterExitCode;
-        }
-
-        Console.WriteLine("Code generation completed.");
-        return 0;
-    }
-
     private static void PrintHelp()
     {
         Console.WriteLine(
@@ -117,9 +90,6 @@ internal sealed class CliApplication(
               new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
                   Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and the ULinkGame actor runtime.
                   Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
-
-              codegen [--config <path>] [--no-restore]
-                  Delegate code generation to ulinkrpc-starter codegen.
             """);
     }
 
@@ -128,7 +98,7 @@ internal sealed class CliApplication(
         Console.WriteLine("ULinkGame project ready. Next steps:");
         Console.WriteLine($"  1) cd \"{projectRoot}\"");
         Console.WriteLine("  2) dotnet run --project \"Server/Edge/Edge.csproj\"");
-        Console.WriteLine("  3) After changing Shared contracts, run `ulinkgame-tool codegen` from the project root.");
+        Console.WriteLine("  3) After changing Shared contracts, rebuild the server or reopen/recompile the client so ULinkRPC.Analyzers regenerates RPC glue.");
     }
 }
 

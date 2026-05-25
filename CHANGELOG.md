@@ -23,6 +23,8 @@
 - Changed `ULinkGame.Tool` project templates to default to one RPC endpoint and require `--network-profile realtime` for separate control and realtime endpoints.
 - Changed `ULinkGame.Tool` project initialization to add `ULinkGame.Client` to generated Unity and Godot client projects.
 - Added `ULinkGame.Tool new --persistence none|mysql|postgres`; MySQL/PostgreSQL profiles add Dapper plus the selected database provider package to generated server projects.
+- Updated `ULinkGame.Tool` to consume `ULinkRPC.Starter` `0.3.0`, remove the manual `codegen` command path, and keep generated projects on the `ULinkRPC.Analyzers` source-generator workflow.
+- Migrated the Unity and Godot samples away from committed RPC `Generated/` sources; server and client RPC glue is now compiler output.
 
 ## 2026-05-11
 

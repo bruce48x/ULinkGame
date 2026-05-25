@@ -3,7 +3,6 @@
   "rootNamespace": "Rpc",
   "references": [
     "Shared",
-    "ULinkRPC.Generated",
     "ULinkRPC.Client",
     "ULinkRPC.Core",
     "ULinkRPC.Serializer.MemoryPack",

@@ -11,7 +11,6 @@
 当前已提供：
 
 - `new`
-- `codegen`
 
 ## new
 
@@ -21,7 +20,7 @@
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network-profile simple --serializer memorypack --persistence none --nugetforunity-source embedded
 ```
 
-该命令会先调用 `ulinkrpc-starter --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 `ULinkGame.Server` 宿主设施、`ULinkActor` 进程内 actor runtime 根基引用与 `ULinkGame.Client` 客户端包引用，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
+该命令会先调用 `ulinkrpc-starter new --no-next-steps` 生成原始 ULinkRPC 项目骨架，然后在其基础上补充 `ULinkGame.Server` 宿主设施、`ULinkActor` 进程内 actor runtime 根基引用与 `ULinkGame.Client` 客户端包引用，并只输出 ULinkGame 项目的最终 Next steps。默认 `--network-profile simple` 只生成一个 RPC endpoint；需要控制连接和实时连接拆分时，显式传入 `--network-profile realtime`。
 
 - `src/ULinkGame.Server/`
 - `src/ULinkGame.Client/`
@@ -29,6 +28,7 @@ ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --network
 - 基于 `ULinkGame.Server` 的 edge host 启动代码
 - 使用独立的 `ULinkActor` / `ULinkActor.SourceGenerator` 包作为服务端 actor 执行根基
 - 客户端项目中的 `ULinkGame.Client` 包引用
+- 保留 `ULinkRPC.Analyzers` source generator 路线，不再生成或提交 `Generated/` RPC 源码
 - `ulinkgame.tool.json`
 
 默认生成项目不预设 PostgreSQL、MySQL、Redis、SQL Server、Oracle 等任何持久化方案。需要数据库基础设施时，显式传入：
@@ -56,20 +56,12 @@ ulinkgame-tool new
 
 - `ulinkrpc-starter` 需要已安装并可被命令行找到
 
-## codegen
+## RPC Source Generation
 
-根据 `ulinkgame.tool.json` 所在项目根目录，恢复本地 .NET 工具并调用 `ulinkrpc-codegen` 重新生成 RPC 代码：
+`ULinkGame.Tool` 不再提供 `codegen` 命令。共享 RPC 契约变更后，通过正常构建触发 `ULinkRPC.Analyzers`：
 
-```bash
-ulinkgame-tool codegen
-```
-
-可选参数：
-
-```bash
-ulinkgame-tool codegen --config path/to/ulinkgame.tool.json
-ulinkgame-tool codegen --no-restore
-```
+- 服务端、Godot 客户端：运行对应 `.csproj` 的 `dotnet build` / `dotnet run`。
+- Unity / Tuanjie 客户端：打开或重新编译编辑器项目，带有 `[assembly: ULinkRPCGenerateClient("Rpc.Generated")]` 的脚本程序集会接收生成的客户端 API。
 
 ## Config Example
 
@@ -83,19 +75,6 @@ ulinkgame-tool codegen --no-restore
     "serializer": "memorypack",
     "persistence": "none",
     "nuGetForUnitySource": "embedded"
-  },
-  "codegen": {
-    "contractsPath": "Shared",
-    "server": {
-      "projectPath": "Server/Edge",
-      "outputPath": "Generated",
-      "namespace": "Edge.Generated"
-    },
-    "unityClient": {
-      "projectPath": "Client",
-      "outputPath": "Assets/Scripts/Rpc/Generated",
-      "namespace": "Rpc.Generated"
-    }
   }
 }
 ```
@@ -119,4 +98,4 @@ ulinkgame-tool codegen --no-restore
 
 - `ulinkrpc-starter`
 
-它不会直接调用 `ulinkrpc-codegen`。
+它不会直接调用 `ulinkrpc-codegen`，也不会创建本地 codegen 工具清单。

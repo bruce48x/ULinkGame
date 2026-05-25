@@ -48,6 +48,11 @@ src/**/*.meta
 /samples/*/Client/*.VC.db
 !/samples/*.Godot/Client/*.csproj
 
+# Legacy ULinkRPC.CodeGen output should not be committed
+/samples/*/Server/*/Generated/
+/samples/*/Client/Assets/Scripts/Rpc/Generated/
+/samples/*/Client/Scripts/Rpc/Generated/
+
 # NuGetForUnity restored packages in samples
 /samples/*/Client/Assets/Packages/
 

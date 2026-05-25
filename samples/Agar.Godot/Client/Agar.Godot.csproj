@@ -6,13 +6,20 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <BuildInParallel>false</BuildInParallel>
     <RestoreBuildInParallel>false</RestoreBuildInParallel>
+    <ULinkRPCGenerateClient>true</ULinkRPCGenerateClient>
+    <ULinkRPCGeneratedNamespace>Rpc.Generated</ULinkRPCGeneratedNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ULinkRPC.Client" Version="0.11.1" />
-    <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.0" />
-    <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.3" />
-    <PackageReference Include="ULinkRPC.Transport.WebSocket" Version="0.11.3" />
+    <PackageReference Include="ULinkRPC.Core" Version="0.11.8" />
+    <PackageReference Include="ULinkRPC.Client" Version="0.11.4" />
+    <PackageReference Include="ULinkRPC.Analyzers" Version="0.1.6">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.1" />
+    <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.11" />
+    <PackageReference Include="ULinkRPC.Transport.WebSocket" Version="0.11.6" />
     <ProjectReference Include="../../../src/ULinkGame.Client/ULinkGame.Client.csproj" />
     <ProjectReference Include="../Shared/Shared.csproj" TargetFramework="net8.0">
       <SetTargetFramework>TargetFramework=net8.0</SetTargetFramework>

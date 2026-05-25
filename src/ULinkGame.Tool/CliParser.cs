@@ -12,35 +12,6 @@ internal static class CliParser
         "--nugetforunity-source"
     ];
 
-    private static readonly string[] CodegenOptions =
-    [
-        "--config",
-        "--no-restore"
-    ];
-
-    public static RegenerateCodeOptions ParseRegenerateCodeOptions(string[] args)
-    {
-        string? configPath = null;
-        var noRestore = false;
-
-        for (var index = 0; index < args.Length; index++)
-        {
-            switch (args[index])
-            {
-                case "--no-restore":
-                    noRestore = true;
-                    break;
-                case "--config":
-                    configPath = Path.GetFullPath(ReadOptionValue(args, ref index, "--config"));
-                    break;
-                default:
-                    throw CreateUnsupportedArgumentException(args[index], CodegenOptions);
-            }
-        }
-
-        return new RegenerateCodeOptions(configPath, noRestore);
-    }
-
     public static NewCommandOptions ParseNewOptions(string[] args)
     {
         string? name = null;

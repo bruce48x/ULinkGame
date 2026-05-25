@@ -131,9 +131,9 @@ flowchart TB
 
     Server --> Edge["Edge<br/>RPC gateway / client connection"]
     Server --> StateHost["State Host<br/>ULinkActor state runtime"]
-    Shared --> CodeGen["ULinkRPC.CodeGen"]
-    CodeGen --> EdgeGenerated["Edge Generated<br/>binder / callback proxy"]
-    CodeGen --> ClientGenerated["Client Generated<br/>RpcApi / service client"]
+    Shared --> SourceGen["ULinkRPC.Analyzers<br/>source generator"]
+    SourceGen --> EdgeGenerated["Compiler Generated<br/>binder / callback proxy"]
+    SourceGen --> ClientGenerated["Compiler Generated<br/>RpcApi / service client"]
 ```
 
 典型目录长这样：
@@ -147,7 +147,6 @@ MyGame/
     Edge/
       Edge.csproj
       Program.cs
-      Generated/
       Services/
     Silo/ or ActorHost/
       Silo.csproj or ActorHost.csproj
@@ -165,9 +164,9 @@ MyGame/
 - `Server/Silo/` 或 `Server/ActorHost/`
   放权威状态服务。`Silo` 是历史模板命名；目标运行时模型是基于 ULinkActor 的进程内 actor/mailbox，而不是 Orleans silo / grain。
 - `Client/`
-  放 Unity 或 Godot 工程，以及客户端生成代码和业务脚本。
+  放 Unity 或 Godot 工程、source generator 标记和业务脚本。
 - `ulinkgame.tool.json`
-  记录项目结构，供 `ulinkgame-tool codegen` 后续重新生成代码。
+  记录 ULinkGame 项目选项。
 
 新手最容易踩的坑是把所有代码都塞进 Edge。更稳的拆法是：
 
@@ -180,7 +179,7 @@ MyGame/
 ULinkRPC 解决的是通信问题：
 
 - 契约定义
-- 代码生成
+- 编译期 source generation
 - RPC client / server glue
 - transport
 - serializer
@@ -198,7 +197,7 @@ ULinkGame 解决的是游戏会话基础设施问题：
 所以你开发业务时，顺序通常是：
 
 1. 在 `Shared/Interfaces/` 定义 RPC 契约。
-2. 运行 `ulinkgame-tool codegen`。
+2. 正常构建服务端或重新编译客户端，让 `ULinkRPC.Analyzers` 生成 RPC glue。
 3. 在 `Server/Edge/Services/` 或基于 ULinkActor 的状态 actor 里实现服务端逻辑。
 4. 在客户端调用生成的 `RpcApi`。
 5. 需要重要服务端通知时，再接入 reliable push 和 ack。
@@ -338,35 +337,31 @@ Godot 侧按这个顺序处理：
 5. Unity 是否执行过 `NuGet -> Restore Packages`。
 6. 是否手改了 generated 目录。
 
-## 日常怎么重新生成代码
+## 日常怎么刷新 RPC 胶水
 
-只要你改了 `Shared/Interfaces/` 里的 RPC 契约，就要重新生成代码。
+只要你改了 `Shared/Interfaces/` 里的 RPC 契约，就要重新构建依赖它的项目。`ULinkRPC.Analyzers` 会在编译期生成客户端 API 和服务端 binder，不再需要手动运行 codegen。
 
-在项目根目录运行：
-
-```bash
-ulinkgame-tool codegen
-```
-
-如果本地工具已经恢复过，也可以跳过 restore：
+服务端通常运行：
 
 ```bash
-ulinkgame-tool codegen --no-restore
+dotnet build Server/Edge/Edge.csproj
 ```
 
-如果你不在项目根目录，可以指定配置：
+Unity / Tuanjie 客户端重新编译编辑器项目即可。Godot 客户端通常运行：
 
 ```bash
-ulinkgame-tool codegen --config path/to/ulinkgame.tool.json
+dotnet build Client/Client.csproj
 ```
+
+具体客户端 `.csproj` 文件名以生成项目为准。
 
 日常开发顺序建议固定下来：
 
 ```mermaid
 flowchart LR
-    A["修改 Shared/Interfaces<br/>DTO / RPC 接口"] --> B["运行 ulinkgame-tool codegen"]
-    B --> C["更新 Edge 生成代码"]
-    B --> D["更新 Client 生成代码"]
+    A["修改 Shared/Interfaces<br/>DTO / RPC 接口"] --> B["构建服务端 / 重新编译客户端"]
+    B --> C["source generator 生成 Edge glue"]
+    B --> D["source generator 生成 Client API"]
     C --> E["补 Edge 服务实现"]
     E --> F["需要状态时调用 ULinkActor state actor"]
     D --> G["客户端调用 generated RpcApi"]
@@ -374,11 +369,11 @@ flowchart LR
     G --> H
 ```
 
-判断是否需要 codegen 的方法很简单：
+判断是否需要重新构建的方法很简单：
 
-**只要改了 Shared 契约，就先跑 `ulinkgame-tool codegen`。**
+**只要改了 Shared 契约，就重新构建服务端并重新编译客户端。**
 
-需要重新生成的情况包括：
+需要刷新生成结果的情况包括：
 
 - 新增 RPC service
 - 新增 RPC method
@@ -428,10 +423,10 @@ public interface IProfileService
 }
 ```
 
-然后立刻重新生成：
+然后立刻构建服务端，让 source generator 刷新 binder：
 
 ```bash
-ulinkgame-tool codegen
+dotnet build Server/Edge/Edge.csproj
 ```
 
 再去 `Server/Edge/Services/` 补实现。概念上会像这样：
@@ -457,7 +452,7 @@ public sealed class ProfileService : IProfileService
 
 如果这个资料要从权威状态服务读取，`ProfileService` 就应该调用基于 ULinkActor 的状态 actor 或项目自己的状态服务，而不是把长生命周期状态直接塞进普通 RPC 服务实现里。
 
-客户端侧则调用生成出来的强类型 API。具体命名会跟 codegen 输出有关，但思路是：
+客户端侧则调用编译期生成出来的强类型 API。具体命名由 source generator 的命名空间设置决定，但思路是：
 
 ```csharp
 var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
@@ -470,7 +465,7 @@ var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
 这条线最重要的是：
 
 - 契约在 Shared
-- 胶水代码由 codegen 生成
+- 胶水代码由 `ULinkRPC.Analyzers` 在编译期生成
 - Edge 暴露 RPC 服务
 - ULinkActor state actor 承载权威状态
 - Client 调用 generated API
@@ -566,7 +561,7 @@ ULinkGame 会把这类结果显式表达出来。常见结果可以粗略理解�
 - Unity 首次导入依赖时变量更少
 - 默认测试跑通更快
 
-当你确认结构、连接、codegen 和业务调用都稳定后，再考虑：
+当你确认结构、连接、source generation 和业务调用都稳定后，再考虑：
 
 ```bash
 --transport websocket --serializer memorypack
@@ -627,11 +622,10 @@ ULinkGame 不应该接管你的业务 schema。
 
 不要手工维护这些位置：
 
-- `Server/Edge/Generated/`
-- `Client/Assets/Scripts/Rpc/Generated/`
-- `Client/Scripts/Rpc/Generated/`
+- 编译器输出目录里的 ULinkRPC generated source
+- Unity / Godot 编辑器或构建系统生成的中间文件
 
-契约变了就重新生成，不要手改 generated。
+契约变了就重新构建，不要把 RPC generated source 当作项目源码维护。
 
 ## 常见问题
 
@@ -646,7 +640,7 @@ ULinkGame 不应该接管你的业务 schema。
 - 权威状态服务配置
 - ULinkGame runtime package 引用
 - `ulinkgame.tool.json`
-- 项目级 `codegen` 入口
+- `ULinkRPC.Analyzers` source-generator 配置
 
 ### 为什么服务端通常要两个进程
 
@@ -681,7 +675,7 @@ ULinkGame 提供的是匹配、房间、奖励、邮件这些业务都可能用�
 默认测试跑通后，建议按这个顺序继续：
 
 1. 先新增一个自己的 RPC service，例如 `ProfileService` 或 `InventoryService`。
-2. 练习一次 `Shared -> codegen -> Edge service -> Client call` 的完整流程。
+2. 练习一次 `Shared -> source generation -> Edge service -> Client call` 的完整流程。
 3. 再把长期状态放到以 ULinkActor 为根基的进程内 actor。
 4. 最后再接入 reliable push、reconnect 和 state-lost 处理。
 
@@ -697,7 +691,7 @@ ULinkGame 的推荐起步方式很明确：
 1. 安装 `ULinkRPC.Starter` 和 `ULinkGame.Tool`。
 2. 用 `ulinkgame-tool new` 生成项目。
 3. 先用 `simple + websocket + json + none` 跑通默认测试。
-4. 按 `Shared -> codegen -> Edge/StateActor -> Client` 的顺序开发业务。
+4. 按 `Shared -> source generation -> Edge/StateActor -> Client` 的顺序开发业务。
 5. 等基础链路稳定后，再升级到 `memorypack`、`kcp`、`realtime` 或数据库持久化。
 
 第一次接入不要急着改目录结构。先让工具生成的结构跑起来，理解每一层的职责，再开始替换成自己的业务。

@@ -3,20 +3,9 @@
     "name": "Sample-Agar.Unity",
     "clientEngine": "unity",
     "transport": "websocket",
+    "networkProfile": "realtime",
     "serializer": "memorypack",
+    "persistence": "none",
     "nuGetForUnitySource": "embedded"
-  },
-  "codegen": {
-    "contractsPath": "Shared",
-    "server": {
-      "projectPath": "Server/Gateway",
-      "outputPath": "Generated",
-      "namespace": "Gateway.Generated"
-    },
-    "unityClient": {
-      "projectPath": "Client",
-      "outputPath": "Assets/Scripts/Rpc/Generated",
-      "namespace": "Rpc"
-    }
   }
 }

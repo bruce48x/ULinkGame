@@ -16,7 +16,7 @@
 共享协议变更时，先改 `Shared` 合同，再从 `samples/Agar.Unity` 目录重新生成 RPC 代码：
 
 ```powershell
-ulinkgame-tool codegen
+dotnet build Server/Gateway/Gateway.csproj
 ```
 
 常规验证基线：
@@ -212,7 +212,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 将 `DotArenaSceneUiPresenter` 拆成根协调器和面板 presenter：入口/模式选择、登录、匹配中、大厅、HUD、对局排名、结算分别拥有自己的字段和刷新方法；不再保留调试面板 presenter。
 - 将 `DotArenaSceneUiPresenter.Layout.cs`、`Layout2.cs`、`Styling.cs` 中重复的运行时 UI 构建逻辑移动到 `DotArenaUiFactory`、`DotArenaUiStyleCatalog` 或稳定 prefab/资源中；短期先用工厂类，后续需要可视化调参时再资源化。
 - 删除拆分后不再需要的 partial 文件，避免留下空壳文件或只转发一行方法的文件。
-- 每一小步拆分后都做 Unity 脚本编译检查；触碰共享协议时才重新运行 `ulinkgame-tool codegen`。
+- 每一小步拆分后都做 Unity 脚本编译检查；触碰共享协议时重新构建服务端并让 Unity 重新编译，RPC 胶水由 `ULinkRPC.Analyzers` 在编译期生成。
 
 验收标准：
 

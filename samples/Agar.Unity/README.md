@@ -85,11 +85,7 @@ dotnet run --project Server/Gateway/Gateway.csproj
 
 ## 开发命令
 
-共享协议变更后，从 `samples/Agar.Unity` 目录重新生成客户端和服务端 RPC 代码：
-
-```powershell
-ulinkgame-tool codegen
-```
+共享协议变更后，不再手动生成 RPC 源码。服务端 `dotnet build` 会通过 `ULinkRPC.Analyzers` 生成服务端绑定；Unity 客户端重新编译时会通过 `Client/Assets/Scripts/Rpc/ULinkRPCGeneration.cs` 中的 assembly 标记生成客户端 API。
 
 常用构建和测试命令：
 

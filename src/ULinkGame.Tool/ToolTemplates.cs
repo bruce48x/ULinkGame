@@ -1,25 +1,5 @@
 internal static class ToolTemplates
 {
-    public static string RenderDotNetToolManifest()
-    {
-        return $$"""
-        {
-          "version": 1,
-          "isRoot": true,
-          "tools": {
-            "ulinkrpc.starter": {
-              "version": "{{ToolPackageVersions.ULinkRpcStarter}}",
-              "commands": [
-                "ulinkrpc-starter",
-                "ulinkrpc-codegen"
-              ],
-              "rollForward": false
-            }
-          }
-        }
-        """;
-    }
-
     public static string RenderServerSolution()
     {
         return """
@@ -121,6 +101,8 @@ internal static class ToolTemplates
             <RootNamespace>Edge</RootNamespace>
             <BuildInParallel>false</BuildInParallel>
             <RestoreBuildInParallel>false</RestoreBuildInParallel>
+            <ULinkRPCGenerateServer>true</ULinkRPCGenerateServer>
+            <ULinkRPCServerGeneratedNamespace>Edge.Generated</ULinkRPCServerGeneratedNamespace>
           </PropertyGroup>
 
           <ItemGroup>

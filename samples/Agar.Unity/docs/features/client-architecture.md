@@ -18,13 +18,13 @@ Unity 客户端负责：
 重要代码位置：
 
 - `Client/Assets/Scenes/Gameplay.unity`：场景来源。
-- `Client/Assets/Scripts/Rpc`：传输创建和生成的 RPC 访问入口。
+- `Client/Assets/Scripts/Rpc`：传输创建、source generator 标记和 RPC 访问入口。
 - `Client/Assets/Scripts/Gameplay`：主流程、同步、视图、HUD 和本地进度。
 
 依赖方向：
 
 ```txt
-Shared -> ULinkRPC.Generated -> SampleClient.Rpc -> SampleClient.Gameplay
+Shared -> ULinkRPC.Analyzers compiler output -> SampleClient.Rpc -> SampleClient.Gameplay
 ```
 
 `Gameplay` 可以依赖 RPC 辅助代码；RPC 辅助代码不能反向依赖玩法界面代码。
