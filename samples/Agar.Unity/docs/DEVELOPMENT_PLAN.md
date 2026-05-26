@@ -23,7 +23,7 @@ dotnet build Server/Gateway/Gateway.csproj
 
 ```powershell
 dotnet build Shared/Shared.csproj -f net10.0
-dotnet build Server/Silo/Silo.csproj
+dotnet build Server/State/State.csproj
 dotnet build Server/Gateway/Gateway.csproj
 dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ```
@@ -40,8 +40,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 控制面的 WebSocket RPC。
 - 实时面的 KCP RPC。
 - 用于实时会话绑定的 `AttachRealtimeAsync`。
-- 基于 Dapper + PostgreSQL 的 Orleans grain 持久化。
-- 基于 Orleans 的匹配队列。
+- 基于 Dapper + PostgreSQL 的状态持久化。
+- 基于状态服务的匹配队列。
 - 持久化的房间和会话分配，包含运行时网关端点信息。
 - 支持运行时网关绑定的仅实时连接本地会话注册。
 - `SessionDirectory` / `PlayerService` 已接入 `ULinkGame.Server.Sessions`，控制连接和实时连接绑定由框架会话目录保存 opaque callback。
@@ -55,19 +55,19 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 旧食物协议命名已删除，食物行为统一为 `PickupType.MassPoint` 质量成长。
 - 战斗内 HUD、实时排名和结算只展示整型质量；玩家可见的实时排名只有质量列，不再出现“分数”或分数列。
 - `PlayerState` 应只发布位置、速度、生死、整型质量、半径和移动速度；旧分数字段已从共享协议、服务端快照和客户端读取路径中彻底删除。
-- `IUserGrain` 已持久化 `VictoryPoints`，`ILeaderboardGrain` 已提供周榜查询、周期重置和最近两周归档。
+- 用户状态已持久化 `VictoryPoints`，排行榜服务已提供周榜查询、周期重置和最近两周归档。
 - 排行榜周期重置已按榜单当地时间周一 00:00 计算，旧 `PeriodStartUtc` 字段仅作为兼容字段保留。
 - `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，AI 玩家不获得积分。
 - 游戏暂不包含任务、商店和记录功能；大厅不应展示或跳转到 Tasks / Shop / Records 页面。
 - 面向玩家的 Unity 界面应使用中文文案；联机大厅和战斗内 HUD 不显示 DEBUG 信息、调试面板、tick、连接细节、内部状态枚举、同步视图数或快捷键提示。将来需要排查问题时只通过 Unity Console、服务端日志或客户端日志打印，不在玩家 UI 中保留。
 - 战斗中需要实时显示当前对局玩家排名，排名框固定在画面右侧，背景必须低遮挡半透明，避免遮挡游戏画面和影响玩家判断。
-- sample 自动化测试当前为 31 个（`ArenaSimulationRulesTests` 17 个测试用例、`LeaderboardGrainTests` 6 个、`MatchmakingQueuePolicyTests` 4 个、`SessionDirectoryCleanupTests` 4 个）；框架会话、可靠推送和客户端 session controller 另由 `Tests/tests.slnx` 覆盖。
+- sample 自动化测试当前为 31 个（`ArenaSimulationRulesTests` 17 个测试用例、排行榜测试 6 个、`MatchmakingQueuePolicyTests` 4 个、`SessionDirectoryCleanupTests` 4 个）；框架会话、可靠推送和客户端 session controller 另由 `Tests/tests.slnx` 覆盖。
 - `samples/Agar.Unity/docs/ART_DIRECTION.md` 已定义整体美术、UI 设计、素材生成、Unity 接入和验收标准。
 
 已经从当前计划中移除的方向：
 
-- 把本地内存 grain 存储作为目标服务端状态模型。
-- 把只限本机的 Orleans 集群作为目标部署模型。
+- 把本地内存状态存储作为目标服务端状态模型。
+- 把只限本机的状态服务部署作为目标部署模型。
 - 把网关本地匹配队列作为目标匹配队列模型。
 - 把旧的击退、冲刺、强化战斗循环作为目标玩法模型。
 - 为客户端架构、生产基础设施和网关重构继续维护分散的一次性文档。
@@ -163,7 +163,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 待办：
 
 - 在 Unity 编辑器中验证单机启动、食物成长、玩家吞噬、死亡、复活和结算全流程。
-- 在 Silo 和 gateway 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
+- 在状态服务和 gateway 运行时，验证联机登录、匹配、实时绑定、输入、世界快照和结算全流程。
 - 验证联机大厅不展示 DEBUG 信息，不保留调试面板、连接端点、连接细节、内部状态枚举、同步视图数、快捷键提示或开发诊断文本。
 - 验证单机和联机对局中的右侧实时排名面板随世界状态变化正确刷新，且只展示整型质量；表头、行内容和排序都不出现“分数”。
 - 验证右侧实时排名面板背景已改为低遮挡半透明，不再因为背景框过深或过实影响游戏画面可读性。
@@ -232,7 +232,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 审核 `PlayerService.cs`、`SessionRegistration.cs`、`SessionDirectory.cs`、`DisconnectedSessionCleanupHostedService.cs` 中的登出、断线、取消匹配、离开房间和对局结束清理路径；其中会话绑定、resume 和 ack state-lost 已接入 ULinkGame 框架，剩余重点是业务资源和生产回归。
 - 回归控制连接和实时连接可以独立解绑（解绑实时连接不意外断开控制连接，反之亦然），并覆盖 stale connection id 不会解绑新连接。
-- 确认 `IPlayerSessionGrain`、`IRoomGrain` 和 `SessionDirectory` 本地业务状态在失败后能收敛（重复登出不残留、匹配取消后票据不堆积）。
+- 确认玩家会话、房间状态和 `SessionDirectory` 本地业务状态在失败后能收敛（重复登出不残留、匹配取消后票据不堆积）。
 - 确认 `RoomRuntime.RemovePlayerAsync` 返回 `remaining == 0` 后，`RoomRuntimeHost` 或调用方正确释放房间资源。
 - 为登出、断线、重复匹配、session mismatch 和 state-lost 流程增加聚焦测试，或者留下可追踪的手动验证步骤文档。
 
@@ -267,7 +267,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 待办：
 
-- 选择网关到网关的事件机制：Orleans stream、Orleans observer 或 Redis 发布订阅。
+- 选择网关到网关的事件机制：Redis 发布订阅、ULinkGame.Cluster 或应用自定义消息总线。
 - 定义输入转发、世界状态扇出、断线事件和背压的所有权。
 - 定义顺序、重试和运行时所有者过期时的行为。
 - 实现前先更新 `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`。
@@ -284,7 +284,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 - 实现阶段 9 选定的路由层。
 - 保持房间模拟在同一时刻只由一个运行时所有者权威推进。
-- 不把实时回调对象序列化到 Redis 或 Orleans 状态中。
+- 不把实时回调对象序列化到 Redis、PostgreSQL 或任何持久化状态中。
 - 增加路由决策和投递失败日志。
 
 验收标准：
@@ -303,7 +303,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 为 `DotArenaNetworkSession` 增加测试：连接生命周期、重连参数、实时绑定、ack 携带 session id/generation。
 - 为 `ArenaSimulation` 补充测试：食物刷新边界、吞噬比例边界、AI 补位、多人同时死亡。
 - 为 `DotArenaMetaProgression` 增加测试：经验升级边界、首胜断言，以及阶段 1 后仍保留的本地进度路径。
-- 为 `LeaderboardGrain` 补足测试：AI 过滤、全周期路径、未来全量用户目录接入后的全用户重置路径。
+- 为排行榜服务补足测试：AI 过滤、全周期路径、未来全量用户目录接入后的全用户重置路径。
 
 验收标准：
 
@@ -314,7 +314,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 待办：
 
-- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/Silo/Silo.csproj`、`Server/Gateway/Gateway.csproj`。
+- 每轮触碰服务端或共享协议后，构建 `Shared/Shared.csproj`、`Server/State/State.csproj`、`Server/Gateway/Gateway.csproj`。
 - 每轮触碰业务逻辑后，运行已有自动化测试和新增测试。
 - 每轮触碰 Unity 客户端脚本或资源后，触发 Unity 资源刷新/脚本编译并检查控制台错误。
 - 每轮发布前，手动冒烟测试单机和联机流程。
@@ -331,16 +331,16 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 目标：
 
-- 将胜利积分排行榜的排序索引从 `LeaderboardGrain` 内部状态迁移到 Redis sorted set。
+- 将胜利积分排行榜的排序索引从排行榜服务内部状态迁移到 Redis sorted set。
 - 继续保留 `IPlayerService.GetLeaderboardAsync` 作为客户端唯一查询入口，不让 Unity 客户端直接依赖 Redis。
 - 让排行榜实现更接近 Docker 生产部署形态，为后续多 gateway 和生产上线计划打基础。
 
 设计原则：
 
 - 胜利积分发放仍由服务端结算路径触发，客户端不能直接写排行榜。
-- `IUserGrain` 继续保存用户资料、胜场和胜利积分等持久化用户状态。
+- 用户状态服务继续保存用户资料、胜场和胜利积分等持久化用户状态。
 - Redis 负责当前周期排行榜索引，不替代用户 profile 存储。
-- `ILeaderboardGrain` 退回为排行榜协调者：周期检查、Redis key 管理、归档、查询聚合和兼容现有 RPC 合同。
+- 排行榜服务退回为协调者：周期检查、Redis key 管理、归档、查询聚合和兼容现有 RPC 合同。
 - 排序口径保持不变：胜利积分降序、胜场降序、玩家标识升序。
 
 待办：
@@ -356,29 +356,29 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
   - 查询时从 points zset 取候选集合，再按胜利积分、胜场和玩家标识在服务端内存中做最终稳定排序。
   - 明确候选 overfetch 规则，避免 top N 边界处大量同分玩家导致排序不稳定；必要时用 Lua 脚本或更大的候选窗口保证确定性。
 - 增加 Redis 配置：
-  - 在 Gateway/Silo 配置中增加 Redis connection string、password、database、key prefix、operation timeout。
+  - 在 Gateway/State 配置中增加 Redis connection string、password、database、key prefix、operation timeout。
   - 本地 compose 继续使用现有 Redis；生产 compose 在生产上线追加计划中补齐持久化和密码。
   - Redis 不可用时，排行榜写入和查询要返回明确错误或降级结果，不能影响对局结算主流程崩溃。
 - 调整服务端实现：
   - 新增 Redis 排行榜存储接口，例如 `ILeaderboardStore`。
   - 实现 `RedisLeaderboardStore`，封装 zset/hash 写入、查询、周期清理和归档读取。
-  - 保留现有 `ILeaderboardGrain` 合同，让它调用 Redis store，而不是继续维护完整积分索引。
-  - `RoomRuntime.PersistMatchEndAsync` 仍按排名调用用户 grain 增加积分，再通过排行榜协调层更新 Redis 索引。
+  - 保留现有排行榜查询合同，让它调用 Redis store，而不是继续维护完整积分索引。
+  - `RoomRuntime.PersistMatchEndAsync` 仍按排名调用用户状态服务增加积分，再通过排行榜协调层更新 Redis 索引。
   - `PlayerService.GetLeaderboardAsync` 对外合同保持不变。
 - 周期重置：
   - 周期边界仍按榜单当地时间周一 00:00 计算。
   - 首次查询或写入发现过期时，先归档上个周期 top 100，再切换到新周期 key。
   - 旧周期 key 设置合理 TTL，只保留最近两周归档。
-  - 明确 Redis 当前榜清空后，用户 grain 中当前周期胜利积分是否同步重置；如果继续把 `UserState.VictoryPoints` 作为当前周期字段，则必须在阶段 13 同步修正重置语义。
+  - 明确 Redis 当前榜清空后，用户状态中当前周期胜利积分是否同步重置；如果继续把 `UserState.VictoryPoints` 作为当前周期字段，则必须在阶段 13 同步修正重置语义。
 - 兼容迁移：
-  - 为已有 `LeaderboardGrain` 状态提供一次性迁移路径，把当前周期索引写入 Redis。
-  - 迁移完成后，旧 grain 内积分索引只作为兼容读取或废弃，不再作为排行榜主数据源。
+  - 为已有排行榜状态提供一次性迁移路径，把当前周期索引写入 Redis。
+  - 迁移完成后，旧内部积分索引只作为兼容读取或废弃，不再作为排行榜主数据源。
   - README 或功能文档说明本地开发需要 Redis 才能验证排行榜。
 - 测试：
   - 增加 Redis store 单元或集成测试：写入、累加、top N、同分胜场排序、同分同胜场 playerId 排序。
   - 增加周期重置测试：周一当地时间切换、归档 top 100、只保留最近两周。
   - 增加 Redis 不可用测试：写入失败日志、查询失败返回、对局结算不崩溃。
-  - 更新 `LeaderboardGrainTests`，验证 grain 通过 Redis store 返回结果。
+  - 更新排行榜测试，验证排行榜服务通过 Redis store 返回结果。
   - 增加 Docker compose Redis 回归步骤。
 - 文档：
   - 更新 `docs/features/victory-points.md`，把排行榜索引设计改为 Redis sorted set。
@@ -423,7 +423,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 目标：
 
-- 为 Silo 和 gateway 生成可复现、可部署、可回滚的 Docker 镜像。
+- 为状态服务和 gateway 生成可复现、可部署、可回滚的 Docker 镜像。
 
 具体任务：
 
@@ -438,8 +438,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 验收标准：
 
-- 干净环境可以构建 Silo 和 gateway 镜像。
-- Silo 和 gateway 镜像可以打印版本信息或启动到配置校验阶段。
+- 干净环境可以构建状态服务和 gateway 镜像。
+- 状态服务和 gateway 镜像可以打印版本信息或启动到配置校验阶段。
 - 镜像不包含生产 secrets，不依赖本地绝对路径。
 
 #### P2：Docker Compose 拓扑
@@ -458,12 +458,12 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P2.6：明确 KCP 实时端口暴露方式，按实际传输要求配置 UDP/TCP。
 - P2.7：为 `silo`、`gateway`、`postgres`、`redis` 配置 restart 策略。
 - P2.8：为服务之间的启动顺序增加 healthcheck 或显式等待策略，避免只依赖容器启动顺序。
-- P2.9：提供单 Silo + 单 gateway 的 compose 启动命令。
-- P2.10：提供单 Silo + 双 gateway 的 compose 启动命令或 scale 说明。
+- P2.9：提供单状态服务 + 单 gateway 的 compose 启动命令。
+- P2.10：提供单状态服务 + 双 gateway 的 compose 启动命令或 scale 说明。
 
 验收标准：
 
-- 一条 Docker Compose 命令可以启动 PostgreSQL、Redis、Silo 和 gateway。
+- 一条 Docker Compose 命令可以启动 PostgreSQL、Redis、状态服务和 gateway。
 - PostgreSQL/Redis 数据写入持久化 volume。
 - 容器重启后服务可以恢复到可连接状态。
 
@@ -475,8 +475,8 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 具体任务：
 
-- P3.1：梳理 Silo 必填配置：PostgreSQL 连接串、Orleans ClusterId、ServiceId、AdvertisedIPAddress、SiloPort、GatewayPort。
-- P3.2：梳理 gateway 必填配置：Orleans ClusterId、ServiceId、gateway NodeId、控制面端口、Realtime Host、Realtime Port、Realtime Path。
+- P3.1：梳理状态服务必填配置：PostgreSQL 连接串、ServiceId、AdvertisedIPAddress、服务端口。
+- P3.2：梳理 gateway 必填配置：ServiceId、gateway NodeId、控制面端口、Realtime Host、Realtime Port、Realtime Path。
 - P3.3：梳理业务配置：房间容量、匹配超时、断线保留时间、可靠 push 保留时间、排行榜时区、排行榜归档周期。
 - P3.4：新增或更新 `.env.example`，仅保留开发默认值。
 - P3.5：新增生产 env 模板，所有密码、token secret、公网 host、连接串都要求显式填写。
@@ -497,11 +497,11 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 具体任务：
 
-- P4.1：为 Silo 定义健康检查：进程存活、配置有效、PostgreSQL 可连接、Orleans 可启动。
-- P4.2：为 gateway 定义健康检查：进程存活、Orleans client 可连接、控制面 RPC server 可监听、实时端口可监听。
-- P4.3：在 compose 中接入 Silo 和 gateway healthcheck。
+- P4.1：为状态服务定义健康检查：进程存活、配置有效、PostgreSQL 可连接、状态服务可启动。
+- P4.2：为 gateway 定义健康检查：进程存活、状态服务可连接、控制面 RPC server 可监听、实时端口可监听。
+- P4.3：在 compose 中接入状态服务和 gateway healthcheck。
 - P4.4：定义优雅停止行为：收到 SIGTERM 后停止接受新连接、清理本地会话、释放房间 runtime。
-- P4.5：验证容器 restart 后不会留下不可恢复的 Orleans membership 或本地注册状态。
+- P4.5：验证容器 restart 后不会留下不可恢复的服务注册或本地注册状态。
 
 验收标准：
 
@@ -524,13 +524,13 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P5.5：写出从旧版本升级到新版本流程。
 - P5.6：写出 PostgreSQL 备份命令。
 - P5.7：写出 PostgreSQL 恢复演练步骤。
-- P5.8：验证排行榜和 Orleans grain 状态在恢复后可读取。
+- P5.8：验证排行榜和持久化状态在恢复后可读取。
 
 验收标准：
 
 - 空库可以按脚本初始化。
 - 已初始化库可以安全重复执行迁移入口。
-- 备份文件可以恢复到新 PostgreSQL 实例，并通过 Silo 启动校验。
+- 备份文件可以恢复到新 PostgreSQL 实例，并通过状态服务启动校验。
 
 #### P6：Redis 用途与生产配置
 
@@ -562,7 +562,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 具体任务：
 
-- P7.1：检查 `UserGrain` 当前账号和密码存储方式。
+- P7.1：检查用户状态服务当前账号和密码存储方式。
 - P7.2：将密码改为不可逆哈希存储，选择 salt 和迭代策略。
 - P7.3：为游客登录生成可撤销凭据或明确游客会话生命周期。
 - P7.4：统一 token 生成、过期、刷新和失效策略。
@@ -613,7 +613,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - P9.5：补实时绑定、输入投递失败、世界状态广播失败日志。
 - P9.6：补结算、胜利积分发放、排行榜查询和周重置日志。
 - P9.7：定义指标：在线人数、匹配队列长度、房间数、输入延迟、快照频率、断线率、RPC 错误率、数据库错误率。
-- P9.8：定义告警：Gateway/Silo unhealthy、PostgreSQL/Redis 不可用、匹配积压、房间异常退出、错误率升高。
+- P9.8：定义告警：Gateway/State unhealthy、PostgreSQL/Redis 不可用、匹配积压、房间异常退出、错误率升高。
 - P9.9：确认 `docker logs` 能完成最小排障；后续可接入集中日志系统。
 
 验收标准：
@@ -653,19 +653,19 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 具体任务：
 
-- P11.1：用生产 compose 启动 PostgreSQL、Redis、Silo、gateway。
+- P11.1：用生产 compose 启动 PostgreSQL、Redis、状态服务、gateway。
 - P11.2：启动 Unity 客户端，完成游客登录。
 - P11.3：完成匹配、实时绑定和一局对战。
 - P11.4：验证结算和胜利积分发放。
 - P11.5：验证排行榜刷新，并确认排行榜数据来自 Redis sorted set 索引。
 - P11.6：重启 gateway，验证玩家重新登录和匹配。
-- P11.7：重启 Silo，验证服务恢复策略和日志。
+- P11.7：重启状态服务，验证服务恢复策略和日志。
 - P11.8：导出本轮日志，确认排障字段齐全。
 
 验收标准：
 
 - Docker 单网关联机完整一局通过。
-- Gateway/Silo 重启后的玩家体验符合设计。
+- Gateway/State 重启后的玩家体验符合设计。
 - 日志能定位本轮对局的关键事件。
 
 #### P12：跨网关实时路由设计
@@ -676,7 +676,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 具体任务：
 
-- P12.1：选择网关间事件机制：Orleans stream、Orleans observer 或 Redis 发布订阅。
+- P12.1：选择网关间事件机制：Redis 发布订阅、ULinkGame.Cluster 或应用自定义消息总线。
 - P12.2：定义 room runtime owner 的创建、续租、过期和释放规则。
 - P12.3：定义输入从非 owner gateway 转发到 owner gateway 的消息格式。
 - P12.4：定义世界状态从 owner gateway 扇出到玩家所在 gateway 的消息格式。
@@ -723,7 +723,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P14.1：确定服务端版本号来源。
-- P14.2：生成 Silo 和 gateway 镜像 tag。
+- P14.2：生成状态服务和 gateway 镜像 tag。
 - P14.3：写出 Docker build 命令。
 - P14.4：写出 Docker push/pull 命令。
 - P14.5：写出生产 compose up/down 命令。
@@ -747,14 +747,14 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 具体任务：
 
 - P15.1：运行 `dotnet build Shared/Shared.csproj -f net10.0`。
-- P15.2：运行 `dotnet build Server/Silo/Silo.csproj`。
+- P15.2：运行 `dotnet build Server/State/State.csproj`。
 - P15.3：运行 `dotnet build Server/Gateway/Gateway.csproj`。
 - P15.4：运行 `dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj`。
 - P15.5：执行 Unity 脚本编译检查。
 - P15.6：完成单机完整一局人工回归。
 - P15.7：完成 Docker 单网关联机完整一局人工回归。
 - P15.8：完成 Docker 双 gateway 联机完整一局人工回归。
-- P15.9：完成断线场景回归：匹配中断线、控制连接断开、实时连接断开、gateway 重启、Silo 重启、重复登录。
+- P15.9：完成断线场景回归：匹配中断线、控制连接断开、实时连接断开、gateway 重启、状态服务重启、重复登录。
 - P15.10：完成视觉验收：入口、登录、匹配、大厅、HUD、局内排名、结算、排行榜。
 - P15.11：确认素材、字体和第三方资源许可。
 - P15.12：确认 README、`PRODUCTION_LAUNCH_PLAN.md`、`GAMEPLAY_DESIGN.md` 和功能文档与实现一致。
@@ -861,15 +861,15 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 ### 阶段 8：胜利积分与排行榜
 
-- 已在 `IUserGrain`、`UserLoginResult` 和 `UserProfileSnapshot` 中增加胜利积分相关合同。
-- 已在 `UserGrain` 中持久化 `VictoryPoints` 并实现积分增加。
-- 已新增 `ILeaderboardGrain` 和 `LeaderboardGrain`。
-- `LeaderboardGrain` 已维护由对局结算写入的排行榜积分索引，并按积分、胜场和玩家标识排序。
-- 排行榜周期已改为榜单当地时间周一 00:00；`LeaderboardGrain` 当前使用 `TimeZoneInfo.Local`。
+- 已在用户状态合同、`UserLoginResult` 和 `UserProfileSnapshot` 中增加胜利积分相关合同。
+- 已在用户状态服务中持久化 `VictoryPoints` 并实现积分增加。
+- 已新增排行榜服务合同和实现。
+- 排行榜服务已维护由对局结算写入的排行榜积分索引，并按积分、胜场和玩家标识排序。
+- 排行榜周期已改为榜单当地时间周一 00:00；排行榜服务当前使用 `TimeZoneInfo.Local`。
 - 周期重置已归档上周 top 100，并只保留最近两周归档。
 - 服务端合同已新增 `PeriodStartLocalDate`；旧 `PeriodStartUtc` 字段暂保留兼容。
 - `RoomRuntime.PersistMatchEndAsync` 已按排名发放胜利积分，并过滤 AI 玩家。
-- `IPlayerService` 已新增 `GetLeaderboardAsync`，`PlayerService` 已转发到 `ILeaderboardGrain`。
+- `IPlayerService` 已新增 `GetLeaderboardAsync`，`PlayerService` 已转发到排行榜服务。
 - 客户端已从本地 mock 排行榜切换到服务端真实排行榜数据缓存展示。
 - 排行榜 UI 已展示当前周期剩余时间。
 
@@ -878,14 +878,14 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 当前自动化测试数量为 31 个。
 - `ArenaSimulationRulesTests` 已覆盖 17 个模拟规则测试用例。
 - `MatchmakingQueuePolicyTests` 已覆盖 4 个匹配队列策略测试。
-- `LeaderboardGrainTests` 已覆盖 6 个排序、当地时区周重置、归档保留和旧 UTC 周期迁移测试。
+- 排行榜测试已覆盖 6 个排序、当地时区周重置、归档保留和旧 UTC 周期迁移测试。
 - `SessionDirectoryCleanupTests` 已覆盖 4 个房间和实时注册清理测试。
 - AI 过滤由 `VictoryPointAwards` 测试覆盖。
 
 ### 阶段 12：验证与打包
 
 - 本轮已通过 `Shared/Shared.csproj` 构建。
-- 本轮已通过 `Server/Silo/Silo.csproj` 构建。
+- 本轮已通过 `Server/State/State.csproj` 构建。
 - 本轮已通过 `Server/Gateway/Gateway.csproj` 构建。
 - 本轮已通过已有自动化测试，31/31。
 - Unity 脚本刷新和控制台错误检查已通过；完整手动游玩仍需按待办执行。

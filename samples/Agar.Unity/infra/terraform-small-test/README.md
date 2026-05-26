@@ -9,7 +9,6 @@ Topology:
 - `gateway_count` gateway ECS instances
 - Public gateway control-plane WebSocket on TCP `20000`
 - Public gateway realtime KCP on UDP `20001`
-- Orleans membership shared through PostgreSQL ADO.NET clustering
 
 This is a distributed test topology for validating cross-machine Silo/Gateway behavior. It is still not a production topology: PostgreSQL and Redis run on a single ECS instance, there is no ALB/TLS/autoscaling, and clients connect directly to one of the gateway public IPs.
 
@@ -42,7 +41,7 @@ Copy `terraform.tfvars.example` to `terraform.tfvars`, then fill in:
 - `postgres_password`
 - `redis_password`
 
-The server images must include the ADO.NET Orleans clustering support from this repository change. Rebuild and push images after changing the server code.
+The server images must include the current distributed routing and persistence support from this repository change. Rebuild and push images after changing the server code.
 
 ## Apply
 

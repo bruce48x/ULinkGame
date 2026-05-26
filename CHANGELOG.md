@@ -15,7 +15,6 @@
 
 - Documented the package boundary after publishing `ULinkActor` and `ULinkActor.SourceGenerator` as standalone NuGet packages.
 - Clarified that `ULinkActor` is the actor/mailbox runtime foundation for ULinkGame; `ULinkGame.Server` builds on it for game-session infrastructure, ULinkRPC hosting, endpoint binding, reconnect, and reliable push integration.
-- Clarified that ULinkGame is not an Orleans wrapper; Orleans-style distributed actor hosting is too heavy for the targeted lightweight game-server execution model.
 - Added `ULinkGame.Abstractions` for cross-side framework-owned session, endpoint, reconnect, and reliable push primitives.
 - Added `IULinkGameServer` / `AddULinkGameServer()` and `ULinkGameClient` as the recommended single-entry APIs for server and client code.
 - Added typed reliable push overloads on `IULinkGameServer` so recommended server code can deliver through endpoint callbacks without handling `ReliablePushRecord`.

@@ -75,7 +75,7 @@ resource "alicloud_security_group_rule" "redis" {
   description       = "Redis from VPC"
 }
 
-resource "alicloud_security_group_rule" "orleans_silo" {
+resource "alicloud_security_group_rule" "state_service" {
   security_group_id = alicloud_security_group.app.id
   type              = "ingress"
   ip_protocol       = "tcp"
@@ -84,10 +84,10 @@ resource "alicloud_security_group_rule" "orleans_silo" {
   port_range        = "11111/11111"
   priority          = 1
   cidr_ip           = var.vpc_cidr
-  description       = "Orleans silo from VPC"
+  description       = "State service from VPC"
 }
 
-resource "alicloud_security_group_rule" "orleans_gateway" {
+resource "alicloud_security_group_rule" "state_gateway" {
   security_group_id = alicloud_security_group.app.id
   type              = "ingress"
   ip_protocol       = "tcp"
@@ -96,7 +96,7 @@ resource "alicloud_security_group_rule" "orleans_gateway" {
   port_range        = "30000/30000"
   priority          = 1
   cidr_ip           = var.vpc_cidr
-  description       = "Orleans gateway from VPC"
+  description       = "State gateway from VPC"
 }
 
 resource "alicloud_security_group_rule" "control_plane" {

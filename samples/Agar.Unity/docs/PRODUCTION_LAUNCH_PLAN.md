@@ -9,21 +9,21 @@
 - 单机模式可离线完整游玩。
 - 联机模式支持账号/游客登录、匹配、实时对局、结算、胜利积分和周榜。
 - 服务端权威推进房间模拟，客户端只发送输入并渲染快照。
-- 网关、Silo、PostgreSQL 和 Redis 可以通过 Docker 在非本机环境部署、监控、回滚和排障。
+- 网关、状态服务、PostgreSQL 和 Redis 可以通过 Docker 在非本机环境部署、监控、回滚和排障。
 - 玩家界面不暴露调试信息，基础美术、中文文案和核心流程达到可交付标准。
 
 不把分裂、吐质量、病毒、组队、复杂技能树、任务、商店和长期历史榜单纳入首发范围。
 
 ## 当前状态判断
 
-当前样例已经具备核心玩法和联机骨架：共享模拟内核、WebSocket 控制面、KCP 实时面、Orleans 匹配与房间分配、按会话隔离的可靠匹配推送、PostgreSQL grain 状态保存、胜利积分和排行榜都已接入。生产上线前，胜利积分排行榜索引计划迁移到 Redis sorted set。
+当前样例已经具备核心玩法和联机骨架：共享模拟内核、WebSocket 控制面、KCP 实时面、匹配与房间分配、按会话隔离的可靠匹配推送、PostgreSQL 状态保存、胜利积分和排行榜都已接入。生产上线前，胜利积分排行榜索引计划迁移到 Redis sorted set。
 
 距离生产上线的主要差距不在“有没有基本玩法”，而在以下几类：
 
 - 跨网关实时路由尚未完成，活跃房间模拟和世界状态扇出仍局限在单个网关进程。
 - 断线、登出、取消匹配、离房和空房间释放已有框架会话基础，但仍需要生产场景回归和补测试。
 - Unity 客户端主流程仍有较高维护风险，`DotArenaGame` 和 `DotArenaSceneUiPresenter` 还没有完全收敛到清晰边界。
-- 生产基础设施还停留在只启动 PostgreSQL/Redis 的本地 compose 和开发配置，缺少 Gateway/Silo 镜像、生产 compose、真实环境配置、密钥、日志、监控、告警和发布流水线。
+- 生产基础设施还停留在只启动 PostgreSQL/Redis 的本地 compose 和开发配置，缺少 Gateway/State 镜像、生产 compose、真实环境配置、密钥、日志、监控、告警和发布流水线。
 - 自动化测试覆盖了模拟、匹配策略、排行榜、框架会话可靠性和部分 sample 会话清理，但缺少房间运行时、网络会话生命周期、客户端流程和端到端回归。
 
 ## 必须补齐的玩家功能
@@ -33,7 +33,7 @@
 | 模块 | 当前基础 | 上线前缺口 | 首发处理 |
 | --- | --- | --- | --- |
 | 登录与会话 | 已有登录、游客登录、重连参数、token 和 `ULinkGame.Server.Sessions` 会话身份 | 缺少异常状态的玩家级提示、重复登录策略、token 生命周期和生产回归 | 必须补齐 |
-| 匹配 | 已有 Orleans 匹配队列和按会话隔离的可靠匹配推送 | 取消匹配、断线重连、匹配超时、重复点击的最终体验需要回归 | 必须补齐 |
+| 匹配 | 已有匹配队列和按会话隔离的可靠匹配推送 | 取消匹配、断线重连、匹配超时、重复点击的最终体验需要回归 | 必须补齐 |
 | 实时对局 | 已有输入提交、服务端模拟、世界快照和结算 | 跨网关输入转发和世界状态回送未实现；网络抖动下的表现和降级策略不足 | 必须补齐 |
 | 断线恢复 | 已有可靠推送 ack、重连状态丢失码、会话 generation 校验和 `ClientSessionController` | 需要完整覆盖控制连接断开、实时连接断开、房间结束后重连、outbox 过期后的体验 | 必须补齐 |
 | 排行榜 | 已接服务端真实排行榜和周重置 | 排行榜索引需要迁移为 Redis sorted set；榜单时区、归档和 Redis 不可用行为需要产品化 | 必须补齐 |
@@ -51,11 +51,11 @@
 
 必须完成：
 
-- 选定网关间事件机制：优先评估 Orleans stream 或 Redis 发布订阅，明确输入转发、世界状态扇出、断线事件和背压所有权。
+- 选定网关间事件机制：优先评估 Redis 发布订阅、ULinkGame.Cluster 或应用自定义消息总线，明确输入转发、世界状态扇出、断线事件和背压所有权。
 - 确保房间模拟同一时刻只有一个权威 runtime owner。
 - 输入消息跨网关投递必须有顺序和过期策略，不能无限排队。
 - 世界状态广播失败时要有可观测日志，不能悄悄丢玩家。
-- 不能把实时 RPC callback 对象序列化进 Redis 或 Orleans grain 状态。
+- 不能把实时 RPC callback 对象序列化进 Redis、PostgreSQL 或任何持久化状态。
 
 验收门槛：
 
@@ -82,7 +82,7 @@
 - 把开发连接串、端口、节点 id 和 advertised IP 从本地配置迁移到环境变量或部署配置。
 - 为排行榜时区、周期重置、归档保留周期、房间容量、匹配超时、可靠推送保留时间提供配置项。
 - 明确 PostgreSQL schema 迁移流程，不能依赖手动复制 init SQL 作为生产升级方式。
-- 将当前周期胜利积分排行榜索引迁移到 Redis sorted set，PostgreSQL/Orleans grain 继续保存用户资料和持久化状态。
+- 将当前周期胜利积分排行榜索引迁移到 Redis sorted set，PostgreSQL 继续保存用户资料和持久化状态。
 - 明确可靠业务推送使用内存短窗口，写清楚进程重启或 outbox 丢失后的 state lost / new session 玩家体验。
 - 建立用户目录或补充排行榜重置策略。当前 leaderboard 只能重置索引内玩家，长期会和“所有玩家积分归零”的产品语义冲突。
 
@@ -137,8 +137,8 @@
 - `RoomRuntime`：玩家加入/离开、输入提交、世界快照、结算、空房间清理。
 - `SessionDirectory` / `SessionRegistration`：在现有房间和实时注册测试基础上，补充 framework-backed 控制注册、generation、stale connection 和过期清理覆盖。
 - `PlayerService`：登录、游客登录、重复登录、匹配、取消、实时绑定、ack state lost 和 session mismatch。
-- `MatchmakingGrain` / `RoomGrain`：票据生命周期、房间分配、运行时网关端点、过期处理。
-- Redis 排行榜 store / `LeaderboardGrain`：sorted set 写入、top N 查询、AI 过滤、周重置、归档、时区配置、Redis 不可用降级。
+- 匹配 / 房间分配服务：票据生命周期、房间分配、运行时网关端点、过期处理。
+- Redis 排行榜 store / 排行榜服务：sorted set 写入、top N 查询、AI 过滤、周重置、归档、时区配置、Redis 不可用降级。
 - 客户端流程：至少对 `DotArenaNetworkSession` 和流程状态机做纯 C# 测试。
 
 手动回归必须形成固定清单：
@@ -146,13 +146,13 @@
 - 单机完整一局：开始、移动、吃食物、吞噬、死亡、复活、结算、再来一局、返回入口。
 - 联机完整一局：登录、匹配、实时绑定、移动、世界同步、结算、积分发放、排行榜刷新。
 - 断线场景：匹配中断线、对局中控制连接断开、实时连接断开、服务端重启、重复登录顶号。
-- 多网关场景：两个 gateway、一个 Silo，玩家分布在不同 gateway 完成一局。
+- 多网关场景：两个 gateway、一个状态服务，玩家分布在不同 gateway 完成一局。
 - 视觉场景：1200x600、960x540 和目标发布分辨率。
 
 上线候选版本的硬门槛：
 
 - `dotnet build Shared/Shared.csproj -f net10.0` 通过。
-- `dotnet build Server/Silo/Silo.csproj` 通过。
+- `dotnet build Server/State/State.csproj` 通过。
 - `dotnet build Server/Gateway/Gateway.csproj` 通过。
 - `dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj` 通过。
 - Unity 脚本编译无错误。
@@ -163,13 +163,13 @@
 
 上线前必须补齐以下非功能工作：
 
-- Docker 部署拓扑：gateway、Silo、PostgreSQL、Redis、反向代理或负载均衡、开放端口、Docker network、volume、健康检查和重启策略。
-- 镜像产物：为 gateway 和 Silo 提供独立 Dockerfile 或统一多目标 Dockerfile，固定 .NET 运行时版本，使用非 root 用户，镜像 tag 包含版本号和 git commit。
-- Compose 文件：保留本地 `docker-compose.yml` 作为开发基础设施；新增生产 compose 或 compose override，纳入 gateway、Silo、PostgreSQL、Redis、反向代理、env 文件和持久化 volume。
+- Docker 部署拓扑：gateway、状态服务、PostgreSQL、Redis、反向代理或负载均衡、开放端口、Docker network、volume、健康检查和重启策略。
+- 镜像产物：为 gateway 和状态服务提供独立 Dockerfile 或统一多目标 Dockerfile，固定 .NET 运行时版本，使用非 root 用户，镜像 tag 包含版本号和 git commit。
+- Compose 文件：保留本地 `docker-compose.yml` 作为开发基础设施；新增生产 compose 或 compose override，纳入 gateway、状态服务、PostgreSQL、Redis、反向代理、env 文件和持久化 volume。
 - 配置管理：环境变量、密钥、连接串、节点 id、公网 host、KCP 端口、榜单时区和日志级别。
 - 日志：登录、匹配、房间创建、实时绑定、输入投递失败、世界状态广播失败、结算、积分发放、排行榜重置。
 - 指标：在线人数、匹配队列长度、房间数、输入延迟、快照广播频率、断线率、RPC 错误率、数据库错误率。
-- 告警：gateway 不健康、Silo 不健康、PostgreSQL/Redis 不可用、匹配队列积压、房间 runtime 异常退出、错误率升高。
+- 告警：gateway 不健康、状态服务不健康、PostgreSQL/Redis 不可用、匹配队列积压、房间 runtime 异常退出、错误率升高。
 - 数据备份：PostgreSQL 备份、恢复演练、排行榜归档策略。
 - 发布流水线：服务端构建、镜像或可执行包产物、Unity 客户端构建、版本号、变更记录和回滚步骤。
 - 灰度策略：先内部房间，再小规模外部测试，最后扩大流量。
@@ -186,7 +186,7 @@
 
 - 完成客户端主流程拆分和 UI 状态补齐。
 - 完成清理语义和房间 runtime 测试。
-- 单 gateway + 单 Silo + PostgreSQL 可以连续完成联机回归。
+- 单 gateway + 单状态服务 + PostgreSQL 可以连续完成联机回归。
 
 ### M2：生产基础设施版本
 
@@ -227,7 +227,7 @@
 | 跨网关实时路由未完成 | 多网关部署下玩家可能无法进入或同步房间 | 阻塞生产上线 |
 | 清理语义缺少生产回归 | 匹配票据、房间 runtime 或 callback 泄漏 | 阻塞生产上线 |
 | 客户端主类继续膨胀 | 上线前修复 UI/网络问题时容易引入回归 | M1 前处理 |
-| Redis 排行榜迁移未完成 | Docker 生产部署下排行榜仍依赖单 grain 内部索引，扩展和恢复边界不清晰 | 阻塞生产上线 |
+| Redis 排行榜迁移未完成 | Docker 生产部署下排行榜索引扩展和恢复边界不清晰 | 阻塞生产上线 |
 | 可靠 push 为内存短窗口 | 网关重启后匹配状态可能丢失 | state lost / new session 语义已接入，首发需完成重启回归 |
 | 明文凭据或弱 token | 账号安全不可接受 | 阻塞外部上线 |
 | 仅本地配置 | 无法部署到真实环境 | M2 前处理 |

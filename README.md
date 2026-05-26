@@ -4,8 +4,6 @@ ULinkGame is a game-session infrastructure layer built on [ULinkRPC](https://git
 
 ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkActor provides the foundational process-local actor/mailbox runtime and source-generated typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame owns the higher-level game infrastructure: session lifecycle, endpoint callback binding, reconnect semantics, named endpoint hosting, and reliable business push messages.
 
-ULinkGame is not an Orleans wrapper. It exists because Orleans-style distributed actor hosting is too heavy and too enterprise-oriented for the game server workflows this framework targets: process-local rooms, battles, matchmaking queues, and short-path state execution that need predictable mailbox behavior on gateway processes.
-
 ## Why ULinkGame
 
 Online games need more than a request/response RPC pipe. A typical project quickly has to answer questions such as:

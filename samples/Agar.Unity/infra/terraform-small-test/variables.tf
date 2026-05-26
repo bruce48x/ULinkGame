@@ -87,12 +87,12 @@ variable "ssh_public_key" {
 }
 
 variable "gateway_image" {
-  description = "Docker image for samples/Agar.Unity Server/Dockerfile gateway target. Must include the ADO.NET clustering changes."
+  description = "Docker image for samples/Agar.Unity Server/Dockerfile gateway target. Must include the current distributed routing and persistence changes."
   type        = string
 }
 
 variable "silo_image" {
-  description = "Docker image for samples/Agar.Unity Server/Dockerfile silo target. Must include the ADO.NET clustering changes."
+  description = "Docker image for samples/Agar.Unity Server/Dockerfile state target. Must include the current distributed routing and persistence changes."
   type        = string
 }
 
@@ -109,13 +109,13 @@ variable "redis_password" {
 }
 
 variable "cluster_id" {
-  description = "Orleans cluster id for the small test environment."
+  description = "Cluster id for the small test environment."
   type        = string
   default     = "small-test"
 }
 
 variable "service_id" {
-  description = "Orleans service id for the Agar.Unity sample."
+  description = "Service id for the Agar.Unity sample."
   type        = string
   default     = "ULinkGame-AgarUnity"
 }

@@ -22,7 +22,6 @@ resource "alicloud_instance" "data" {
     postgres_user     = jsonencode(var.postgres_user)
     postgres_password = jsonencode(var.postgres_password)
     redis_password    = jsonencode(var.redis_password)
-    orleans_sql       = file("${path.cwd}/../postgres/init/001-orleans.sql")
     grain_storage_sql = file("${path.cwd}/../postgres/init/002-dapper-grain-storage.sql")
   })
 

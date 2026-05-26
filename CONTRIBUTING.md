@@ -97,7 +97,7 @@ If a generated project needs a different `ULinkRPC.*` package version or client 
 
 ### Background
 
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, Microsoft Orleans, dependency injection, and process lifetime. Orleans proved too heavy and too enterprise-oriented for the game server workflows this project targets, especially process-local room, battle, and service state that should run with predictable mailbox execution on gateway processes. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
+The framework started as a thin server-hosting layer: it wired ULinkRPC servers, dependency injection, and process lifetime. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
 
 - reconnect versus new-session decisions
 - business push sequencing
@@ -373,6 +373,65 @@ ULinkGame is responsible for:
 - tool templates and operational glue
 
 ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
+
+### ULinkActor 0.2.0 Upgrade Plan
+
+`ULinkActor` `0.2.0` adds runtime features that are useful to ULinkGame, so the dependency update should be treated as a small integration change rather than a version-only bump.
+
+Current ULinkGame dependency:
+
+- `src/ULinkGame.Server/ULinkGame.Server.csproj` references `ULinkActor` `0.1.9`.
+- `ULinkGame.Server` wraps `ULinkActor.ActorSystem` behind `IActorRuntime`, `Actor`, `ActorContext`, and `ULinkActorRuntime`.
+- ULinkGame does not reference `ULinkActor.SourceGenerator` directly today; consuming game projects may add it when they use native ULinkActor typed actors or generated actor clients.
+
+Upgrade objectives:
+
+- Update `ULinkGame.Server` to consume `ULinkActor` `0.2.0`.
+- Preserve ULinkGame's narrow actor facade for sample and framework code that uses `IActorRuntime`.
+- Decide explicitly which new ULinkActor features should surface through ULinkGame and which should remain available only through direct ULinkActor usage.
+- Keep ULinkActor's process-local boundary intact. Do not use this upgrade to add transparent remote actors, distributed actor proxies, persistence, gameplay concepts, or cluster transport.
+
+Required implementation work before the version bump is complete:
+
+1. Update the `ULinkActor` package reference in `ULinkGame.Server`.
+2. Build `ULinkGame.Server` against `ULinkActor` `0.2.0` and adjust only for real compile or behavior changes.
+3. Review `ULinkActorRuntime` message delivery:
+   - keep `AskAsync` on `Call<T>` so call timeouts continue to flow through ULinkActor diagnostics;
+   - decide whether `TellAsync` should continue to await `Send` or expose a new immediate-send path that maps `ActorRef<TMessage>.TrySend(...)` to a ULinkGame result type;
+   - do not hide mailbox-full or actor-unavailable conditions behind best-effort fire-and-forget behavior.
+4. Review timer behavior:
+   - ULinkGame's current timer wrapper posts back through `TellAsync`;
+   - decide whether this remains sufficient or should be replaced by native ULinkActor mailbox timers in a later API;
+   - failed timer posts must be observable and must not disappear silently.
+5. Wire useful diagnostics without creating ULinkGame-specific duplicates:
+   - make `ActorSystem.CallTimedOut`, dead-letter, and slow-message events reachable through logging or options if ULinkGame owns the actor runtime instance;
+   - rely on ULinkActor's `Meter` and `ActivitySource` names for low-level actor metrics/tracing;
+   - keep ULinkGame metrics focused on game-session, endpoint, reliable-push, and later cluster behavior.
+6. Decide whether ULinkGame needs stop/drain APIs:
+   - ULinkActor `0.2.0` exposes bounded stop/drain results;
+   - ULinkGame should add a facade only if gateway shutdown, session teardown, or tests need actor drain semantics at the ULinkGame layer.
+7. Review lifecycle hooks:
+   - ULinkGame actors currently activate through `Actor.ActivateAsync(ActorContext, CancellationToken)`;
+   - do not mix ULinkGame activation with ULinkActor native `IActorStarted<TMessage>` / `IActorStopping<TMessage>` unless there is a clear adapter contract.
+8. Update user-facing server documentation only after the runtime behavior is final:
+   - mention `ULinkActor` `0.2.0` where package install examples imply a concrete version;
+   - explain when users should add `ULinkActor.SourceGenerator` directly to their game projects.
+9. Update `CHANGELOG.md` with the exact package versions released by ULinkGame and a short note about ULinkActor `0.2.0` integration.
+
+Required tests:
+
+- Existing actor runtime tests still pass after the package update.
+- Add a mailbox backpressure test if ULinkGame exposes a non-throwing immediate-send API.
+- Add a call-timeout diagnostic test if ULinkGame wires `ActorSystem.CallTimedOut` through options or logging.
+- Add a timer failure or observability test if timer posts can be rejected by mailbox backpressure.
+- Run `dotnet test Tests/tests.slnx` before releasing any ULinkGame package that consumes the new actor version.
+
+Release impact:
+
+- If only `ULinkGame.Server` changes, release at least `ULinkGame.Server`.
+- If generated templates or package constants consume the updated server package, release `ULinkGame.Tool` as well.
+- If sample package references or docs change, update the relevant sample docs in the same change.
+- Do not bump `ULinkGame.Client` or `ULinkGame.Abstractions` unless their public API or package metadata changes.
 
 ### Node And Execution Model
 
@@ -1188,7 +1247,7 @@ Test requirements:
 
 Goal: generate production-ready infrastructure scaffolding without taking ownership of ULinkRPC starter output or game business code.
 
-The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should use Gateway/State naming, split templates by project shape, and avoid carrying Orleans-oriented naming into new game-runtime templates:
+The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should use Gateway/State naming and split templates by project shape:
 
 - simple online game: one session endpoint
 - multi-endpoint game: one session/control-like endpoint plus an additional application-defined endpoint, for example high-frequency gameplay traffic
@@ -1248,7 +1307,7 @@ The next major module is optional cluster infrastructure. Build it in small laye
 
 ### P0 Actor Runtime Coordination
 
-Repository: `D:\ULinkActor`
+Repository: [bruce48x/ULinkActor](https://github.com/bruce48x/ULinkActor)
 
 These tasks belong to ULinkActor, not ULinkGame. ULinkGame.Cluster can start with adapter-level assumptions, but production-quality cluster actor routing should wait until these runtime contracts are explicit.
 

@@ -2,7 +2,7 @@
 
 `ULinkGame.Server` provides .NET server hosting helpers for ULinkRPC, ULinkActor-based game-state execution, session lifecycle, endpoint callback binding, and reliable business push.
 
-It builds on ULinkActor because ULinkGame targets lightweight game-server execution, not Orleans-style distributed actor hosting. Room, battle, and service state should be able to run with predictable process-local mailbox behavior on the edge process.
+It builds on ULinkActor so room, battle, and service state can run with predictable process-local mailbox behavior on the gateway process.
 
 ## Install
 

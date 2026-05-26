@@ -162,7 +162,7 @@ MyGame/
 - `Server/Edge/`
   放 RPC 入口、连接接入、callback 绑定、可靠业务推送、session 接入逻辑。
 - `Server/Silo/` 或 `Server/ActorHost/`
-  放权威状态服务。`Silo` 是历史模板命名；目标运行时模型是基于 ULinkActor 的进程内 actor/mailbox，而不是 Orleans silo / grain。
+  放权威状态服务。较新的项目应优先使用 `Server/State/` 或 `Server/ActorHost/` 命名。
 - `Client/`
   放 Unity 或 Godot 工程、source generator 标记和业务脚本。
 - `ulinkgame.tool.json`
@@ -270,7 +270,7 @@ ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --seriali
 - `Edge`
   RPC gateway，负责客户端连接和服务调用入口。
 - 状态进程
-  承载基于 ULinkActor 的房间、战斗或长期服务状态。部分早期模板仍使用 `Server/Silo` 这个历史目录名，但目标模型不是 Orleans silo / grain。
+  承载基于 ULinkActor 的房间、战斗或长期服务状态。
 
 先启动状态进程：
 
@@ -614,7 +614,7 @@ ULinkGame 不应该接管你的业务 schema。
 - `Server/Edge/Services/`
   RPC 服务实现、连接入口、可靠推送接入。
 - `Server/Silo/` 或 `Server/ActorHost/`
-  权威状态、长期业务状态。`Silo` 是早期目录名，不代表 Orleans 是目标运行时。
+  权威状态、长期业务状态。较新的项目应优先使用 `Server/State/` 或 `Server/ActorHost/` 命名。
 - `Client/`
   Unity / Godot 业务脚本、UI、场景。
 - `ulinkgame.tool.json`
@@ -651,10 +651,6 @@ Edge 面向客户端连接，适合处理 RPC gateway、callback、session bindi
 状态进程面向权威状态，适合处理玩家状态、房间状态、匹配队列、排行榜等长期状态。进程内 actor/mailbox 执行统一建立在独立的 ULinkActor 包之上。
 
 本地开发时它们可以都跑在同一台机器上；生产环境里可以按压力和部署边界拆开扩展。
-
-### 为什么不用 Orleans
-
-Orleans 不符合这个框架的目标。它是完整的分布式 actor 平台，能力很强，但对游戏服务端常见的进程内房间、战斗、匹配队列和短路径状态执行来说太重，调度和部署心智也偏企业服务。ULinkGame 选择以 `ULinkActor` / `ULinkActor.SourceGenerator` 作为 actor/mailbox 根基，是为了让游戏状态执行更轻、更直接、更贴近边缘进程里的实时服务模型。
 
 ### 可以只装 ULinkGame.Server 包手工接吗
 
