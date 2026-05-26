@@ -4,13 +4,17 @@
 
 ### Released
 
+- `ULinkGame.Abstractions` `0.1.2`
 - `ULinkGame.Cluster` `0.1.0`
 - `ULinkGame.Cluster` `0.1.1`
+- `ULinkGame.Cluster` `0.1.2`
 - `ULinkGame.Cluster.ULinkRPC` `0.1.0`
+- `ULinkGame.Cluster.ULinkRPC` `0.1.1`
 - `ULinkGame.Server` `0.1.6`
 - `ULinkGame.Server` `0.1.7`
 - `ULinkGame.Tool` `0.2.2`
 - `ULinkGame.Tool` `0.2.3`
+- `ULinkGame.Tool` `0.2.4`
 
 ### Added
 
@@ -33,6 +37,7 @@
 - Updated `ULinkGame.Server` to consume `ULinkActor` `0.2.0` while preserving the existing process-local `IActorRuntime` facade.
 - Updated `ULinkGame.Tool` so generated project templates consume `ULinkGame.Server` `0.1.7`.
 - Updated the cluster loopback sample to register generation-aware route locations.
+- Reorganized `src/ULinkGame.Abstractions`, `src/ULinkGame.Cluster`, `src/ULinkGame.Cluster.ULinkRPC`, and `src/ULinkGame.Tool` source files into responsibility-focused directories without changing public namespaces or APIs.
 - Reorganized `CONTRIBUTING.md` around repository workflow, package boundaries, runtime architecture, cluster architecture, and the current development plan.
 - Documented the production cluster adapter decision: ULinkRPC is the first adapter direction, implemented as a separate transport package only after a real cross-process consumer exists.
 - Removed completed or external cluster planning tasks from `CONTRIBUTING.md`; the next implementation should start only when the production adapter gates are met.

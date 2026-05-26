@@ -7,11 +7,27 @@ This document is for people working on the ULinkGame repository itself. User-fac
 ```txt
 src/
   ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
+    Sessions/              Session identity, endpoint names, and resume decisions
+    ReliablePush/          Reliable push sequence and acknowledgement primitives
   ULinkGame.Server/       Server-side RPC hosting, session lifecycle, reliable push outbox, and ULinkActor-based execution
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Cluster/      Optional explicit cluster route contracts and in-memory routing primitives
+    Actors/                Cluster actor route keys and envelopes
+    Diagnostics/           Cluster tracing and metric names
+    Messaging/             Cluster router, messages, handlers, and node messenger abstractions
+    Nodes/                 Node identity and endpoint value types
+    Routes/                Route keys, locations, leases, and route directory implementations
   ULinkGame.Cluster.ULinkRPC/ ULinkRPC cluster messenger and route-directory adapter
+    Clients/               ULinkRPC cluster client cache and factory
+    Diagnostics/           ULinkRPC cluster dependency health probes
+    Messaging/             ULinkRPC cluster message binder, converter, and node messenger
+    Protocol/              ULinkRPC cluster service and method identifiers
+    Routes/                ULinkRPC route-directory client, binder, and DTO conversion
+    Transports/            ULinkRPC transport endpoint and factory abstractions
   ULinkGame.Tool/         Project management tool entry point
+    Cli/                   CLI entry point, parser, application flow, and localized text
+    Infrastructure/        Process execution helpers
+    Scaffolding/           Project scaffolder, templates, and tool models
 
 samples/
   Cluster.Loopback/        Minimal in-memory cluster route and failure-mode sample
