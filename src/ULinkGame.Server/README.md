@@ -101,6 +101,8 @@ await room.Send(new JoinRoom(10001));
 
 ULinkActor is the foundation for actor/mailbox runtime concerns. ULinkGame.Server builds on it and keeps the game-session layer focused on session identity, endpoint binding, reconnect, and reliable push integration.
 
+`ClusterActorDispatcher<TActor>` can adapt an explicit `ULinkGame.Cluster` actor envelope into the local `IActorRuntime` mailbox. The adapter is intentionally typed and requires an application-provided handler delegate; it does not expose transparent remote actor references or generated remote actor proxies.
+
 ## Main Server API
 
 Register the recommended runtime services with one call:

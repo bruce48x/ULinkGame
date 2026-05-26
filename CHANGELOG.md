@@ -7,6 +7,8 @@
 - `ULinkGame.Abstractions` `0.1.1`
 - `ULinkGame.Client` `0.1.5`
 - `ULinkGame.Server` `0.1.5`
+- `ULinkGame.Cluster` `0.1.0`
+- `ULinkGame.Server` `0.1.6`
 - `ULinkGame.Tool` `0.1.16`
 - `ULinkGame.Tool` `0.1.17`
 - `ULinkGame.Tool` `0.2.1`
@@ -27,6 +29,9 @@
 - Added Simplified Chinese and Traditional Chinese CLI text for `ULinkGame.Tool`, matching the culture detection used by `ULinkRPC.Starter`.
 - Clarified cluster routing documentation so `realtime` remains an optional template/sample profile instead of a framework-wide concept.
 - Added cluster node-to-node communication design notes for route lookup, local dispatch, remote dispatch, and pluggable node messenger adapters.
+- Added the initial `ULinkGame.Cluster` package with explicit node/route/message contracts, actor route envelopes, in-memory route directory, loopback messenger, router diagnostics, and unit tests.
+- Added a minimal `samples/Cluster.Loopback` sample that demonstrates in-memory local dispatch, remote loopback dispatch, route-not-found, expiration, and backpressure.
+- Documented the production cluster adapter decision: ULinkRPC is the first adapter direction, implemented as a separate transport package only after a real cross-process consumer exists.
 - Added Skynet-derived cluster design principles for explicit remote boundaries, overload results, trace propagation, large-message boundaries, and draining shutdown.
 - Merged the standalone architecture draft into `CONTRIBUTING.md` and removed duplicate repository design notes.
 - Migrated the Unity and Godot samples away from committed RPC `Generated/` sources; server and client RPC glue is now compiler output.

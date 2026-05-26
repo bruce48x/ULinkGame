@@ -9,9 +9,11 @@ src/
   ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
   ULinkGame.Server/       Server-side RPC hosting, session lifecycle, reliable push outbox, and ULinkActor-based execution
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
+  ULinkGame.Cluster/      Optional explicit cluster route contracts and in-memory routing primitives
   ULinkGame.Tool/         Project management tool entry point
 
 samples/
+  Cluster.Loopback/        Minimal in-memory cluster route and failure-mode sample
   Agar.Unity/             Unity + .NET multiplayer sample
     docs/                 Sample gameplay design and development plan
     tests/                Sample gameplay and server policy tests
@@ -57,6 +59,12 @@ It should stay infrastructure-oriented. `ULinkActor` is a foundational runtime d
 - session resume outcomes
 
 It must stay small. User-owned contracts still belong in a game `Shared` project, and Unity-specific wrappers should wait until repeated integration code becomes stable enough to justify a package.
+
+### ULinkGame.Cluster
+
+`ULinkGame.Cluster` is the optional cluster routing package. It owns explicit node identity, route identity, route locations, message envelopes, route directory abstractions, router abstractions, and in-memory implementations for tests or local validation.
+
+It must stay transport-neutral and actor-boundary-aware. The package must not provide transparent remote actor references, actor migration, durable route storage, Redis-specific state, service discovery, production transport, or gameplay concepts. Production adapters should be added only after the in-memory contract proves route lookup, expiration, local dispatch, remote dispatch, backpressure, and trace propagation.
 
 ### ULinkGame.Tool
 
@@ -256,6 +264,7 @@ Build framework projects:
 dotnet build src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj
 dotnet build src/ULinkGame.Server/ULinkGame.Server.csproj
 dotnet build src/ULinkGame.Client/ULinkGame.Client.csproj
+dotnet build src/ULinkGame.Cluster/ULinkGame.Cluster.csproj
 dotnet build src/ULinkGame.Tool/ULinkGame.Tool.csproj
 ```
 
@@ -292,6 +301,7 @@ The packages currently published by this workflow are:
 - `ULinkGame.Abstractions`, versioned in `src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj`
 - `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
 - `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
+- `ULinkGame.Cluster`, versioned in `src/ULinkGame.Cluster/ULinkGame.Cluster.csproj`
 - `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
 
 Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
@@ -311,6 +321,7 @@ dotnet test Tests/tests.slnx
 dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Cluster/ULinkGame.Cluster.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
 ```
 
@@ -474,6 +485,28 @@ Expected flow:
 6. The receiving adapter handles authentication, TLS, compression, and wire format, then invokes local `IClusterMessageHandler`.
 
 The first implementation should provide in-memory directory and loopback messenger behavior for tests. Production adapters should be pluggable and added only after the abstractions are validated by a sample or generated template. Candidate adapters include ULinkRPC internal transport, gRPC, Redis pub/sub, or a custom message bus.
+
+### Cluster Production Adapter Decision
+
+The first production adapter should be a ULinkRPC internal transport adapter, but it should be implemented only when a real sample, generated template, or consuming project needs cross-process cluster routing.
+
+Decision:
+
+- Preferred first adapter: ULinkRPC internal transport.
+- Package shape: keep it outside `ULinkGame.Cluster`, for example `ULinkGame.Cluster.ULinkRPC`, so the core cluster contracts remain transport-neutral and do not force ULinkRPC server/client packages into every cluster consumer.
+- ULinkRPC adapter scope: node-to-node `ClusterMessage` delivery, adapter-owned authentication/TLS/compression/wire format, trace propagation, timeout mapping, and explicit `ClusterSendStatus` results.
+- ULinkRPC adapter non-goals: route directory storage, service discovery, gameplay DTOs, durable queues, remote actor proxies, generated remote actor clients, or transparent local-looking actor references.
+- Direction for gRPC: keep as the second candidate when a project needs a conventional service-to-service protocol or polyglot operations story.
+- Direction for Redis pub/sub or streams: use only for fanout or brokered delivery after ordering, backpressure, expiry, and observability semantics are explicit; do not serialize live RPC callbacks or actor references into Redis.
+- Direction for custom message buses: keep as an adapter pattern, not a framework default.
+
+Implementation gates before adding `ULinkGame.Cluster.ULinkRPC`:
+
+1. A sample or template needs two independent .NET processes exchanging `ClusterMessage`.
+2. The adapter can authenticate node-to-node traffic without embedding production secrets in templates.
+3. Timeout, expired message, route-not-found, handler-unavailable, backpressure, and failed-send paths are mapped to `ClusterSendStatus`.
+4. Metrics and activity spans preserve the current low-cardinality cluster tags.
+5. The adapter does not change `IRouteDirectory`, `IClusterRouter`, `INodeMessenger`, or `IClusterMessageHandler` into transport-specific APIs.
 
 Skynet-derived cluster principles:
 
@@ -1303,92 +1336,9 @@ Test requirements:
 
 This plan tracks framework-level work only. Keep completed milestones out of this section, and do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
 
-The next major module is optional cluster infrastructure. Build it in small layers so every boundary stays explicit and testable.
-
-### P0 Actor Runtime Coordination
-
-Repository: [bruce48x/ULinkActor](https://github.com/bruce48x/ULinkActor)
-
-These tasks belong to ULinkActor, not ULinkGame. ULinkGame.Cluster can start with adapter-level assumptions, but production-quality cluster actor routing should wait until these runtime contracts are explicit.
-
-| Task | Output | Completion Signal |
-| --- | --- | --- |
-| Mailbox backpressure contract | Confirm the public result/exception shape when a mailbox is full or an actor call times out. | Tests cover bounded mailbox send failure, call timeout, dead-letter behavior, and metrics. |
-| Scheduler lane boundary | Document and test that execution lanes or `LogicThread`-like internals remain private and all work enters through the mailbox. | Public APIs expose actors/mailboxes, not scheduler lane ids. |
-| Slow handler and timeout diagnostics | Add or verify tracing that identifies slow actor handlers, call timeout roots, and blocking actor misuse. | Activity/log tests can correlate a timed-out call to the target actor/message path. |
-| Stop and drain semantics | Define bounded actor stop/drain behavior without pretending all async work can finish cleanly. | Tests cover stop rejecting new work, draining bounded queued work, and timer disposal. |
-| Long-running work guidance | Document the safe pattern for offloading blocking work and resuming by posting a message back to the mailbox. | Analyzer/docs/tests prevent or flag common blocking patterns inside actor handlers. |
+There is currently no active framework implementation milestone in this section. The next cluster implementation should start with `ULinkGame.Cluster.ULinkRPC` only after the production adapter gates above are met.
 
 ULinkGame must not depend on ULinkActor scheduler internals. Any cluster-to-actor bridge should call public actor runtime APIs only.
-
-### P1 Cluster Core Contracts
-
-Repository: this repository
-
-Create the optional cluster package and tests without any production network adapter.
-
-| Task | Output | Completion Signal |
-| --- | --- | --- |
-| Package skeleton | Add `src/ULinkGame.Cluster` and `Tests/ULinkGame.Cluster.Tests`; wire them into the solution. | Package builds independently and has no dependency on sample DTOs. |
-| Identity and route contracts | Add `NodeId`, `RouteKey`, `RouteLocation`, `ClusterMessage`, `ClusterSendStatus`, `NodeEndpoint`. | Contracts are immutable, small, and documented. |
-| Directory abstractions | Add `IRouteDirectory` and an in-memory implementation with lease/expiration behavior. | Tests cover register, replace, expire, clear-by-node, and stale location behavior. |
-| Router abstractions | Add `IClusterRouter`, `INodeMessenger`, `IClusterMessageHandler`, and local node identity options. | Tests cover expired message rejection before lookup, route-not-found, local dispatch, remote dispatch, and backpressure. |
-| Trace envelope | Keep correlation/trace/source-node data on `ClusterMessage`. | Tests prove trace/correlation data survives local and remote loopback delivery. |
-
-Non-goals for P1: production transport, Redis, service discovery, actor migration, generated remote actor proxies, and durable route storage.
-
-### P2 In-Memory Cluster Runtime
-
-Implement the first usable runtime entirely in memory.
-
-| Task | Output | Completion Signal |
-| --- | --- | --- |
-| In-memory route directory | Route records expire by time and can be removed by node. | Deterministic clock tests cover expiration and node cleanup. |
-| Loopback messenger | A node-to-node messenger for same-process or test-host delivery. | Tests prove remote route path uses `INodeMessenger` while local route path bypasses it. |
-| Backpressure propagation | Preserve `Backpressure` from messenger and handler results. | Tests cover route lookup success followed by messenger/handler backpressure. |
-| Ordered key policy | Preserve `OrderedBy` as metadata without promising global ordering. | Tests verify metadata is forwarded and no global ordering API is implied. |
-| Metrics and trace | Add route lookup, send, receive, dispatch, drop, expired, and backpressure counters/spans. | Meter/Activity listener tests assert low-cardinality tags and trace continuity. |
-
-### P3 Explicit Actor Bridge
-
-Add optional integration between cluster routing and the local actor runtime. Keep remote actor usage visibly remote.
-
-| Task | Output | Completion Signal |
-| --- | --- | --- |
-| Actor route keys | Provide a small helper that maps an application-chosen actor id or route id to `RouteKey`. | Helper does not encode node id, endpoint, or scheduler lane. |
-| Cluster actor envelope | Add an explicit cluster actor message envelope with kind, payload, TTL, trace, and optional reply correlation. | Envelope remains bytes-plus-metadata; no live delegate, callback, or actor reference is serializable. |
-| Local actor dispatcher | Add an adapter that receives cluster actor envelopes and calls local actor runtime APIs. | Tests prove the target node's actor runtime owns mailbox dispatch. |
-| Request/reply option | If needed, add explicit remote request/reply with timeout and result status. | API name and result type make network cost and failure visible. |
-
-Non-goals for P3: transparent remote `ActorRef`, generated remote proxies, automatic actor migration, and cross-node shared mutable state.
-
-### P4 Sample Validation
-
-Use a sample to prove the abstraction before adding a production transport.
-
-| Task | Output | Completion Signal |
-| --- | --- | --- |
-| Minimal multi-node route sample | Add a small sample flow where one node owns a route and another node sends a cluster message. | Sample runs with in-memory or loopback transport and no game-specific concepts in `src/`. |
-| Agar integration candidate | Optionally route a room/match command through `ULinkGame.Cluster`. | Existing Agar gameplay remains sample-owned; framework receives no room, battle, or leaderboard DTOs. |
-| Failure demonstration | Show route-not-found, expired, timeout, and backpressure behavior. | README or sample logs make each failure explicit. |
-
-### P5 Production Adapter Decision
-
-Add one production adapter only after P1-P4 prove the contract.
-
-Candidate adapters, in likely order:
-
-1. ULinkRPC internal transport adapter.
-2. gRPC adapter.
-3. Redis pub/sub or stream adapter.
-4. Custom message bus adapter.
-
-Adapter requirements:
-
-- authentication, TLS, compression, and wire format stay inside the adapter
-- route directory remains independent from transport
-- large state sync remains application-owned
-- no adapter may make remote actor calls look local
 
 ### Deliberately Not Default Work
 
