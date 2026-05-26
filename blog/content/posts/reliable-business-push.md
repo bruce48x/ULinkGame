@@ -1,72 +1,72 @@
 ---
-title: "可靠业务推送：为什么传输可靠还不够"
+title: "Reliable Business Push: Why Reliable Transport Is Not Enough"
 date: 2026-05-07T11:25:00+08:00
-summary: "业务推送需要证明客户端已经应用事件；这件事不能只交给 transport 层。"
+summary: "Business push needs proof that the client has applied an event; transport alone cannot provide that."
 ---
 
-Transport 可以让数据更可靠地到达连接，但它不能证明客户端已经把一个业务事件应用到 UI 或本地会话状态里。在线游戏里，这个差异会直接变成卡流程问题。
+Transport can make data reach a connection more reliably, but it cannot prove that the client has applied a business event to UI or local session state. In an online game, that gap can directly turn into a stuck player flow.
 
-## 典型失败场景
+## A Typical Failure Case
 
-1. A 和 B 进入匹配。
-2. 服务端创建房间，并向两端推送 `Matched`。
-3. A 收到并进入房间。
-4. B 在推送窗口内重连。
-5. 旧连接已经断开，服务端不知道 B 是否真的处理了 `Matched`。
-6. B 可能永远停在等待匹配界面。
+1. Players A and B enter matchmaking.
+2. The server creates a room and pushes `Matched` to both clients.
+3. A receives the push and enters the room.
+4. B reconnects during the push window.
+5. The old connection is already gone, and the server does not know whether B actually handled `Matched`.
+6. B may stay on the matchmaking screen forever.
 
-这不是 serializer 或 transport 单独能解决的问题。业务层需要一套可确认、可重放、可去重的推送机制。
+This is not something a serializer or transport can solve by itself. The business layer needs a push mechanism that can be acknowledged, replayed, and deduplicated.
 
-## ULinkGame 的模型
+## The ULinkGame Model
 
-ULinkGame 使用 at-least-once delivery 加 per-owner monotonic sequence number：
+ULinkGame uses at-least-once delivery with a per-owner monotonic sequence number:
 
-- 服务端为每个 owner 分配递增 sequence
-- outbox 保存尚未确认的业务推送记录
-- 客户端只应用比本地 latest sequence 更新的消息
-- 客户端应用完成后 ack latest sequence
-- 服务端删除 `sequence <= latestAppliedSequence` 的记录
-- 客户端重连后，服务端重放仍然 pending 的记录
+- the server assigns an increasing sequence to each owner
+- the outbox keeps business push records that have not been acknowledged
+- the client only applies messages newer than its local latest sequence
+- after applying a message, the client acknowledges the latest sequence
+- the server removes records where `sequence <= latestAppliedSequence`
+- after reconnect, the server replays records that are still pending
 
-这比追求 exactly-once 更实际。重连、进程重启、客户端崩溃和服务器 failover 都会破坏 exactly-once 的假设；at-least-once 加幂等处理更容易验证。
+This is more practical than chasing exactly-once delivery. Reconnects, process restarts, client crashes, and server failover all break exactly-once assumptions; at-least-once delivery plus idempotent handling is easier to verify.
 
-## 职责边界
+## Responsibility Boundary
 
-`ULinkGame.Server` 负责通用机制：
+`ULinkGame.Server` owns the generic mechanism:
 
-- sequence 分配
-- pending records 存储
-- reconnect 后重放
-- ack 后裁剪
-- retention 和 pending-count 限制
+- sequence allocation
+- pending record storage
+- replay after reconnect
+- pruning after acknowledgement
+- retention and pending-count limits
 
-业务代码负责语义：
+Business code owns the semantics:
 
-- 决定哪些消息需要可靠投递
-- 在 payload 中携带 sequence
-- 暴露 ack RPC 或复用已有请求携带 ack
-- 让客户端 handler 幂等
+- decide which messages require reliable delivery
+- include the sequence in the payload
+- expose an ack RPC or piggyback ack on an existing request
+- make client handlers idempotent
 
-这样可靠推送仍然是 host/session infrastructure，不会把 matchmaking、room、mail、reward 等业务概念塞进框架核心。
+This keeps reliable push as host/session infrastructure instead of moving business concepts such as matchmaking, rooms, mail, or rewards into the framework core.
 
-## 状态丢失要显式处理
+## State Loss Must Be Explicit
 
-如果客户端以为自己能恢复 session，但服务端已经丢失兼容状态，不能把它当成普通重连成功。
+If the client believes it can resume a session but the server has already lost compatible state, the server must not treat that as a normal successful reconnect.
 
-常见原因包括：
+Common causes include:
 
-- 客户端离线超过 reconnect grace period
-- gateway 重启导致 in-memory outbox 丢失
-- 服务端清理了 session
+- the client stayed offline beyond the reconnect grace period
+- the gateway restarted and lost its in-memory outbox
+- the server cleaned up the session
 
-正确行为是返回明确的 state-lost 结果，要求客户端清理旧状态并开始新 session，而不是继续停留在旧 matchmaking 或 in-match UI。
+The correct behavior is to return an explicit state-lost result and require the client to clear old state and start a new session, instead of leaving it on a stale matchmaking or in-match UI.
 
-## 实现位置
+## Implementation Location
 
-实现细节属于 `ULinkGame.Server.ReliablePush`：
+The implementation belongs in `ULinkGame.Server.ReliablePush`:
 
 - `IReliablePushOutbox`
 - `InMemoryReliablePushOutbox`
 - `ReliablePushOptions`
 
-更完整的内部设计文档保留在 repository 根目录的 `CONTRIBUTING.md` 中。
+The more complete internal design notes remain in `CONTRIBUTING.md` at the repository root.

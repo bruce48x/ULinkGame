@@ -2,8 +2,8 @@
 title = "ULinkGame Blog"
 +++
 
-ULinkGame 是构建在 ULinkRPC 与 ULinkActor 之上的游戏会话基础设施层，面向在线游戏服务端和客户端工作流。
+ULinkGame is a game-session infrastructure layer built on ULinkRPC and ULinkActor for online game server and client workflows.
 
-- [ULinkGame 入门：从 RPC 到游戏会话基础设施](/ULinkGame/posts/ulinkgame-getting-started/)
-- [可靠业务推送：为什么传输可靠还不够](/ULinkGame/posts/reliable-business-push/)
-- [关于本站](/ULinkGame/about/)
+- [Getting Started With ULinkGame: From RPC To Game-Session Infrastructure](/ULinkGame/posts/ulinkgame-getting-started/)
+- [Reliable Business Push: Why Reliable Transport Is Not Enough](/ULinkGame/posts/reliable-business-push/)
+- [About This Site](/ULinkGame/about/)

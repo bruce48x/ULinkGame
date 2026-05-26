@@ -145,6 +145,136 @@ main.wrap {
   font-family: "SFMono-Regular", Consolas, monospace;
 }
 
+.content .highlight {
+  margin: 18px 0;
+}
+
+.content .highlight pre {
+  margin: 0;
+}
+
+.content .chroma {
+  color: #e6edf3;
+  background: #0d1117;
+  -webkit-text-size-adjust: none;
+}
+
+.content .chroma .err {
+  color: #ff7b72;
+}
+
+.content .chroma .k,
+.content .chroma .kd,
+.content .chroma .kn,
+.content .chroma .kr,
+.content .chroma .kt,
+.content .chroma .o,
+.content .chroma .ow {
+  color: #ff7b72;
+}
+
+.content .chroma .kc,
+.content .chroma .kp,
+.content .chroma .no,
+.content .chroma .py,
+.content .chroma .nv,
+.content .chroma .vc,
+.content .chroma .vg,
+.content .chroma .vi,
+.content .chroma .vm,
+.content .chroma .ld,
+.content .chroma .sa,
+.content .chroma .dl,
+.content .chroma .se,
+.content .chroma .sr {
+  color: #79c0ff;
+}
+
+.content .chroma .nc,
+.content .chroma .ne {
+  color: #f0883e;
+  font-weight: 700;
+}
+
+.content .chroma .nd,
+.content .chroma .nf,
+.content .chroma .fm {
+  color: #d2a8ff;
+  font-weight: 700;
+}
+
+.content .chroma .ni {
+  color: #ffa657;
+}
+
+.content .chroma .nl,
+.content .chroma .gh,
+.content .chroma .gu {
+  color: #79c0ff;
+  font-weight: 700;
+}
+
+.content .chroma .nn {
+  color: #ff7b72;
+}
+
+.content .chroma .nt {
+  color: #7ee787;
+}
+
+.content .chroma .l,
+.content .chroma .s,
+.content .chroma .sb,
+.content .chroma .sc,
+.content .chroma .sd,
+.content .chroma .s2,
+.content .chroma .si,
+.content .chroma .sx,
+.content .chroma .s1,
+.content .chroma .ss,
+.content .chroma .m,
+.content .chroma .mb,
+.content .chroma .mf,
+.content .chroma .mh,
+.content .chroma .mi,
+.content .chroma .il,
+.content .chroma .mo {
+  color: #a5d6ff;
+}
+
+.content .chroma .c,
+.content .chroma .ch,
+.content .chroma .cm,
+.content .chroma .c1,
+.content .chroma .cs,
+.content .chroma .cp,
+.content .chroma .cpf,
+.content .chroma .go,
+.content .chroma .gp {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.content .chroma .gd {
+  color: #ffa198;
+  background: #490202;
+}
+
+.content .chroma .gi {
+  color: #56d364;
+  background: #0f5323;
+}
+
+.content .chroma .gl {
+  text-decoration: underline;
+}
+
+.content .chroma .w,
+.content .chroma .ln,
+.content .chroma .lnt {
+  color: #6e7681;
+}
+
 .content :not(pre) > code {
   padding: 0.14em 0.4em;
   border-radius: 6px;

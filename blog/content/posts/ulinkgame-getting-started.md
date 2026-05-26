@@ -1,7 +1,7 @@
 ---
-title: "ULinkGame 入门：创建一个带会话、重连和可靠推送基础设施的游戏项目"
+title: "Getting Started With ULinkGame: Build Game Projects With Sessions, Reconnects, And Reliable Push"
 date: 2026-05-07T11:20:00+08:00
-summary: "从安装工具、生成项目、启动服务端、打开 Unity 或 Godot 客户端，到理解 ULinkGame、ULinkRPC 和 ULinkActor 的分工。"
+summary: "Install the tools, generate a project, start the server, open the Unity or Godot client, and understand how ULinkGame, ULinkRPC, and ULinkActor fit together."
 tags:
   - ulinkgame
   - ulinkrpc
@@ -14,45 +14,45 @@ categories:
   - Tutorial
 ---
 
-如果你只是想让客户端调用服务端方法，先看 ULinkRPC 就够了。
+If all you need is for a client to call server methods, start with ULinkRPC.
 
-如果你要做的是在线游戏，事情很快会多出一层：
+Online games usually need another layer very quickly:
 
-- 玩家登录后要有 session
-- 客户端断线后要能重连
-- 服务端重要业务通知不能因为断线窗口丢掉
-- .NET 服务端通常需要 gateway / edge 进程；进程内房间、战斗或服务状态由 ULinkActor actor/mailbox runtime 承载
-- Unity、Godot、plain .NET 客户端不应该各写一套可靠推送去重逻辑
+- players need a session after login
+- clients need to reconnect after a disconnect
+- important server notifications must not disappear during a disconnect window
+- a .NET server usually needs a gateway or edge process, while in-process room, battle, or service state runs on the ULinkActor actor/mailbox runtime
+- Unity, Godot, and plain .NET clients should not each reimplement reliable-push deduplication
 
-ULinkGame 就是为这一层准备的。它不是替你写账号、背包、匹配规则或玩法逻辑，而是把在线游戏反复要搭的基础设施先接好。
+ULinkGame is built for that layer. It does not write your account system, inventory, matchmaking rules, or gameplay logic for you. It wires up the infrastructure that online games repeatedly need.
 
-一句话理解：
+One-sentence version:
 
-**ULinkRPC 负责双端强类型通信；ULinkActor 负责进程内 actor / mailbox 运行时；ULinkGame 负责把它们组织成更像游戏项目的会话、宿主、重连和可靠推送结构。**
+**ULinkRPC provides strongly typed communication across client and server; ULinkActor provides the in-process actor/mailbox runtime; ULinkGame organizes them into a game-project shape with sessions, hosting, reconnects, and reliable push.**
 
-## 前提条件
+## Prerequisites
 
-开始之前，请先安装 **.NET 10 SDK**：
+Before you start, install the **.NET 10 SDK**:
 
-- 下载地址：https://dotnet.microsoft.com/en-us/download/dotnet/10.0
+- Download: https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 
-如果你要生成 Unity 客户端，还需要：
+If you want to generate a Unity client, you also need:
 
-- Unity 2022 LTS，或兼容的 Unity 版本
-- Unity 项目首次打开后执行 `NuGet -> Restore Packages`
+- Unity 2022 LTS, or a compatible Unity version
+- after opening the Unity project for the first time, run `NuGet -> Restore Packages`
 
-如果你要生成 Godot 客户端，还需要：
+If you want to generate a Godot client, you also need:
 
-- Godot 4.x .NET 版本
+- Godot 4.x .NET
 
-ULinkGame 的项目工具会复用 `ULinkRPC.Starter` 生成基础 RPC 项目，所以两个工具都要装：
+ULinkGame's project tool reuses `ULinkRPC.Starter` to generate the base RPC project, so install both tools:
 
 ```bash
 dotnet tool install -g ULinkRPC.Starter
 dotnet tool install -g ULinkGame.Tool
 ```
 
-如果你已经安装过，可以更新：
+If they are already installed, update them:
 
 ```bash
 dotnet tool update -g ULinkRPC.Starter
@@ -61,7 +61,7 @@ dotnet tool update -g ULinkGame.Tool
 
 ## Quick Start
 
-第一次接入建议先用最容易排错的组合：
+For a first integration, use the easiest-to-debug combination:
 
 - `unity`
 - `websocket`
@@ -69,7 +69,7 @@ dotnet tool update -g ULinkGame.Tool
 - `simple` network profile
 - `none` persistence
 
-直接照下面做：
+Run:
 
 ```bash
 ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json --persistence none
@@ -77,22 +77,22 @@ cd MyGame
 dotnet run --project Server/Silo/Silo.csproj
 ```
 
-保持状态进程运行，再打开第二个终端：
+Keep the state process running, then open a second terminal:
 
 ```bash
 cd MyGame
 dotnet run --project Server/Edge/Edge.csproj
 ```
 
-然后打开客户端：
+Then open the client:
 
-- 用 Unity 打开 `MyGame/Client`
-- 等待导入完成
-- 执行 `NuGet -> Restore Packages`
-- 打开默认连接测试场景
-- 点击 Play
+- open `MyGame/Client` in Unity
+- wait for import to finish
+- run `NuGet -> Restore Packages`
+- open the default connection test scene
+- click Play
 
-如果你选的是 Godot：
+If you chose Godot:
 
 ```bash
 ulinkgame-tool new --name MyGame --client-engine godot --transport websocket --serializer json --persistence none
@@ -100,34 +100,34 @@ cd MyGame
 dotnet run --project Server/Silo/Silo.csproj
 ```
 
-再开第二个终端启动 Edge：
+Then start Edge in a second terminal:
 
 ```bash
 cd MyGame
 dotnet run --project Server/Edge/Edge.csproj
 ```
 
-然后：
+Then:
 
-- 用 Godot 4.x .NET 打开 `MyGame/Client`
-- 等待 Godot 生成并恢复 C# 工程
-- 打开默认场景
-- 点击 Play
+- open `MyGame/Client` in Godot 4.x .NET
+- wait for Godot to generate and restore the C# project
+- open the default scene
+- click Play
 
-最短路径可以记成：
+The shortest path is:
 
-**安装两个工具 -> 生成项目 -> 启动状态进程 -> 启动 Edge -> 打开 Client -> 恢复依赖 -> 运行默认测试场景。**
+**Install both tools -> generate the project -> start the state process -> start Edge -> open Client -> restore dependencies -> run the default test scene.**
 
-## 先理解生成出来的结构
+## Understand The Generated Structure
 
-ULinkGame 项目是在 ULinkRPC starter 生成的双端项目上继续扩展出来的。
+A ULinkGame project extends the two-sided project generated by the ULinkRPC starter.
 
 ```mermaid
 flowchart TB
-    Root["MyGame/"] --> Shared["Shared<br/>共享 DTO / RPC 契约"]
-    Root --> Server["Server<br/>服务端解决方案"]
-    Root --> Client["Client<br/>Unity / Godot 客户端"]
-    Root --> Config["ulinkgame.tool.json<br/>项目工具配置"]
+    Root["MyGame/"] --> Shared["Shared<br/>shared DTOs / RPC contracts"]
+    Root --> Server["Server<br/>server solution"]
+    Root --> Client["Client<br/>Unity / Godot client"]
+    Root --> Config["ulinkgame.tool.json<br/>project tool config"]
 
     Server --> Edge["Edge<br/>RPC gateway / client connection"]
     Server --> StateHost["State Host<br/>ULinkActor state runtime"]
@@ -136,7 +136,7 @@ flowchart TB
     SourceGen --> ClientGenerated["Compiler Generated<br/>RpcApi / service client"]
 ```
 
-典型目录长这样：
+A typical project looks like this:
 
 ```text
 MyGame/
@@ -155,56 +155,56 @@ MyGame/
   ulinkgame.tool.json
 ```
 
-每一层的职责要分清：
+Keep each layer's responsibility clear:
 
 - `Shared/`
-  放双端共享的 DTO、RPC 接口和 callback 接口。
+  Shared DTOs, RPC interfaces, and callback interfaces.
 - `Server/Edge/`
-  放 RPC 入口、连接接入、callback 绑定、可靠业务推送、session 接入逻辑。
-- `Server/Silo/` 或 `Server/ActorHost/`
-  放权威状态服务。较新的项目应优先使用 `Server/State/` 或 `Server/ActorHost/` 命名。
+  RPC entry points, connection ingress, callback binding, reliable business push, and session integration.
+- `Server/Silo/` or `Server/ActorHost/`
+  Authoritative state services. Newer projects should prefer `Server/State/` or `Server/ActorHost/` naming.
 - `Client/`
-  放 Unity 或 Godot 工程、source generator 标记和业务脚本。
+  Unity or Godot project files, source-generator markers, and game scripts.
 - `ulinkgame.tool.json`
-  记录 ULinkGame 项目选项。
+  ULinkGame project options.
 
-新手最容易踩的坑是把所有代码都塞进 Edge。更稳的拆法是：
+The easiest beginner mistake is putting everything into Edge. A sturdier split is:
 
-- 网络连接和 RPC 接入放 Edge
-- 长生命周期状态和需要串行执行的逻辑放到基于 ULinkActor 的状态 actor 中
-- 共享契约只放 DTO 和接口，不放服务端实现
+- put network connections and RPC ingress in Edge
+- put long-lived state and serialized logic in ULinkActor-based state actors
+- keep shared contracts limited to DTOs and interfaces, not server implementations
 
-## ULinkRPC 和 ULinkGame 怎么分工
+## How ULinkRPC And ULinkGame Split Responsibilities
 
-ULinkRPC 解决的是通信问题：
+ULinkRPC solves communication:
 
-- 契约定义
-- 编译期 source generation
-- RPC client / server glue
+- contract definition
+- compile-time source generation
+- RPC client/server glue
 - transport
 - serializer
 - callback
 
-ULinkGame 解决的是游戏会话基础设施问题：
+ULinkGame solves game-session infrastructure:
 
-- .NET host 中托管 RPC endpoint
-- 以 ULinkActor 为根基的进程内 actor/mailbox 运行时组合
-- session identity 和 endpoint binding
+- hosting RPC endpoints inside a .NET host
+- composing an in-process actor/mailbox runtime on top of ULinkActor
+- session identity and endpoint binding
 - reliable business push outbox
-- 客户端可靠推送 inbox
-- reconnect / state-lost 这类状态结果
+- client-side reliable push inbox
+- reconnect and state-lost results
 
-所以你开发业务时，顺序通常是：
+The usual business-development flow is:
 
-1. 在 `Shared/Interfaces/` 定义 RPC 契约。
-2. 正常构建服务端或重新编译客户端，让 `ULinkRPC.Analyzers` 生成 RPC glue。
-3. 在 `Server/Edge/Services/` 或基于 ULinkActor 的状态 actor 里实现服务端逻辑。
-4. 在客户端调用生成的 `RpcApi`。
-5. 需要重要服务端通知时，再接入 reliable push 和 ack。
+1. Define RPC contracts in `Shared/Interfaces/`.
+2. Build the server or recompile the client so `ULinkRPC.Analyzers` generates RPC glue.
+3. Implement server logic in `Server/Edge/Services/` or in ULinkActor-based state actors.
+4. Call the generated `RpcApi` from the client.
+5. Add reliable push and acknowledgements when you need important server notifications.
 
-## 生成项目时怎么选参数
+## Choose Project Options
 
-`ulinkgame-tool new` 常用参数如下：
+Common `ulinkgame-tool new` options look like this:
 
 ```bash
 ulinkgame-tool new --name MyGame \
@@ -215,187 +215,187 @@ ulinkgame-tool new --name MyGame \
   --persistence none
 ```
 
-可选客户端：
+Client engine options:
 
 - `unity`
 - `unity-cn`
 - `tuanjie`
 - `godot`
 
-可选 transport：
+Transport options:
 
 - `websocket`
 - `tcp`
 - `kcp`
 
-可选 serializer：
+Serializer options:
 
 - `json`
 - `memorypack`
 
-可选 network profile：
+Network profile options:
 
 - `simple`
-  默认选项，只生成一个 RPC endpoint。第一次接入建议用它。
+  The default. Generates one RPC endpoint. Recommended for a first integration.
 - `realtime`
-  生成控制连接和实时连接拆分的项目结构，适合高频实时玩法。
+  Generates a split control/realtime project structure for high-frequency realtime gameplay.
 
-可选 persistence：
+Persistence options:
 
 - `none`
-  默认本地开发形态，不预设业务数据库。
+  Default local-development shape, with no business database assumed.
 - `postgres`
-  生成 PostgreSQL 连接配置和相关包引用。
+  Generates PostgreSQL connection configuration and package references.
 - `mysql`
-  生成 MySQL 连接配置和相关包引用。
+  Generates MySQL connection configuration and package references.
 
-第一次接入建议先用：
+For a first integration, start with:
 
 ```bash
 ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json --persistence none
 ```
 
-等默认连接测试跑通后，再考虑：
+After the default connection test works, consider:
 
 ```bash
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --network-profile realtime --persistence postgres
 ```
 
-不要一开始就把 `kcp`、`memorypack`、`realtime`、数据库持久化一起打开。先把最小链路跑通，后面升级会容易很多。
+Do not enable `kcp`, `memorypack`, `realtime`, and database persistence all at once on day one. Get the smallest path working first; upgrading later will be much easier.
 
-## 服务端怎么启动
+## Start The Server
 
-生成项目后，服务端通常有两个进程：
+Generated projects usually have two server processes:
 
 - `Edge`
-  RPC gateway，负责客户端连接和服务调用入口。
-- 状态进程
-  承载基于 ULinkActor 的房间、战斗或长期服务状态。
+  The RPC gateway, responsible for client connections and service-call ingress.
+- state process
+  Hosts ULinkActor-based room, battle, or long-lived service state.
 
-先启动状态进程：
+Start the state process first:
 
 ```bash
 cd MyGame
 dotnet run --project Server/Silo/Silo.csproj
 ```
 
-再启动 Edge：
+Then start Edge:
 
 ```bash
 cd MyGame
 dotnet run --project Server/Edge/Edge.csproj
 ```
 
-默认 `simple + websocket` 会在 Edge 上启动一个 WebSocket RPC endpoint。客户端默认测试脚本会连接这个 endpoint 并调用一次默认服务。
+The default `simple + websocket` setup starts one WebSocket RPC endpoint on Edge. The default client test script connects to that endpoint and calls a default service once.
 
-如果你改了 transport：
+If you changed transport:
 
 - `websocket`
-  更适合第一次接入和浏览器 / WebSocket 网络环境。
+  Best for first integration and browser/WebSocket-friendly environments.
 - `tcp`
-  更接近传统长连接 TCP 模型。
+  Closer to a traditional persistent TCP connection model.
 - `kcp`
-  更适合后续低延迟实时玩法，但第一次排错成本更高。
+  Better for later low-latency realtime gameplay, but harder to debug at first.
 
-## 客户端怎么启动
+## Start The Client
 
-Unity / 团结引擎项目在：
-
-```text
-MyGame/Client
-```
-
-首次打开后，按这个顺序处理：
-
-1. 等待编辑器导入完成。
-2. 等待 NuGetForUnity 导入完成。
-3. 执行 `NuGet -> Restore Packages`。
-4. 打开默认连接测试场景。
-5. 确认状态进程和 Edge 都在运行。
-6. 点击 Play。
-
-Godot 项目也在：
+Unity and Tuanjie projects live under:
 
 ```text
 MyGame/Client
 ```
 
-Godot 侧按这个顺序处理：
+After opening the project for the first time:
 
-1. 用 Godot 4.x .NET 打开项目。
-2. 等待 C# 工程生成和依赖恢复。
-3. 打开默认场景。
-4. 确认状态进程和 Edge 都在运行。
-5. 点击 Play。
+1. Wait for editor import to finish.
+2. Wait for NuGetForUnity to import.
+3. Run `NuGet -> Restore Packages`.
+4. Open the default connection test scene.
+5. Confirm that both the state process and Edge are running.
+6. Click Play.
 
-如果客户端连接失败，先按这个顺序排查：
+Godot projects also live under:
 
-1. 状态进程是否已经启动成功。
-2. Edge 是否已经启动成功。
-3. transport 是否和生成项目时一致。
-4. WebSocket 端口是否被占用。
-5. Unity 是否执行过 `NuGet -> Restore Packages`。
-6. 是否手改了 generated 目录。
+```text
+MyGame/Client
+```
 
-## 日常怎么刷新 RPC 胶水
+For Godot:
 
-只要你改了 `Shared/Interfaces/` 里的 RPC 契约，就要重新构建依赖它的项目。`ULinkRPC.Analyzers` 会在编译期生成客户端 API 和服务端 binder，不再需要手动运行 codegen。
+1. Open the project with Godot 4.x .NET.
+2. Wait for C# project generation and dependency restore.
+3. Open the default scene.
+4. Confirm that both the state process and Edge are running.
+5. Click Play.
 
-服务端通常运行：
+If the client cannot connect, check in this order:
+
+1. Did the state process start successfully?
+2. Did Edge start successfully?
+3. Does the transport match the generated project options?
+4. Is the WebSocket port already in use?
+5. Did Unity run `NuGet -> Restore Packages`?
+6. Did anyone manually edit the generated directory?
+
+## Refresh RPC Glue During Development
+
+Whenever you change RPC contracts under `Shared/Interfaces/`, rebuild the projects that depend on them. `ULinkRPC.Analyzers` generates the client API and server binder at compile time, so you do not need to run manual code generation.
+
+For the server, usually run:
 
 ```bash
 dotnet build Server/Edge/Edge.csproj
 ```
 
-Unity / Tuanjie 客户端重新编译编辑器项目即可。Godot 客户端通常运行：
+For Unity or Tuanjie, recompile the editor project. For Godot, usually run:
 
 ```bash
 dotnet build Client/Client.csproj
 ```
 
-具体客户端 `.csproj` 文件名以生成项目为准。
+The exact client `.csproj` name depends on the generated project.
 
-日常开发顺序建议固定下来：
+Use a consistent development flow:
 
 ```mermaid
 flowchart LR
-    A["修改 Shared/Interfaces<br/>DTO / RPC 接口"] --> B["构建服务端 / 重新编译客户端"]
-    B --> C["source generator 生成 Edge glue"]
-    B --> D["source generator 生成 Client API"]
-    C --> E["补 Edge 服务实现"]
-    E --> F["需要状态时调用 ULinkActor state actor"]
-    D --> G["客户端调用 generated RpcApi"]
-    F --> H["联调运行"]
+    A["Edit Shared/Interfaces<br/>DTOs / RPC interfaces"] --> B["Build server / recompile client"]
+    B --> C["source generator creates Edge glue"]
+    B --> D["source generator creates Client API"]
+    C --> E["Implement Edge service"]
+    E --> F["Call ULinkActor state actor when state is needed"]
+    D --> G["Client calls generated RpcApi"]
+    F --> H["Run integration test"]
     G --> H
 ```
 
-判断是否需要重新构建的方法很简单：
+The rule is simple:
 
-**只要改了 Shared 契约，就重新构建服务端并重新编译客户端。**
+**If you changed a Shared contract, rebuild the server and recompile the client.**
 
-需要刷新生成结果的情况包括：
+Changes that require generated output to refresh include:
 
-- 新增 RPC service
-- 新增 RPC method
-- 修改请求或响应 DTO
-- 修改方法参数或返回值
-- 新增 callback 接口
-- 修改 callback payload
+- adding an RPC service
+- adding an RPC method
+- changing a request or response DTO
+- changing method parameters or return values
+- adding a callback interface
+- changing callback payloads
 
-不需要重新生成的情况包括：
+Changes that do not require regeneration include:
 
-- 只改服务端内部查询逻辑
-- 只改 ULinkActor state actor 内部状态处理
-- 只改客户端 UI
-- 只改日志、配置、样式
+- changing only internal server query logic
+- changing only internal ULinkActor state-actor logic
+- changing only client UI
+- changing only logs, configuration, or styling
 
-generated 目录不要手改。它们应该被看成由 Shared 契约生成出来的源码产物。
+Do not manually edit generated directories. Treat them as source artifacts generated from Shared contracts.
 
-## 一个更实际的扩展示例
+## A More Practical Extension Example
 
-假设默认连接测试已经跑通，现在你要做第一个真实功能：查询玩家资料。
+Assume the default connection test already works and you want to add your first real feature: querying a player profile.
 
-第一步应该改 `Shared/Interfaces/`，例如新增：
+The first step is to change `Shared/Interfaces/`, for example:
 
 ```csharp
 using System.Threading.Tasks;
@@ -423,13 +423,13 @@ public interface IProfileService
 }
 ```
 
-然后立刻构建服务端，让 source generator 刷新 binder：
+Then immediately build the server so the source generator refreshes the binder:
 
 ```bash
 dotnet build Server/Edge/Edge.csproj
 ```
 
-再去 `Server/Edge/Services/` 补实现。概念上会像这样：
+Next, implement the service under `Server/Edge/Services/`. Conceptually, it looks like this:
 
 ```csharp
 using Shared.Interfaces;
@@ -450,9 +450,9 @@ public sealed class ProfileService : IProfileService
 }
 ```
 
-如果这个资料要从权威状态服务读取，`ProfileService` 就应该调用基于 ULinkActor 的状态 actor 或项目自己的状态服务，而不是把长生命周期状态直接塞进普通 RPC 服务实现里。
+If this profile should be read from authoritative state, `ProfileService` should call a ULinkActor-based state actor or your project's own state service instead of putting long-lived state directly inside a normal RPC service implementation.
 
-客户端侧则调用编译期生成出来的强类型 API。具体命名由 source generator 的命名空间设置决定，但思路是：
+On the client, call the strongly typed API generated at compile time. The exact name depends on the source generator namespace settings, but the shape is:
 
 ```csharp
 var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
@@ -462,232 +462,232 @@ var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
     });
 ```
 
-这条线最重要的是：
+The important path is:
 
-- 契约在 Shared
-- 胶水代码由 `ULinkRPC.Analyzers` 在编译期生成
-- Edge 暴露 RPC 服务
-- ULinkActor state actor 承载权威状态
-- Client 调用 generated API
+- contracts live in Shared
+- glue code is generated by `ULinkRPC.Analyzers` at compile time
+- Edge exposes RPC services
+- ULinkActor state actors host authoritative state
+- Client calls the generated API
 
-## reliable push 是什么时候用的
+## When To Use Reliable Push
 
-不是所有服务端通知都需要 reliable push。
+Not every server notification needs reliable push.
 
-普通日志、临时提示、下一帧还会刷新的状态，可以用普通 callback。
+Temporary logs, transient hints, and state that will be refreshed next frame can use normal callbacks.
 
-但这些事件通常应该可靠处理：
+These events usually should be handled reliably:
 
-- 匹配成功
-- 进入房间
-- 结算完成
-- 奖励到账
-- 邮件到达
-- 需要客户端切换 UI 状态的关键业务事件
+- match found
+- room entered
+- settlement completed
+- reward granted
+- mail arrived
+- key business events that require the client to switch UI state
 
-原因是：transport 可靠不等于业务可靠。
+The reason is simple: reliable transport is not the same thing as reliable business handling.
 
-例如服务端已经把 `Matched` 写进连接，但客户端刚好重连，旧连接断了，服务端不知道客户端有没有真的应用这个事件。结果可能是服务端认为玩家已经进房间，客户端还停在匹配中。
+For example, the server may write `Matched` to the connection just as the client reconnects. The old connection is gone, and the server does not know whether the client actually applied the event. The server may believe the player entered the room while the client is still waiting in matchmaking.
 
-ULinkGame 的可靠业务推送模型是：
+ULinkGame's reliable business push model is:
 
-1. 服务端给每个 owner 的重要推送分配递增 sequence。
-2. 服务端 outbox 保存还没确认的推送。
-3. 客户端只应用比本地 latest sequence 更新的推送。
-4. 客户端应用完成后 ack latest sequence。
-5. 客户端重连后，服务端重放 pending 推送。
-6. 客户端遇到重复 sequence 时直接忽略。
+1. The server assigns an increasing sequence to each important push for each owner.
+2. The server outbox stores pushes that have not been acknowledged.
+3. The client only applies pushes newer than its local latest sequence.
+4. After applying a push, the client acknowledges the latest sequence.
+5. After reconnect, the server replays pending pushes.
+6. If the client sees a duplicate sequence, it ignores it.
 
-你可以先把默认 RPC 跑通，再读专门的可靠推送文章：
+After the default RPC path works, read the dedicated reliable-push article:
 
-- [可靠业务推送：为什么传输可靠还不够](/ULinkGame/posts/reliable-business-push/)
+- [Reliable Business Push: Why Reliable Transport Is Not Enough](/ULinkGame/posts/reliable-business-push/)
 
-## reconnect 和 state lost 要怎么理解
+## Reconnect And State Lost
 
-新手很容易把“重连”理解成重新连上 socket。在线游戏里这不够。
+Beginners often think reconnect means reconnecting the socket. For online games, that is not enough.
 
-真正需要判断的是：
+The real questions are:
 
-- 客户端带回来的 session 是否还有效
-- 服务端是否还保留兼容的会话状态
-- reliable push sequence 是否还能继续使用
-- 房间、匹配、结算等权威状态是否还能恢复
+- is the session brought back by the client still valid?
+- does the server still have compatible session state?
+- can the reliable push sequence continue?
+- can authoritative room, matchmaking, or settlement state be restored?
 
-ULinkGame 会把这类结果显式表达出来。常见结果可以粗略理解为：
+ULinkGame expresses these outcomes explicitly. Common results can be understood as:
 
 - `Resumed`
-  状态兼容，可以继续会话，并重放 pending 推送。
+  State is compatible. The session can continue, and pending pushes can be replayed.
 - `StateRefreshRequired`
-  session 还有效，但客户端本地临时状态过期，需要拉取权威快照。
+  The session is still valid, but the client's local transient state has expired and must be refreshed from an authoritative snapshot.
 - `StateLost`
-  服务端已经无法验证旧状态，客户端必须清理旧 session，重新开始。
+  The server can no longer validate the old state. The client must clear the old session and start again.
 
-这个设计的重点是：不要假装所有断线都能无损恢复。恢复不了时，要明确告诉客户端进入新流程。
+The point is to avoid pretending every disconnect can be recovered losslessly. When recovery is not possible, the server should tell the client to enter a new flow.
 
-## simple 和 realtime 怎么选
+## Choose Simple Or Realtime
 
-默认 `simple` profile 适合大多数第一版在线游戏：
+The default `simple` profile is a good fit for most first versions of online games:
 
-- 登录
-- 账号查询
-- 背包
-- 邮件
-- 商店
-- 轻量匹配
-- 低频房间状态
-- 回合制或弱实时玩法
+- login
+- account queries
+- inventory
+- mail
+- shop
+- lightweight matchmaking
+- low-frequency room state
+- turn-based or light realtime gameplay
 
-它只生成一个 RPC endpoint，心智负担最小。
+It generates one RPC endpoint and keeps the mental model small.
 
-`realtime` profile 适合你明确需要拆分控制面和实时面的时候：
+The `realtime` profile is for games that clearly need a split control plane and realtime plane:
 
-- 控制 endpoint 处理登录、匹配、房间进入、结算、可靠业务推送
-- 实时 endpoint 处理输入、快照、帧同步或高频玩法消息
+- the control endpoint handles login, matchmaking, room entry, settlement, and reliable business push
+- the realtime endpoint handles input, snapshots, lockstep messages, or other high-frequency gameplay messages
 
-如果你还没确定自己需要实时拆分，就先用 `simple`。后续真的需要时，再迁移到 `realtime` 结构。
+If you are not sure you need this split yet, start with `simple`. Move to `realtime` when the need is clear.
 
-## 什么时候选 JSON，什么时候选 MemoryPack
+## Choose JSON Or MemoryPack
 
-第一次接入建议：
+For a first integration, use:
 
 ```bash
 --transport websocket --serializer json
 ```
 
-原因是：
+Reasons:
 
-- 错误更容易看懂
-- 传输链路更容易排查
-- Unity 首次导入依赖时变量更少
-- 默认测试跑通更快
+- errors are easier to read
+- the transport path is easier to inspect
+- Unity's first dependency import has fewer variables
+- the default test is faster to get working
 
-当你确认结构、连接、source generation 和业务调用都稳定后，再考虑：
+Once structure, connection, source generation, and business calls are stable, consider:
 
 ```bash
 --transport websocket --serializer memorypack
 ```
 
-或者：
+Or:
 
 ```bash
 --transport kcp --serializer memorypack
 ```
 
-`MemoryPack` 更适合性能敏感阶段，不建议作为第一次排错时的默认选择。
+`MemoryPack` is better for performance-sensitive phases, but it is not recommended as the default for first-time debugging.
 
-## 什么时候选 persistence
+## Choose Persistence
 
-默认 `--persistence none` 是为了让你快速跑通本地链路。
+The default `--persistence none` helps you get the local path working quickly.
 
-如果你明确要让权威状态或业务数据接入数据库，可以选择：
+If authoritative state or business data needs a database, choose:
 
 ```bash
 --persistence postgres
 ```
 
-或：
+Or:
 
 ```bash
 --persistence mysql
 ```
 
-注意：ULinkGame 只生成基础连接配置和包引用，不替你定义业务表。
+ULinkGame only generates basic connection configuration and package references. It does not define your business tables.
 
-这些仍然属于你的游戏：
+These still belong to your game:
 
-- 账号表
-- 角色表
-- 背包表
-- 排行榜表
-- 订单表
-- 房间历史
-- 战斗记录
+- account table
+- character table
+- inventory table
+- leaderboard table
+- order table
+- room history
+- battle records
 
-ULinkGame 不应该接管你的业务 schema。
+ULinkGame should not take over your business schema.
 
-## 你真正应该维护哪些文件
+## Files You Actually Maintain
 
-日常开发里，主要维护这些位置：
+In daily development, you mostly maintain:
 
 - `Shared/Interfaces/`
-  RPC 接口、DTO、callback 契约。
+  RPC interfaces, DTOs, and callback contracts.
 - `Server/Edge/Services/`
-  RPC 服务实现、连接入口、可靠推送接入。
-- `Server/Silo/` 或 `Server/ActorHost/`
-  权威状态、长期业务状态。较新的项目应优先使用 `Server/State/` 或 `Server/ActorHost/` 命名。
+  RPC service implementations, connection ingress, and reliable push integration.
+- `Server/Silo/` or `Server/ActorHost/`
+  Authoritative state and long-lived business state. Newer projects should prefer `Server/State/` or `Server/ActorHost/` naming.
 - `Client/`
-  Unity / Godot 业务脚本、UI、场景。
+  Unity/Godot game scripts, UI, and scenes.
 - `ulinkgame.tool.json`
-  只有项目结构变化时才需要看。
+  Usually only needed when project structure changes.
 
-不要手工维护这些位置：
+Do not manually maintain:
 
-- 编译器输出目录里的 ULinkRPC generated source
-- Unity / Godot 编辑器或构建系统生成的中间文件
+- ULinkRPC generated source in compiler output directories
+- intermediate files generated by Unity, Godot, or the build system
 
-契约变了就重新构建，不要把 RPC generated source 当作项目源码维护。
+When contracts change, rebuild. Do not treat RPC generated source as project source code.
 
-## 常见问题
+## FAQ
 
-### 为什么要同时装 ULinkRPC.Starter 和 ULinkGame.Tool
+### Why Install Both ULinkRPC.Starter And ULinkGame.Tool?
 
-因为 ULinkGame.Tool 不重新发明底层 RPC 项目模板。
+Because ULinkGame.Tool does not reinvent the lower-level RPC project template.
 
-它会先调用 `ulinkrpc-starter` 生成基础 `Shared + Server + Client` 项目，再在上面补充 ULinkGame 自己负责的内容：
+It first calls `ulinkrpc-starter` to generate a base `Shared + Server + Client` project, then adds the ULinkGame-owned pieces:
 
 - `Server/Edge`
-- `Server/Silo` 或 `Server/ActorHost`
-- 权威状态服务配置
-- ULinkGame runtime package 引用
+- `Server/Silo` or `Server/ActorHost`
+- authoritative state service configuration
+- ULinkGame runtime package references
 - `ulinkgame.tool.json`
-- `ULinkRPC.Analyzers` source-generator 配置
+- `ULinkRPC.Analyzers` source-generator configuration
 
-### 为什么服务端通常要两个进程
+### Why Does The Server Usually Have Two Processes?
 
-因为 Edge 和状态进程的职责不同。
+Because Edge and the state process have different responsibilities.
 
-Edge 面向客户端连接，适合处理 RPC gateway、callback、session binding、reliable push delivery。
+Edge faces client connections and is a good place for the RPC gateway, callbacks, session binding, and reliable push delivery.
 
-状态进程面向权威状态，适合处理玩家状态、房间状态、匹配队列、排行榜等长期状态。进程内 actor/mailbox 执行统一建立在独立的 ULinkActor 包之上。
+The state process faces authoritative state and is a better place for player state, room state, matchmaking queues, leaderboards, and other long-lived state. In-process actor/mailbox execution is built on the separate ULinkActor package.
 
-本地开发时它们可以都跑在同一台机器上；生产环境里可以按压力和部署边界拆开扩展。
+In local development they can run on the same machine. In production, you can scale them separately according to load and deployment boundaries.
 
-### 可以只装 ULinkGame.Server 包手工接吗
+### Can I Wire Up Only ULinkGame.Server By Hand?
 
-可以，但不建议作为第一次接入方式。
+Yes, but it is not recommended for a first integration.
 
-新手更应该从 `ulinkgame-tool new` 开始，因为它会一次性生成可运行的项目结构。等你理解 Edge、状态进程、Shared、Client 的关系后，再手工拆改会稳很多。
+Beginners should start with `ulinkgame-tool new` because it generates a runnable project structure in one step. After you understand how Edge, the state process, Shared, and Client relate to each other, manual restructuring is much safer.
 
-### ULinkGame 会帮我做匹配和房间吗
+### Does ULinkGame Implement Matchmaking And Rooms For Me?
 
-不会。
+No.
 
-ULinkGame 提供的是匹配、房间、奖励、邮件这些业务都可能用到的基础设施，例如 session、reconnect、reliable push、host integration。
+ULinkGame provides infrastructure that features such as matchmaking, rooms, rewards, and mail can use: session, reconnect, reliable push, and host integration.
 
-匹配规则、房间规则、玩法模拟和产品 DTO 仍然应该放在你的游戏项目里。
+Matchmaking rules, room rules, gameplay simulation, and product DTOs should still live in your game project.
 
-## 接下来继续看什么
+## What To Read Next
 
-默认测试跑通后，建议按这个顺序继续：
+After the default test works, continue in this order:
 
-1. 先新增一个自己的 RPC service，例如 `ProfileService` 或 `InventoryService`。
-2. 练习一次 `Shared -> source generation -> Edge service -> Client call` 的完整流程。
-3. 再把长期状态放到以 ULinkActor 为根基的进程内 actor。
-4. 最后再接入 reliable push、reconnect 和 state-lost 处理。
+1. Add your own RPC service, such as `ProfileService` or `InventoryService`.
+2. Practice the full `Shared -> source generation -> Edge service -> Client call` flow once.
+3. Move long-lived state into an in-process actor based on ULinkActor.
+4. Then add reliable push, reconnect, and state-lost handling.
 
-相关指南：
+Related guides:
 
-- [可靠业务推送：为什么传输可靠还不够](/ULinkGame/posts/reliable-business-push/)
-- [ULinkRPC 入门教程](/ULinkRPC/posts/ulinkrpc-getting-started/)
+- [Reliable Business Push: Why Reliable Transport Is Not Enough](/ULinkGame/posts/reliable-business-push/)
+- [ULinkRPC Getting Started](/ULinkRPC/posts/ulinkrpc-getting-started/)
 
-## 最后总结
+## Summary
 
-ULinkGame 的推荐起步方式很明确：
+The recommended ULinkGame starting path is clear:
 
-1. 安装 `ULinkRPC.Starter` 和 `ULinkGame.Tool`。
-2. 用 `ulinkgame-tool new` 生成项目。
-3. 先用 `simple + websocket + json + none` 跑通默认测试。
-4. 按 `Shared -> source generation -> Edge/StateActor -> Client` 的顺序开发业务。
-5. 等基础链路稳定后，再升级到 `memorypack`、`kcp`、`realtime` 或数据库持久化。
+1. Install `ULinkRPC.Starter` and `ULinkGame.Tool`.
+2. Generate a project with `ulinkgame-tool new`.
+3. First get the default test working with `simple + websocket + json + none`.
+4. Develop business code in the `Shared -> source generation -> Edge/StateActor -> Client` order.
+5. After the foundation is stable, upgrade to `memorypack`, `kcp`, `realtime`, or database persistence.
 
-第一次接入不要急着改目录结构。先让工具生成的结构跑起来，理解每一层的职责，再开始替换成自己的业务。
+Do not rush to change the generated directory structure during the first integration. Get the tool-generated structure running, understand what each layer owns, then replace pieces with your own business code.
