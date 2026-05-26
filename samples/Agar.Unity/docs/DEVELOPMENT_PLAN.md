@@ -49,7 +49,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - Unity 客户端可靠推送和 reconnect/state-lost 状态已由 `ReliablePushInbox` 与 `ClientSessionController` 管理。
 - 包含 PostgreSQL 和 Redis 的本地 compose 基线。
 - `DisconnectedSessionCleanupHostedService` 用于后台清理过期会话。
-- `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
+- `DotArenaMetaProgression` 已按关注点拆分为 Models、Persistence、Queries、Rules 四个 partial 文件。
 - 客户端排行榜 UI 已通过 `IPlayerService.GetLeaderboardAsync` 连接服务端真实排行榜数据。
 - `InputMessage` 只包含玩家、移动方向和 tick，不再包含 dash。
 - 旧食物协议命名已删除，食物行为统一为 `PickupType.MassPoint` 质量成长。
@@ -88,7 +88,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - `DotArenaSceneUiPresenter` 仍偏大，负责运行时控件构建（`Layout.cs`、`Layout2.cs`）、刷新（`Refresh.cs`）、样式（`Styling.cs`）、大厅（`Lobby.cs`）。
 - 联机大厅的任务、商店和记录入口已从玩家可见路径移除；旧场景对象仅作为兼容占位隐藏，不再绑定玩家导航动作。
 - 玩家可见 UI 已收敛为中文，并隐藏 debug 面板、连接端点、内部状态枚举和快捷键提示；后续继续确保联机大厅和战斗内 HUD 不展示任何 DEBUG 信息。
-- `DotArenaMetaProgression` 的拆分已完成（Models、Catalog、Persistence、Queries、Rules），本计划不再对其安排额外拆分工作。
+- `DotArenaMetaProgression` 的拆分已完成（Models、Persistence、Queries、Rules），本计划不再对其安排额外拆分工作。
 
 ### 测试缺口
 
@@ -302,7 +302,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 为 `PlayerService` 增加测试：登录、游客登录、重复登录、匹配、取消、实时绑定、ack state lost 和 session mismatch。
 - 为 `DotArenaNetworkSession` 增加测试：连接生命周期、重连参数、实时绑定、ack 携带 session id/generation。
 - 为 `ArenaSimulation` 补充测试：食物刷新边界、吞噬比例边界、AI 补位、多人同时死亡。
-- 为 `DotArenaMetaProgression` 增加测试：经验升级边界、首胜断言，以及阶段 1 后仍保留的本地进度路径。
+- 为 `DotArenaMetaProgression` 增加测试：经验升级边界、首胜断言，以及阶段 1 后仍保留的资料、设置、排行榜缓存和最近对局趋势路径。
 - 为排行榜服务补足测试：AI 过滤、全周期路径、未来全量用户目录接入后的全用户重置路径。
 
 验收标准：
@@ -775,7 +775,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 
 验收整理（2026-05-08）：
 
-阶段 1 原待办共 8 项，当前 7 项完成，1 项部分完成。玩家可见路径的验收已基本完成；剩余部分完成项是更深层的本地进度数据模型收敛，当前保留的商店/记录相关字段仍有皮肤和排行榜趋势等实际用途，暂未做破坏性删除。
+阶段 1 原待办共 8 项，当前 8 项完成。玩家可见路径和本地进度数据模型均已收敛到首发范围。
 
 | 序号 | 原待办 | 状态 | 说明 |
 | --- | --- | --- | --- |
@@ -785,7 +785,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 | 4 | 清理商店/记录相关图标加载和挂载路径 | 完成 | 运行时不再加载或挂载 `Icon_Shop_01.png`。 |
 | 5 | 删除 debug 面板、连接端点、内部状态、tick、同步视图数和快捷键提示 | 完成 | 玩家界面、联机大厅和战斗内 HUD 不再展示这些内部信息；开发诊断只进 console/log。 |
 | 6 | 将玩家可见文案收敛为中文 | 完成 | 入口、登录、匹配、大厅、HUD、结算、排行榜、设置和错误状态已中文化；后续仅保留常规措辞打磨。 |
-| 7 | 评估并清理 `DotArenaMetaProgression` 中任务、商店、记录相关模型 | 部分完成 | 任务进度不再生成或推进，旧任务存档会清空；皮肤、历史和排行榜趋势仍依赖部分本地进度字段，未强删。 |
+| 7 | 评估并清理 `DotArenaMetaProgression` 中任务、商店、记录相关模型 | 完成 | 已删除任务和商店模型/API；保留皮肤装备、最近对局趋势和排行榜缓存作为资料、表现和排行榜实际使用的数据。 |
 | 8 | 同步 `ART_DIRECTION.md` 和客户端架构文档 | 完成 | 文档已明确当前 UI 验收范围暂不包含任务、商店和记录，玩家 UI 使用中文。 |
 
 - 已从大厅玩家可见导航中移除任务、商店和记录入口；保留资料、排行榜和设置。
@@ -794,7 +794,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - 已停止运行时 UI 加载和挂载 `Icon_Shop_01.png`。
 - 已删除玩家界面上的 debug 面板，并清理联机大厅和备用 HUD 中的 endpoint、tick、同步视图数、快捷键提示等内部信息；联机大厅和战斗内 HUD 不应显示 DEBUG 信息。
 - 已将入口、登录、匹配、大厅、对局 HUD、结算、排行榜、设置和错误状态的玩家可见文案收敛为中文。
-- `DotArenaMetaProgression` 不再为任务生成新进度或推进任务计数；旧本地存档中的任务字段会被清空以保持兼容加载。
+- `DotArenaMetaProgression` 不再包含任务进度、任务领取、商店目录、购买或商店可购买性 API；旧本地存档中的任务字段在新模型中不再读取。
 - `ART_DIRECTION.md` 和 `docs/features/client-architecture.md` 已同步当前 UI 验收范围：暂不包含任务、商店和记录，玩家 UI 使用中文。
 
 ### 阶段 3：战斗中实时排名面板
@@ -827,7 +827,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
   - `Skin_Jelly_Cyan.png`
   - `Skin_Jelly_Crimson.png`
   - `Skin_Jelly_Sunburst.png`
-- 第一轮基础美术资产已进入 Unity 项目目录，并已完成脚本侧运行时接入：玩家球皮肤、质量拾取物、竞技场背景、入口/匹配/大厅/结算按钮基准图、商店/排行榜图标、吸收环和出生波纹。
+- 第一轮基础美术资产已进入 Unity 项目目录，并已完成脚本侧运行时接入：玩家球皮肤、质量拾取物、竞技场背景、入口/匹配/大厅/结算按钮基准图、排行榜图标、吸收环和出生波纹。
 - `ART_DIRECTION.md` 已作为后续资产生成、UI 设计、AI 生成提示词、Unity 接入和验收的风格标准。
 
 ### 阶段 5：玩法回归与协议清理
@@ -840,7 +840,7 @@ dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 - Unity 脚本刷新通过，KCP factory 引用保持正常。
 ### 阶段 6：客户端拆分
 
-- `DotArenaMetaProgression` 已按关注点拆分为 Models、Catalog、Persistence、Queries、Rules 五个 partial 文件。
+- `DotArenaMetaProgression` 已按关注点拆分为 Models、Persistence、Queries、Rules 四个 partial 文件。
 - 已完成第一轮客户端职责拆分：新增 `DotArenaMultiplayerState` 集中保存联机会话身份、认证资料、待处理 UI 请求、重连标记、匹配计时、实时连接和可靠推送/session controller；`DotArenaGame` 通过转发属性兼容现有 partial，后续还需继续减少直接状态写入。
 - 已新增 `DotArenaSinglePlayerController`，负责本地模拟创建、无敌模式选项、本地输入提交、tick catch-up 和模拟推进；`DotArenaGame.SinglePlayer.cs` 改为把单机结果接回现有表现和结算流程的适配层。
 - 已新增 `DotArenaUiFactory` 和 `DotArenaUiStyleCatalog`，将 `DotArenaSceneUiPresenter.Layout*.cs` 与 `Styling.cs` 中重复的运行时文本、按钮、面板、输入框创建和样式逻辑抽到共享工厂/样式目录。

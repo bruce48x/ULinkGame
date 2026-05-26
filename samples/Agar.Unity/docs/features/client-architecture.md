@@ -69,7 +69,7 @@ Shared -> ULinkRPC.Analyzers compiler output -> SampleClient.Rpc -> SampleClient
 - `DotArenaSceneUiPresenter` 的第一轮拆分已引入 `DotArenaUiFactory` 和 `DotArenaUiStyleCatalog`，把重复文本、按钮、面板和输入框创建/样式逻辑从 Layout/Styling 文件中抽出。Presenter 仍偏大，后续需要继续把入口、登录、匹配中、大厅、HUD、对局排名和结算拆成独立面板 presenter 或稳定 prefab。
 - 后续拆分的目标是让 `DotArenaGame` 退回 Unity 场景组合根，让会话流程、单机模拟、输入、世界表现、UI 快照、资源/皮肤和本地元进度分别拥有清晰所有者。
 - `DotArenaSceneUiPresenter` 应退回 UI 根协调器；入口/模式选择、登录、匹配中、大厅、HUD、对局排名和结算应由独立 presenter、稳定 prefab 或小型工厂承载。调试面板不作为玩家 UI 保留。
-- `DotArenaMetaProgression` 已拆分完成（Models、Catalog、Persistence、Queries、Rules）。本地 mock 排行榜已淘汰，`GetLeaderboardSummary` 现在展示服务端 RPC 刷新后的缓存数据。
+- `DotArenaMetaProgression` 已拆分完成（Models、Persistence、Queries、Rules）。本地 mock 排行榜已淘汰，`GetLeaderboardSummary` 现在展示服务端 RPC 刷新后的缓存数据。
 - 计划中的拆分工作见 `DEVELOPMENT_PLAN.md` 阶段 6。
 
 建议的目标结构：
@@ -116,5 +116,5 @@ DotArenaUiFactory / DotArenaUiStyleCatalog
 - 界面文案使用质量、排名、成长和存活语义，不使用冲刺或技能强化作为核心表达。
 - 玩家碰撞和成长可以有果冻感表现，但眩晕、击退不应被当作当前核心玩法。
 - 排行榜界面展示当前周期剩余时间、玩家排名、胜利积分和胜场数。
-- 当前美术接入优先使用 `Client/Assets/Art` 下已导入 Sprite：玩家皮肤、质量拾取物、竞技场背景、UI 面板/按钮、排行榜图标和吸收/出生 FX 都由 Gameplay 运行时视图按需挂载，缺失资产时回退到脚本生成的占位 sprite。未上线的任务、商店和记录页面不属于当前玩家 UI；相关后台模型暂时保留，等待后续主线程评估。
+- 当前美术接入优先使用 `Client/Assets/Art` 下已导入 Sprite：玩家皮肤、质量拾取物、竞技场背景、UI 面板/按钮、排行榜图标和吸收/出生 FX 都由 Gameplay 运行时视图按需挂载，缺失资产时回退到脚本生成的占位 sprite。未上线的任务、商店和记录页面不属于当前玩家 UI；相关任务和商店后台模型已从本地进度中移除。
 - 本地玩家默认小球颜色由客户端在每局开始时随机决定，候选色为蓝色、橙色、绿色。该随机值只影响表现层，不写入 `Shared` 协议，也不改变服务端权威世界状态。玩家明确装备非默认皮肤时，仍按皮肤自己的颜色表现。

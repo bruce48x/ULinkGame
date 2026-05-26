@@ -10,51 +10,6 @@ namespace SampleClient.Gameplay
 {
     internal static partial class DotArenaMetaProgression
     {
-        public static DotArenaTaskReadySummary GetClaimableTaskSummary(DotArenaMetaState? state)
-        {
-            if (state == null)
-            {
-                return new DotArenaTaskReadySummary();
-            }
-
-            NormalizeState(state, state.PlayerId);
-
-            var dailyClaimable = 0;
-            foreach (var task in state.DailyTasks)
-            {
-                if (!task.Claimed && task.Progress >= task.Target)
-                {
-                    dailyClaimable += 1;
-                }
-            }
-
-            var newPlayerClaimable = 0;
-            foreach (var task in state.NewPlayerTasks)
-            {
-                if (!task.Claimed && task.Progress >= task.Target)
-                {
-                    newPlayerClaimable += 1;
-                }
-            }
-
-            return new DotArenaTaskReadySummary
-            {
-                DailyClaimableCount = dailyClaimable,
-                NewPlayerClaimableCount = newPlayerClaimable,
-                TotalClaimableCount = dailyClaimable + newPlayerClaimable
-            };
-        }
-
-        public static int GetClaimableTaskCount(DotArenaMetaState? state)
-        {
-            return GetClaimableTaskSummary(state).TotalClaimableCount;
-        }
-
-        public static bool HasClaimableTasks(DotArenaMetaState? state)
-        {
-            return GetClaimableTaskCount(state) > 0;
-        }
-
         public static bool TryGetRecentMatchSummary(DotArenaMetaState? state, out DotArenaRecentMatchSummary summary)
         {
             summary = GetRecentMatchSummary(state);
@@ -250,74 +205,6 @@ namespace SampleClient.Gameplay
             }
 
             return $"{span.Minutes}m";
-        }
-
-        public static DotArenaShopAvailabilitySummary GetShopAvailabilitySummary(DotArenaMetaState? state)
-        {
-            if (state == null)
-            {
-                return new DotArenaShopAvailabilitySummary();
-            }
-
-            NormalizeState(state, state.PlayerId);
-
-            var owned = 0;
-            var affordable = 0;
-            var affordableAndUnowned = 0;
-            DotArenaShopItem? cheapestAffordable = null;
-            DotArenaShopItem? cheapestAffordableUnowned = null;
-
-            foreach (var item in ShopCatalog)
-            {
-                var isOwned = state.OwnedCosmeticIds != null && state.OwnedCosmeticIds.Contains(item.Id);
-                if (isOwned)
-                {
-                    owned += 1;
-                }
-
-                if (state.SoftCurrency < item.Price)
-                {
-                    continue;
-                }
-
-                affordable += 1;
-                if (!isOwned)
-                {
-                    affordableAndUnowned += 1;
-                }
-
-                if (cheapestAffordable == null || item.Price < cheapestAffordable.Price)
-                {
-                    cheapestAffordable = item;
-                }
-
-                if (!isOwned && (cheapestAffordableUnowned == null || item.Price < cheapestAffordableUnowned.Price))
-                {
-                    cheapestAffordableUnowned = item;
-                }
-            }
-
-            return new DotArenaShopAvailabilitySummary
-            {
-                TotalCatalogCount = ShopCatalog.Length,
-                OwnedCount = owned,
-                AffordableCount = affordable,
-                AffordableAndUnownedCount = affordableAndUnowned,
-                CheapestAffordableItem = cheapestAffordable,
-                CheapestAffordableUnownedItem = cheapestAffordableUnowned
-            };
-        }
-
-        public static int GetPurchasableShopItemCount(DotArenaMetaState? state)
-        {
-            return GetShopAvailabilitySummary(state).AffordableAndUnownedCount;
-        }
-
-        public static bool TryGetCheapestPurchasableShopItem(DotArenaMetaState? state, out DotArenaShopItem? item)
-        {
-            var summary = GetShopAvailabilitySummary(state);
-            item = summary.CheapestAffordableUnownedItem;
-            return item != null;
         }
     }
 }

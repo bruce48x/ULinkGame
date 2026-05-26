@@ -109,8 +109,6 @@ namespace SampleClient.Gameplay
             state.Settings.MusicVolume = Mathf.Clamp01(state.Settings.MusicVolume);
             state.Settings.SfxVolume = Mathf.Clamp01(state.Settings.SfxVolume);
             state.OwnedCosmeticIds ??= new List<string>();
-            state.DailyTasks ??= new List<DotArenaTaskProgress>();
-            state.NewPlayerTasks ??= new List<DotArenaTaskProgress>();
             state.MatchHistory ??= new List<DotArenaMatchRecord>();
             if (!state.OwnedCosmeticIds.Contains("skin_default"))
             {
@@ -121,9 +119,6 @@ namespace SampleClient.Gameplay
             {
                 state.EquippedCosmeticId = "skin_default";
             }
-
-            state.DailyTasks.Clear();
-            state.NewPlayerTasks.Clear();
         }
 
         private static string ResolvePlayerId(string playerId)

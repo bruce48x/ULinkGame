@@ -22,26 +22,11 @@ namespace SampleClient.Gameplay
         public string LastFirstWinClaimDateIso = string.Empty;
         public string EquippedCosmeticId = "skin_default";
         public List<string> OwnedCosmeticIds = new() { "skin_default" };
-        public List<DotArenaTaskProgress> DailyTasks = new();
-        public List<DotArenaTaskProgress> NewPlayerTasks = new();
         public List<DotArenaMatchRecord> MatchHistory = new();
         public string LeaderboardPeriodStartUtc = string.Empty;
         public int LeaderboardSecondsUntilReset;
         public List<DotArenaLeaderboardEntrySummary> LeaderboardEntries = new();
         public DotArenaSettings Settings = new();
-    }
-
-    [Serializable]
-    internal sealed class DotArenaTaskProgress
-    {
-        public string TaskId = string.Empty;
-        public string Title = string.Empty;
-        public int Target;
-        public int Progress;
-        public int RewardCurrency;
-        public int RewardExperience;
-        public bool Claimed;
-        public bool IsDaily;
     }
 
     [Serializable]
@@ -70,21 +55,6 @@ namespace SampleClient.Gameplay
         public int CurrencyGained { get; set; }
         public bool ClaimedFirstWinReward { get; set; }
         public int NewLevel { get; set; }
-    }
-
-    internal sealed class DotArenaShopItem
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public int Price { get; set; }
-        public bool IsStarterOffer { get; set; }
-    }
-
-    internal sealed class DotArenaTaskReadySummary
-    {
-        public int DailyClaimableCount { get; set; }
-        public int NewPlayerClaimableCount { get; set; }
-        public int TotalClaimableCount { get; set; }
     }
 
     internal sealed class DotArenaRecentMatchSummary
@@ -132,16 +102,6 @@ namespace SampleClient.Gameplay
         public string TrendLine { get; set; } = string.Empty;
         public string FormLine { get; set; } = string.Empty;
         public List<DotArenaLeaderboardEntrySummary> Entries { get; set; } = new();
-    }
-
-    internal sealed class DotArenaShopAvailabilitySummary
-    {
-        public int TotalCatalogCount { get; set; }
-        public int OwnedCount { get; set; }
-        public int AffordableCount { get; set; }
-        public int AffordableAndUnownedCount { get; set; }
-        public DotArenaShopItem? CheapestAffordableItem { get; set; }
-        public DotArenaShopItem? CheapestAffordableUnownedItem { get; set; }
     }
 
     internal static partial class DotArenaMetaProgression

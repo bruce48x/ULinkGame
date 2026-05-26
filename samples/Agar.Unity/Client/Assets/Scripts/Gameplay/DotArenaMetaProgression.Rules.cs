@@ -9,44 +9,6 @@ namespace SampleClient.Gameplay
 {
     internal static partial class DotArenaMetaProgression
     {
-        public static bool TryClaimTaskById(DotArenaMetaState state, string taskId) => ClaimTask(state, taskId);
-
-        public static bool TryPurchaseAndOptionallyEquip(DotArenaMetaState state, string itemId, bool equipAfterPurchase = true)
-        {
-            if (state == null)
-            {
-                return false;
-            }
-
-            NormalizeState(state, state.PlayerId);
-            var item = FindItem(itemId);
-            if (item == null)
-            {
-                return false;
-            }
-
-            var owned = state.OwnedCosmeticIds != null && state.OwnedCosmeticIds.Contains(item.Id);
-            if (!owned)
-            {
-                if (state.SoftCurrency < item.Price)
-                {
-                    return false;
-                }
-
-                state.SoftCurrency -= item.Price;
-                state.OwnedCosmeticIds ??= new List<string>();
-                state.OwnedCosmeticIds.Add(item.Id);
-            }
-
-            if (equipAfterPurchase)
-            {
-                state.EquippedCosmeticId = item.Id;
-            }
-
-            Save(state);
-            return true;
-        }
-
         public static bool SetLanguage(DotArenaMetaState state, string language)
         {
             if (state == null)
@@ -117,11 +79,6 @@ namespace SampleClient.Gameplay
             state.Settings.Fullscreen = !state.Settings.Fullscreen;
             Save(state);
             return state.Settings.Fullscreen;
-        }
-
-        public static bool TryPurchase(DotArenaMetaState state, string itemId)
-        {
-            return TryPurchaseAndOptionallyEquip(state, itemId, false);
         }
 
         public static void Equip(DotArenaMetaState state, string itemId)
@@ -204,54 +161,6 @@ namespace SampleClient.Gameplay
                 ClaimedFirstWinReward = claimedFirstWin,
                 NewLevel = state.Level
             };
-        }
-
-        public static bool ClaimTask(DotArenaMetaState state, string taskId)
-        {
-            if (state == null)
-            {
-                return false;
-            }
-
-            NormalizeState(state, state.PlayerId);
-            foreach (var task in state.DailyTasks)
-            {
-                if (TryClaim(state, task, taskId))
-                {
-                    Save(state);
-                    return true;
-                }
-            }
-
-            foreach (var task in state.NewPlayerTasks)
-            {
-                if (TryClaim(state, task, taskId))
-                {
-                    Save(state);
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryClaim(DotArenaMetaState state, DotArenaTaskProgress task, string taskId)
-        {
-            if (task.TaskId != taskId || task.Claimed || task.Progress < task.Target)
-            {
-                return false;
-            }
-
-            task.Claimed = true;
-            state.SoftCurrency += task.RewardCurrency;
-            state.Experience += task.RewardExperience;
-            while (state.Experience >= GetExperienceForNextLevel(state.Level))
-            {
-                state.Experience -= GetExperienceForNextLevel(state.Level);
-                state.Level += 1;
-            }
-
-            return true;
         }
         private static int GetExperienceForNextLevel(int level) => 100 + ((Math.Max(1, level) - 1) * 25);
     }
