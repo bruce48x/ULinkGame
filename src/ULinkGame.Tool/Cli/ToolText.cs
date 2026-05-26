@@ -179,11 +179,25 @@ internal sealed class ToolText
         _ => "Unable to locate `ulinkrpc-starter`."
     };
 
+    public string InstallingStarter(string packageId, string version) => Language switch
+    {
+        ToolLanguage.SimplifiedChinese => $"未找到 `ulinkrpc-starter`，正在自动安装 `{packageId}` `{version}`...",
+        ToolLanguage.TraditionalChinese => $"找不到 `ulinkrpc-starter`，正在自動安裝 `{packageId}` `{version}`...",
+        _ => $"`ulinkrpc-starter` was not found. Installing `{packageId}` `{version}`..."
+    };
+
+    public string UnableToInstallStarter(string packageId) => Language switch
+    {
+        ToolLanguage.SimplifiedChinese => $"无法自动安装 `{packageId}`。",
+        ToolLanguage.TraditionalChinese => $"無法自動安裝 `{packageId}`。",
+        _ => $"Unable to install `{packageId}` automatically."
+    };
+
     public string InstallStarterBeforeNew => Language switch
     {
-        ToolLanguage.SimplifiedChinese => "运行 `ulinkgame-tool new` 前，请全局安装它或将它加入 PATH。",
-        ToolLanguage.TraditionalChinese => "執行 `ulinkgame-tool new` 前，請全域安裝它或將它加入 PATH。",
-        _ => "Install it globally or expose it on PATH before running `ulinkgame-tool new`."
+        ToolLanguage.SimplifiedChinese => "请运行 `dotnet tool install --global ULinkRPC.Starter`，或确认 .NET 全局工具目录已加入 PATH。",
+        ToolLanguage.TraditionalChinese => "請執行 `dotnet tool install --global ULinkRPC.Starter`，或確認 .NET 全域工具目錄已加入 PATH。",
+        _ => "Run `dotnet tool install --global ULinkRPC.Starter`, or make sure the .NET global tools directory is on PATH."
     };
 
     private string DidYouMeanValue(string suggestion) => Language switch
