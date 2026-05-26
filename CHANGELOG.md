@@ -26,6 +26,10 @@
 - Added `ULinkGame.Tool new --persistence none|mysql|postgres`; MySQL/PostgreSQL profiles add Dapper plus the selected database provider package to generated server projects.
 - Updated `ULinkGame.Tool` to consume `ULinkRPC.Starter` `0.3.1`, remove the manual `codegen` command path, and keep generated projects on the `ULinkRPC.Analyzers` source-generator workflow.
 - Added Simplified Chinese and Traditional Chinese CLI text for `ULinkGame.Tool`, matching the culture detection used by `ULinkRPC.Starter`.
+- Clarified cluster routing documentation so `realtime` remains an optional template/sample profile instead of a framework-wide concept.
+- Added cluster node-to-node communication design notes for route lookup, local dispatch, remote dispatch, and pluggable node messenger adapters.
+- Added Skynet-derived cluster design principles for explicit remote boundaries, overload results, trace propagation, large-message boundaries, and draining shutdown.
+- Merged the standalone architecture draft into `CONTRIBUTING.md` and removed duplicate repository design notes.
 - Migrated the Unity and Godot samples away from committed RPC `Generated/` sources; server and client RPC glue is now compiler output.
 
 ## 2026-05-11

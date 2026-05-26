@@ -26,7 +26,7 @@ blog/
   Hugo blog and user-facing article source
 ```
 
-User-facing articles live in the Hugo site under root `blog/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `blog/`; keep standalone repository architecture drafts at the repository root and cross-cutting package decisions in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
+User-facing articles live in the Hugo site under root `blog/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `blog/`; keep cross-cutting package decisions and repository architecture notes in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
 
 ## Package Boundaries
 
@@ -127,7 +127,7 @@ Do not introduce `ULinkGame.Unity` yet.
 
 - `ULinkRPC`: transport, serialization, RPC calls, and generated bindings
 - `ULinkActor`: process-local actor identity, mailbox execution, timers, backpressure, diagnostics, and source-generated typed spawn helpers
-- `ULinkGame`: game-session infrastructure that integrates ULinkRPC, ULinkActor execution, reconnect, realtime endpoint hosting, and reliable push
+- `ULinkGame`: game-session infrastructure that integrates ULinkRPC, ULinkActor execution, reconnect, named endpoint hosting, and reliable push
 - user game code: matchmaking, room rules, gameplay state, rewards, inventory, and other domain features
 
 This keeps the product line understandable without forcing a thick game framework.
@@ -323,6 +323,157 @@ ULinkGame should not become a full game business framework. Keep the boundary na
 
 When a capability is only useful to one sample, keep it under that sample in `samples/`. Move it into `src` only when it is demonstrably reusable across games.
 
+## Runtime And Cluster Architecture
+
+This section consolidates the repository architecture notes. It records direction for future framework work; it is not a claim that every capability already exists in `src/`.
+
+### Framework Admission Rules
+
+A concept belongs in ULinkGame only when it is infrastructure, not gameplay semantics; useful across multiple game genres; compatible with low-latency online workflows; and able to expose failure, backpressure, and state mismatch explicitly.
+
+Good candidates:
+
+- session identity and endpoint binding
+- reliable business push
+- named RPC endpoint hosting
+- cluster node identity and route location
+- route directory and node messenger abstractions
+- diagnostics, health checks, and metrics
+- optional tool templates for deployment infrastructure
+
+Bad candidates:
+
+- account schemas
+- matchmaking rules
+- room rules
+- battle or skill systems
+- AOI implementation
+- inventory, guild, leaderboard policy, rewards, quests, or product DTOs
+- Unity/Godot UI architecture
+
+### ULinkActor Boundary
+
+`ULinkActor` owns the process-local actor/mailbox runtime. ULinkGame builds on it but should not absorb it.
+
+`ULinkActor` is responsible for:
+
+- actor identity and creation
+- in-process message delivery
+- mailbox serialization and backpressure
+- timers and local scheduling
+- source-generated typed actor helpers
+
+ULinkGame is responsible for:
+
+- ULinkRPC hosting integration
+- session lifecycle and endpoint callback binding
+- reliable business push
+- route location and node-to-node messaging integration
+- explicit cross-node failure results
+- tool templates and operational glue
+
+ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
+
+### Node And Execution Model
+
+A node is a server process participating in a ULinkGame cluster. The framework should prefer neutral node concepts over business node types. `Gateway`, `State`, `Match`, `Room`, or `Battle` are deployment roles, labels, or sample terms, not core identity types.
+
+Suggested node concepts:
+
+- `NodeId`: stable runtime node identity
+- node epoch/generation: changes when the process re-registers after restart
+- node exposure: client-facing or internal-only
+- node capabilities: actor host, client session host, reliable push host, route directory host, scheduler host
+- node endpoints: named addresses for internal or external communication
+- node state: starting, ready, draining, suspect, dead
+
+Actor execution remains process-local first. An actor belongs to one local execution domain at a time. Cross-thread or cross-node communication should use message delivery, not shared mutable objects. Actor location is separate from actor identity: stable actor ids should not encode node id, ports, endpoints, business category, or thread id.
+
+Cross-node actor communication should be route-based, not proxy-based. A local actor runtime may expose `TellAsync` or `AskAsync` for process-local actor calls, but remote actor communication should go through an explicitly named cluster API such as `IClusterActorRouter`. That API should require route lookup, timeout, expiration, and result handling at the call site. Do not make a remote actor look like a local actor reference.
+
+If `ULinkActor` internally schedules actors through `LogicThread` or a similar execution lane, that remains a node-local runtime detail. Cluster state should route only to `NodeId` and `RouteLocation`; the receiving node then hands the message to its local actor runtime, which chooses the mailbox or logic thread. Cluster code must not store, expose, or target `LogicThread` identifiers.
+
+### Cluster Location And Messaging
+
+Cluster routing uses two separate responsibilities:
+
+- `IRouteDirectory`: stores `RouteKey -> RouteLocation` with expiration.
+- `IClusterRouter`: applies route lookup, TTL checks, local dispatch, remote dispatch, and backpressure behavior.
+
+Node communication is a lower layer:
+
+- `INodeMessenger`: sends a `ClusterMessage` to a resolved `NodeId`.
+- `IClusterMessageHandler`: receives a cluster message on the target node and dispatches it locally.
+
+Expected flow:
+
+1. Caller submits a `ClusterMessage` to `IClusterRouter`.
+2. Router rejects expired messages before doing directory or network work.
+3. Router resolves the current `RouteLocation` through `IRouteDirectory`.
+4. If the target node is local, router calls local `IClusterMessageHandler`.
+5. If the target node is remote, router calls `INodeMessenger.SendAsync(location.Node, message)`.
+6. The receiving adapter handles authentication, TLS, compression, and wire format, then invokes local `IClusterMessageHandler`.
+
+The first implementation should provide in-memory directory and loopback messenger behavior for tests. Production adapters should be pluggable and added only after the abstractions are validated by a sample or generated template. Candidate adapters include ULinkRPC internal transport, gRPC, Redis pub/sub, or a custom message bus.
+
+Skynet-derived cluster principles:
+
+- Keep cluster support as infrastructure, not a full distributed actor platform. Provide node identity, route location, message delivery, diagnostics, and explicit failure results first.
+- Make remote boundaries visible in API names and return types. Local calls and remote sends must not share the same surface.
+- Treat overload as a normal result, not an exceptional surprise. Route lookup success does not guarantee delivery; node messenger, remote inbox, and target actor mailbox can all reject work with backpressure.
+- Keep trace context in the message envelope. Cluster messages should carry correlation data that lets tools reconstruct route lookup, remote send, receive, local dispatch, and actor handling time.
+- Do not use `ClusterMessage` as a generic large-state sync protocol. Large snapshots, fanout target sets, and repeated state should use application-owned versioning, caching, or diff protocols.
+
+### Cluster Management
+
+The first cluster model should be simple and lease-based. Avoid starting with a fully decentralized consensus system.
+
+The route directory should treat locations as expiring records. When a node dies or stops heartbeating, its temporary route locations should expire or be cleared. A stale location is a normal distributed condition, not a fatal error.
+
+Recommended lifecycle:
+
+1. Node starts and reads cluster name, node id, capabilities, endpoints, and labels.
+2. Node registers with the route or node directory.
+3. Directory assigns or records a node epoch and lease.
+4. Node heartbeats until it drains or dies.
+5. During draining, node stops accepting new ownership but may finish existing work.
+6. Expired leases make affected routes unavailable until another node registers a new location.
+
+Shutdown should use explicit draining rather than destructor-style cleanup. A draining node should stop accepting new route ownership, reject or redirect new remote sends, finish only bounded in-flight work, close external connections, flush required state, and then let process shutdown terminate anything still unfinished. The framework should not promise that every pending distributed request naturally completes during shutdown.
+
+### Hotfix Boundary
+
+Hotfix is an engineering goal, but it should not pollute the core actor or session APIs.
+
+Recommended model:
+
+```txt
+stable runtime state + replaceable business logic
+```
+
+Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
+
+First versions should avoid hotfixing:
+
+- actor runtime internals
+- serializer protocol structure
+- transport protocol structure
+- persistent state schema
+- low-level schedulers
+
+### Deferred Cluster Capabilities
+
+Do not implement these as default framework behavior in the first cluster module:
+
+- automatic actor migration
+- transparent remote actor calls
+- distributed transactions
+- exactly-once cross-node delivery
+- battle live migration
+- fully decentralized route directory
+- Raft-based cluster consensus
+- cross-node shared mutable objects
+
 ## Endpoint Model Boundary
 
 ULinkGame should support multiple named RPC endpoints or channels, but it should not force every game to understand a fixed "control connection plus realtime connection" split.
@@ -336,12 +487,12 @@ The reusable framework capability is:
 
 The default user mental model should remain simple: one session endpoint can handle login, normal requests, reliable business push, and reconnect for light online games.
 
-The control/realtime split is an optional architecture for games that need high-frequency, low-latency gameplay traffic. In that model:
+The control/realtime split is only an optional example for games that need high-frequency, low-latency gameplay traffic. In that model:
 
 - the control endpoint handles login, matchmaking, room entry, settlement, low-frequency queries, and reliable business push
 - the realtime endpoint handles input, snapshots, and other high-frequency gameplay traffic
 
-This split belongs in samples or templates that explicitly opt into realtime multiplayer. It should not become a mandatory package concept, and starter output should avoid introducing realtime attach, room runtime, or dual-connection terminology unless the selected project shape needs it.
+This split belongs in samples or templates that explicitly opt into that shape. It should not become a mandatory package concept, and starter output should avoid introducing realtime attach, room runtime, or dual-connection terminology unless the selected project shape needs it.
 
 ## Reliable Business Push Design
 
@@ -367,7 +518,7 @@ Use at-least-once delivery with per-player monotonic sequence numbers.
 This is a better fit than trying to implement exactly-once delivery:
 
 - Exactly-once is not realistic across reconnects, retries, client crashes, and server failover.
-- At-least-once plus idempotent client handling is predictable and common in game control-plane flows.
+- At-least-once plus idempotent client handling is predictable and common for low-frequency session and business flows.
 - Sequence numbers let clients discard duplicates and let servers prune acknowledged messages.
 - The mechanism is generic enough for `ULinkGame.Server`; matchmaking, rooms, mail, rewards, and other features can opt in without entering host core as business concepts.
 
@@ -438,7 +589,7 @@ flowchart TD
     F --> G["Client fetches authoritative session snapshot"]
     G --> H["Client resumes lobby, match, room, or settlement from snapshot"]
     D -->|no| L
-    L --> I["Client clears cached session, room, match, realtime binding, and reliable sequence"]
+    L --> I["Client clears cached session, room, match, endpoint binding, and reliable sequence"]
     I --> J["Client starts a new login/session flow"]
 ```
 
@@ -450,13 +601,13 @@ There are two detection points:
 Client behavior:
 
 1. Stop treating the current flow as recoverable.
-2. Clear cached realtime room, pending callbacks, and latest reliable sequence.
+2. Clear cached room, endpoint bindings, pending callbacks, and latest reliable sequence.
 3. Start a normal login/new-session flow instead of retrying reconnect.
 4. Return the player to a coherent lobby or login state; do not leave them on a stale matchmaking or in-match screen.
 
 ### Persistence
 
-The default outbox is process-local and in-memory. Reliable push is a short-window, low-frequency control-plane notification mechanism, not a durable business event log and not the source of truth for game state.
+The default outbox is process-local and in-memory. Reliable push is a short-window, low-frequency session/business notification mechanism, not a durable business event log and not the source of truth for game state.
 
 If a server process restarts or otherwise loses the outbox, the server should not pretend that replay is still possible. It should return an explicit state-lost result when reconnect or acknowledgement proves that the client has state the server can no longer validate. The client must then clear local session state, reset reliable sequence tracking, and start a new session or return to a coherent lobby/login flow.
 
@@ -690,7 +841,7 @@ Test requirements:
 
 - duplicate bind replaces only the matching endpoint binding
 - stale connection id cannot detach a newer binding
-- control-like and realtime-like endpoint bindings can be independently detached
+- two distinct named endpoint bindings can be independently detached
 - session generation prevents old acknowledgements from affecting new sessions
 - expired sessions return `StateLost`, not silent success
 
@@ -759,89 +910,142 @@ Test requirements:
 - missing authoritative state returns state lost
 - old generation ack does not mutate the current generation cursor
 
-### Cross-Gateway Realtime Routing
+### Cluster Routing
 
-Goal: provide optional infrastructure for realtime multiplayer deployments where a player's current RPC connection and a room/runtime owner may live on different gateway processes.
+Goal: provide optional infrastructure for cluster deployments where a player's current RPC connection and the authoritative location for an application-defined route may live on different nodes.
 
-This is not required for light online games. It should live under an optional namespace such as `ULinkGame.Server.RealtimeRouting` and remain independent of any gameplay DTO.
+This is not required for light online games. It should live in an optional package and namespace such as `ULinkGame.Cluster` and remain independent of any gameplay DTO. Realtime multiplayer is one possible consumer, not the naming or design center of the module.
 
 Framework-owned concepts:
 
-- gateway identity: stable node id, endpoint addresses, health state
+- node identity: stable node id, endpoint addresses, health state
 - route key: application-defined key such as room id, match id, or shard id
-- runtime owner: the gateway currently authoritative for a route key
-- routed envelope: ordered key, expiration time, payload, content type, correlation id
-- delivery result: accepted, expired, no owner, backpressure, failed
+- route location: the node currently authoritative for a route key
+- cluster message: route key, ordering key, expiration time, payload, content type, correlation id
+- delivery result: accepted, expired, route not found, backpressure, failed
 
 Suggested API shape:
 
 ```csharp
-public sealed record GatewayNodeId(string Value);
+namespace ULinkGame.Cluster;
 
-public sealed record RealtimeRouteKey(string Value);
+public sealed record NodeId(string Value);
 
-public sealed record RealtimeRouteOwner(
-    RealtimeRouteKey Route,
-    GatewayNodeId Gateway,
+public sealed record RouteKey(string Value);
+
+public sealed record RouteLocation(
+    RouteKey Route,
+    NodeId Node,
     DateTimeOffset ExpiresAt);
 
-public sealed record RealtimeEnvelope(
-    RealtimeRouteKey Route,
+public sealed record ClusterMessage(
+    RouteKey Route,
     string Kind,
     ReadOnlyMemory<byte> Payload,
     string? OrderedBy = null,
     DateTimeOffset? ExpiresAt = null,
-    string? CorrelationId = null);
+    string? CorrelationId = null,
+    string? TraceId = null,
+    NodeId? SourceNode = null);
 
-public enum RealtimeRouteSendStatus
+public enum ClusterSendStatus
 {
     Accepted,
     Expired,
-    NoOwner,
+    RouteNotFound,
     Backpressure,
     Failed
 }
 
-public interface IRealtimeRouteRegistry
+public interface IRouteDirectory
 {
-    ValueTask RegisterOwnerAsync(RealtimeRouteOwner owner, CancellationToken cancellationToken = default);
+    ValueTask RegisterAsync(RouteLocation location, CancellationToken cancellationToken = default);
 
-    ValueTask<RealtimeRouteOwner?> GetOwnerAsync(RealtimeRouteKey route, CancellationToken cancellationToken = default);
+    ValueTask<RouteLocation?> GetAsync(RouteKey route, CancellationToken cancellationToken = default);
 
-    ValueTask ClearOwnerAsync(RealtimeRouteKey route, GatewayNodeId gateway, CancellationToken cancellationToken = default);
+    ValueTask ClearAsync(RouteKey route, NodeId node, CancellationToken cancellationToken = default);
 }
 
-public interface IRealtimeMessageRouter
+public interface IClusterRouter
 {
-    ValueTask<RealtimeRouteSendStatus> SendAsync(
-        RealtimeEnvelope envelope,
+    ValueTask<ClusterSendStatus> SendAsync(
+        ClusterMessage message,
         CancellationToken cancellationToken = default);
 }
 ```
 
+Cluster node communication:
+
+`IClusterRouter` owns route lookup and delivery policy. It should not own a concrete network stack. The lower layer is a node-to-node messenger that sends a `ClusterMessage` to a specific `NodeId`.
+
+```csharp
+public sealed record NodeEndpoint(
+    NodeId Node,
+    string Name,
+    Uri Address,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public interface INodeMessenger
+{
+    ValueTask<ClusterSendStatus> SendAsync(
+        NodeId target,
+        ClusterMessage message,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IClusterMessageHandler
+{
+    ValueTask<ClusterSendStatus> HandleAsync(
+        ClusterMessage message,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Expected flow:
+
+1. The caller sends a `ClusterMessage` through `IClusterRouter`.
+2. The router rejects expired messages before any directory or network work.
+3. The router asks `IRouteDirectory` for the current `RouteLocation`.
+4. If the target node is local, the message is dispatched directly to the local `IClusterMessageHandler`.
+5. If the target node is remote, the router calls `INodeMessenger.SendAsync(location.Node, message)`.
+6. The receiving node authenticates the cluster request at the adapter boundary, then hands the message to its local `IClusterMessageHandler`.
+7. The handler dispatches by route/kind to application-owned code, actor runtime code, or sample-owned room code.
+
 Guidance:
 
 - Do not serialize live RPC callback objects into Redis, durable state, streams, or route records.
-- Payload serialization belongs to the application or adapter. The framework route layer can move bytes plus metadata.
+- Do not expose transparent remote objects. Cross-node work must stay explicit message delivery or explicit request/reply in a later API.
+- Do not generate remote actor proxies that use the same surface as process-local actor calls. Remote actor APIs must make timeout, expiration, serialization, delivery status, and backpressure visible.
+- Do not let route records target `LogicThread` or any other node-local execution lane. Route records target `NodeId`; the destination node's actor runtime owns mailbox and execution-lane dispatch.
+- Payload serialization belongs to the application or adapter. The cluster route layer can move bytes plus metadata.
+- Large state synchronization, large fanout target sets, and repeated snapshots belong to application protocols with versioning or diff semantics, not to the generic cluster message envelope.
+- Node-to-node authentication, TLS, compression, and wire format belong to the `INodeMessenger` adapter, not to the route directory.
 - Ordering should be scoped by an explicit key such as player id or route id, not globally.
-- Expiration is mandatory for high-frequency realtime messages; stale inputs and stale snapshots should be dropped, not replayed indefinitely.
+- Expiration is mandatory for short-lived route messages; stale inputs, stale commands, and stale snapshots should be dropped, not replayed indefinitely.
 - Backpressure must be visible through return values and metrics.
-- Provide adapters later, for example Redis pub/sub, custom message buses, or in-process loopback. Start with an in-memory adapter for tests.
+- Trace propagation should be built in from the first implementation: route lookup, local dispatch, remote send, receive, and actor handling should be measurable under one correlation or trace id.
+- Provide adapters later, for example ULinkRPC internal transport, gRPC, Redis pub/sub, custom message buses, or in-process loopback. Start with an in-memory loopback adapter for tests.
 
 Implementation order:
 
-1. Define route registry and router abstractions with in-memory implementation.
-2. Add route owner registration and expiration tests.
-3. Add send result, TTL, and backpressure behavior.
-4. Add one production adapter only after the sample proves the abstraction.
-5. Migrate Agar multi-gateway routing as the first real consumer.
+1. Define route directory and router abstractions with in-memory implementation.
+2. Define `INodeMessenger` and `IClusterMessageHandler` with in-memory loopback implementation.
+3. Add route location registration and expiration tests.
+4. Add send result, TTL, local dispatch, remote dispatch, and backpressure behavior.
+5. Add trace propagation and per-stage metrics for route lookup, node send, receive, local dispatch, and target handler execution.
+6. Add one production node messenger adapter only after a sample or generated template proves the abstraction.
+7. Migrate a sample multi-node route flow as the first real consumer.
 
 Test requirements:
 
-- only one active owner is returned for a route
-- owner expiration makes the route unavailable
+- only one active location is returned for a route
+- location expiration makes the route unavailable
 - expired envelopes are dropped before delivery
-- no-owner and backpressure are surfaced as explicit statuses
+- local routes dispatch without network adapter calls
+- remote routes call `INodeMessenger` with the resolved `NodeId`
+- receiving node dispatches through `IClusterMessageHandler`
+- route-not-found and backpressure are surfaced as explicit statuses
+- trace/correlation data survives local and remote delivery
 - callback objects never appear in serialized route state
 
 ### Engine-Neutral Client Session State
@@ -932,7 +1136,7 @@ Suggested namespaces:
 - `ULinkGame.Server.Hosting` for endpoint hosted-service diagnostics
 - `ULinkGame.Server.ReliablePush` for outbox metrics
 - `ULinkGame.Server.Sessions` for session lifecycle metrics once sessions exist
-- `ULinkGame.Server.RealtimeRouting` for routing metrics once routing exists
+- `ULinkGame.Cluster` for route directory and router metrics once cluster routing exists
 
 Suggested metrics:
 
@@ -987,7 +1191,7 @@ Goal: generate production-ready infrastructure scaffolding without taking owners
 The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should use Gateway/State naming, split templates by project shape, and avoid carrying Orleans-oriented naming into new game-runtime templates:
 
 - simple online game: one session endpoint
-- realtime multiplayer game: session/control endpoint plus optional realtime endpoint
+- multi-endpoint game: one session/control-like endpoint plus an additional application-defined endpoint, for example high-frequency gameplay traffic
 - server-only or client-engine variants only when supported by `ulinkrpc-starter`
 
 Template-owned additions:
@@ -1005,7 +1209,7 @@ Template non-goals:
 
 - do not rewrite `ULinkRPC.*` package versions generated by `ulinkrpc-starter`
 - do not own game RPC contracts, business DTOs, account schema, leaderboard schema, or room rules
-- do not generate realtime endpoint terminology for simple single-endpoint projects
+- do not generate multi-endpoint or realtime terminology for simple single-endpoint projects
 - do not include production secrets or real connection strings
 
 Suggested options:
@@ -1017,7 +1221,7 @@ ulinkgame-tool new --name MyGame --client-engine unity --with-docker
 ulinkgame-tool new --name MyGame --client-engine unity --with-health-checks
 ```
 
-The exact option names can change, but the project shape should be explicit. Avoid making realtime multiplayer the implicit default for every new project.
+The exact option names can change, but the project shape should be explicit. Avoid making realtime multiplayer or any other multi-endpoint architecture the implicit default for every new project.
 
 Implementation order:
 
@@ -1036,67 +1240,96 @@ Test requirements:
 - Docker template does not contain secrets
 - tool still preserves starter-owned package references and generated layout
 
-## Unfinished Framework Features
+## Next Development Plan
 
-This list tracks framework-level gaps only. Do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
+This plan tracks framework-level work only. Keep completed milestones out of this section, and do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
 
-### P0 Session Reliability Milestone
+The next major module is optional cluster infrastructure. Build it in small layers so every boundary stays explicit and testable.
 
-These four modules are the highest-priority framework work. Implement them as one dependency chain: explicit state semantics first, session identity second, reliable push session scoping third, and engine-neutral client state last.
+### P0 Actor Runtime Coordination
 
-#### StateLost Semantics
+Repository: `D:\ULinkActor`
 
-Status:
+These tasks belong to ULinkActor, not ULinkGame. ULinkGame.Cluster can start with adapter-level assumptions, but production-quality cluster actor routing should wait until these runtime contracts are explicit.
 
-- [x] Add framework result enums and outcome types for reconnect/ack decisions.
-- [x] Add reliable push ack decision helper for accepted, duplicate, session mismatch, and state lost outcomes.
-- [x] Add authoritative state probe abstraction for state refresh versus state lost decisions.
-- [x] Migrate Agar sample login and ack result mapping to framework outcome types.
-- [x] Document replay versus refresh versus new-session behavior in package READMEs.
+| Task | Output | Completion Signal |
+| --- | --- | --- |
+| Mailbox backpressure contract | Confirm the public result/exception shape when a mailbox is full or an actor call times out. | Tests cover bounded mailbox send failure, call timeout, dead-letter behavior, and metrics. |
+| Scheduler lane boundary | Document and test that execution lanes or `LogicThread`-like internals remain private and all work enters through the mailbox. | Public APIs expose actors/mailboxes, not scheduler lane ids. |
+| Slow handler and timeout diagnostics | Add or verify tracing that identifies slow actor handlers, call timeout roots, and blocking actor misuse. | Activity/log tests can correlate a timed-out call to the target actor/message path. |
+| Stop and drain semantics | Define bounded actor stop/drain behavior without pretending all async work can finish cleanly. | Tests cover stop rejecting new work, draining bounded queued work, and timer disposal. |
+| Long-running work guidance | Document the safe pattern for offloading blocking work and resuming by posting a message back to the mailbox. | Analyzer/docs/tests prevent or flag common blocking patterns inside actor handlers. |
 
-#### Session Lifecycle
+ULinkGame must not depend on ULinkActor scheduler internals. Any cluster-to-actor bridge should call public actor runtime APIs only.
 
-Status:
+### P1 Cluster Core Contracts
 
-- [x] Add `ULinkGame.Server.Sessions` session identity, endpoint identity, resume decision, and in-memory directory primitives.
-- [x] Add service registration for the in-memory session directory.
-- [x] Support typed opaque callback bindings by endpoint name.
-- [x] Prevent stale connection ids from detaching newer endpoint bindings.
-- [x] Make session generation changes return `StateLost` instead of silent success.
-- [x] Add token validation hook.
-- [x] Add authoritative state probe integration.
-- [x] Add cleanup hosted service helpers after the directory API stabilizes.
-- [x] Migrate Agar sample `SessionDirectory`/`PlayerService` to the framework directory.
+Repository: this repository
 
-#### Reliable Push
+Create the optional cluster package and tests without any production network adapter.
 
-Status:
+| Task | Output | Completion Signal |
+| --- | --- | --- |
+| Package skeleton | Add `src/ULinkGame.Cluster` and `Tests/ULinkGame.Cluster.Tests`; wire them into the solution. | Package builds independently and has no dependency on sample DTOs. |
+| Identity and route contracts | Add `NodeId`, `RouteKey`, `RouteLocation`, `ClusterMessage`, `ClusterSendStatus`, `NodeEndpoint`. | Contracts are immutable, small, and documented. |
+| Directory abstractions | Add `IRouteDirectory` and an in-memory implementation with lease/expiration behavior. | Tests cover register, replace, expire, clear-by-node, and stale location behavior. |
+| Router abstractions | Add `IClusterRouter`, `INodeMessenger`, `IClusterMessageHandler`, and local node identity options. | Tests cover expired message rejection before lookup, route-not-found, local dispatch, remote dispatch, and backpressure. |
+| Trace envelope | Keep correlation/trace/source-node data on `ClusterMessage`. | Tests prove trace/correlation data survives local and remote loopback delivery. |
 
-- [x] Keep existing in-memory reliable push outbox for publish/replay/ack/prune.
-- [x] Add session/generation-aware ack outcome primitives.
-- [x] Add shared `GameSessionKey`, `ReliablePushSequence`, `ReliablePushAck`, `ReliablePushInbox`, and cursor store primitives.
-- [x] Add tests for duplicate handling, cursor isolation, and old-generation/session mismatch outcomes.
-- [x] Wire server ack helper directly into `IReliablePushOutbox` or an adjacent ack service.
-- [x] Scope server-side pending records to `GameSessionKey` or equivalent generation-bearing identity.
-- [x] Migrate Unity sample from `ReliablePushTracker` to `ReliablePushInbox`.
-- [x] Migrate Godot sample from `ReliablePushTracker` to `ReliablePushInbox`.
+Non-goals for P1: production transport, Redis, service discovery, actor migration, generated remote actor proxies, and durable route storage.
 
-#### Engine-Neutral Client State
+### P2 In-Memory Cluster Runtime
 
-Status:
+Implement the first usable runtime entirely in memory.
 
-- [x] Add `ClientSessionPhase`, `ClientSessionSnapshot`, and `ClientSessionController`.
-- [x] Keep client state helpers synchronous and free of Unity, Godot, transport, generated RPC client, and UI dependencies.
-- [x] Make `StateLost` clear reliable state and remain terminal until `StartSession`.
-- [x] Add deterministic pure transition tests.
-- [x] Add README examples for Unity, Godot, and plain .NET usage.
-- [x] Migrate sample reconnect/state-lost handling to `ClientSessionController`.
+| Task | Output | Completion Signal |
+| --- | --- | --- |
+| In-memory route directory | Route records expire by time and can be removed by node. | Deterministic clock tests cover expiration and node cleanup. |
+| Loopback messenger | A node-to-node messenger for same-process or test-host delivery. | Tests prove remote route path uses `INodeMessenger` while local route path bypasses it. |
+| Backpressure propagation | Preserve `Backpressure` from messenger and handler results. | Tests cover route lookup success followed by messenger/handler backpressure. |
+| Ordered key policy | Preserve `OrderedBy` as metadata without promising global ordering. | Tests verify metadata is forwarded and no global ordering API is implied. |
+| Metrics and trace | Add route lookup, send, receive, dispatch, drop, expired, and backpressure counters/spans. | Meter/Activity listener tests assert low-cardinality tags and trace continuity. |
 
-### Candidate Framework Work
+### P3 Explicit Actor Bridge
 
-- Endpoint model cleanup: `ULinkGame.Tool` now defaults to a simple single-endpoint project shape and only generates separate control/realtime endpoint code when `--network-profile realtime` is selected. Further cleanup should focus on production health checks, Docker options, and richer profile-specific docs.
-- Optional realtime routing infrastructure: no framework abstraction exists yet for gateway-to-gateway routing, runtime owner identity, ordered input forwarding, snapshot fanout, or endpoint-level backpressure. If added, this should remain optional infrastructure for realtime multiplayer templates, not a mandatory concept for light online games.
-- Endpoint diagnostics and operations: the framework does not yet provide built-in per-endpoint health checks, readiness signals, structured log event ids, metrics hooks, graceful endpoint shutdown semantics, or standard diagnostics for reliable push and session lifecycle decisions.
+Add optional integration between cluster routing and the local actor runtime. Keep remote actor usage visibly remote.
+
+| Task | Output | Completion Signal |
+| --- | --- | --- |
+| Actor route keys | Provide a small helper that maps an application-chosen actor id or route id to `RouteKey`. | Helper does not encode node id, endpoint, or scheduler lane. |
+| Cluster actor envelope | Add an explicit cluster actor message envelope with kind, payload, TTL, trace, and optional reply correlation. | Envelope remains bytes-plus-metadata; no live delegate, callback, or actor reference is serializable. |
+| Local actor dispatcher | Add an adapter that receives cluster actor envelopes and calls local actor runtime APIs. | Tests prove the target node's actor runtime owns mailbox dispatch. |
+| Request/reply option | If needed, add explicit remote request/reply with timeout and result status. | API name and result type make network cost and failure visible. |
+
+Non-goals for P3: transparent remote `ActorRef`, generated remote proxies, automatic actor migration, and cross-node shared mutable state.
+
+### P4 Sample Validation
+
+Use a sample to prove the abstraction before adding a production transport.
+
+| Task | Output | Completion Signal |
+| --- | --- | --- |
+| Minimal multi-node route sample | Add a small sample flow where one node owns a route and another node sends a cluster message. | Sample runs with in-memory or loopback transport and no game-specific concepts in `src/`. |
+| Agar integration candidate | Optionally route a room/match command through `ULinkGame.Cluster`. | Existing Agar gameplay remains sample-owned; framework receives no room, battle, or leaderboard DTOs. |
+| Failure demonstration | Show route-not-found, expired, timeout, and backpressure behavior. | README or sample logs make each failure explicit. |
+
+### P5 Production Adapter Decision
+
+Add one production adapter only after P1-P4 prove the contract.
+
+Candidate adapters, in likely order:
+
+1. ULinkRPC internal transport adapter.
+2. gRPC adapter.
+3. Redis pub/sub or stream adapter.
+4. Custom message bus adapter.
+
+Adapter requirements:
+
+- authentication, TLS, compression, and wire format stay inside the adapter
+- route directory remains independent from transport
+- large state sync remains application-owned
+- no adapter may make remote actor calls look local
 
 ### Deliberately Not Default Work
 
