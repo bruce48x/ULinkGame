@@ -1,7 +1,7 @@
 ---
 title: "Getting Started With ULinkGame: Build Game Projects With Sessions, Reconnects, And Reliable Push"
 date: 2026-05-07T11:20:00+08:00
-summary: "Install the tools, generate a project, start the server, open the Unity or Godot client, and understand how ULinkGame, ULinkRPC, and ULinkActor fit together."
+summary: "Build a C# client-and-server game project, share contracts and code, start the server, open the Unity or Godot client, and make your first service call."
 tags:
   - ulinkgame
   - ulinkrpc
@@ -14,21 +14,27 @@ categories:
   - Tutorial
 ---
 
-If all you need is for a client to call server methods, start with ULinkRPC.
-
-Online games usually need another layer very quickly:
+Online games usually need these basics very quickly:
 
 - players need a session after login
 - clients need to reconnect after a disconnect
 - important server notifications must not disappear during a disconnect window
-- a .NET server usually needs a gateway or edge process, while in-process room, battle, or service state runs on the ULinkActor actor/mailbox runtime
+- a .NET server usually needs a Gateway process for client ingress, while room, battle, or service state runs in a serialized state runtime
 - Unity, Godot, and plain .NET clients should not each reimplement reliable-push deduplication
 
-ULinkGame is built for that layer. It does not write your account system, inventory, matchmaking rules, or gameplay logic for you. It wires up the infrastructure that online games repeatedly need.
+ULinkGame is built for that layer. It does not write your account system, inventory, matchmaking rules, or gameplay logic for you. It gives you a runnable project shape and the session infrastructure that online games repeatedly need.
 
-One-sentence version:
+This framework is intentionally for **C# on both sides**: a .NET server plus a C# client such as Unity, Tuanjie, Godot .NET, or another .NET client. That constraint is the point. When the front end and back end use the same language, you can share contracts, DTOs, validation helpers, protocol constants, and selected gameplay logic instead of maintaining parallel implementations in two stacks.
 
-**ULinkRPC provides strongly typed communication across client and server; ULinkActor provides the in-process actor/mailbox runtime; ULinkGame organizes them into a game-project shape with sessions, hosting, reconnects, and reliable push.**
+For small teams, that shared-code model can remove a lot of routine work:
+
+- one set of request and response types
+- one set of callback payloads
+- one typed contract path for client and server calls
+- fewer mismatches between client assumptions and server behavior
+- faster iteration when gameplay features change
+
+The goal of this guide is simple: generate a project, start the server, run the client, then add one small feature in the right place.
 
 ## Prerequisites
 
@@ -39,11 +45,14 @@ Before you start, install the **.NET 10 SDK**:
 If you want to generate a Unity client, you also need:
 
 - Unity 2022 LTS, or a compatible Unity version
+- a Unity project that uses C# gameplay scripts
 - after opening the Unity project for the first time, run `NuGet -> Restore Packages`
 
 If you want to generate a Godot client, you also need:
 
 - Godot 4.x .NET
+
+Non-C# clients are outside this framework's starter path. If your game client is JavaScript, TypeScript, Lua, C++, Java, Swift, or another stack, you lose the main benefit this guide is built around: sharing C# code directly between client and server.
 
 ULinkGame's project tool reuses `ULinkRPC.Starter` to generate the base RPC project, so install both tools:
 
@@ -67,21 +76,21 @@ For a first integration, use the easiest-to-debug combination:
 - `websocket`
 - `json`
 - `simple` network profile
-- `none` persistence
+- default persistence, which means no business database
 
 Run:
 
 ```bash
-ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json --persistence none
+ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json
 cd MyGame
-dotnet run --project Server/Silo/Silo.csproj
+dotnet run --project Server/State/State.csproj
 ```
 
 Keep the state process running, then open a second terminal:
 
 ```bash
 cd MyGame
-dotnet run --project Server/Edge/Edge.csproj
+dotnet run --project Server/Gateway/Gateway.csproj
 ```
 
 Then open the client:
@@ -95,16 +104,16 @@ Then open the client:
 If you chose Godot:
 
 ```bash
-ulinkgame-tool new --name MyGame --client-engine godot --transport websocket --serializer json --persistence none
+ulinkgame-tool new --name MyGame --client-engine godot --transport websocket --serializer json
 cd MyGame
-dotnet run --project Server/Silo/Silo.csproj
+dotnet run --project Server/State/State.csproj
 ```
 
-Then start Edge in a second terminal:
+Then start Gateway in a second terminal:
 
 ```bash
 cd MyGame
-dotnet run --project Server/Edge/Edge.csproj
+dotnet run --project Server/Gateway/Gateway.csproj
 ```
 
 Then:
@@ -116,25 +125,11 @@ Then:
 
 The shortest path is:
 
-**Install both tools -> generate the project -> start the state process -> start Edge -> open Client -> restore dependencies -> run the default test scene.**
+**Install both tools -> generate the project -> start the state process -> start Gateway -> open Client -> restore dependencies -> run the default test scene.**
 
 ## Understand The Generated Structure
 
-A ULinkGame project extends the two-sided project generated by the ULinkRPC starter.
-
-```mermaid
-flowchart TB
-    Root["MyGame/"] --> Shared["Shared<br/>shared DTOs / RPC contracts"]
-    Root --> Server["Server<br/>server solution"]
-    Root --> Client["Client<br/>Unity / Godot client"]
-    Root --> Config["ulinkgame.tool.json<br/>project tool config"]
-
-    Server --> Edge["Edge<br/>RPC gateway / client connection"]
-    Server --> StateHost["State Host<br/>ULinkActor state runtime"]
-    Shared --> SourceGen["ULinkRPC.Analyzers<br/>source generator"]
-    SourceGen --> EdgeGenerated["Compiler Generated<br/>binder / callback proxy"]
-    SourceGen --> ClientGenerated["Compiler Generated<br/>RpcApi / service client"]
-```
+A generated project has four places you will work with most often.
 
 A typical project looks like this:
 
@@ -144,12 +139,12 @@ MyGame/
     Interfaces/
   Server/
     Server.slnx
-    Edge/
-      Edge.csproj
+    Gateway/
+      Gateway.csproj
       Program.cs
       Services/
-    Silo/ or ActorHost/
-      Silo.csproj or ActorHost.csproj
+    State/
+      State.csproj
       Program.cs
   Client/
   ulinkgame.tool.json
@@ -158,48 +153,41 @@ MyGame/
 Keep each layer's responsibility clear:
 
 - `Shared/`
-  Shared DTOs, RPC interfaces, and callback interfaces.
-- `Server/Edge/`
-  RPC entry points, connection ingress, callback binding, reliable business push, and session integration.
-- `Server/Silo/` or `Server/ActorHost/`
-  Authoritative state services. Newer projects should prefer `Server/State/` or `Server/ActorHost/` naming.
+  Shared DTOs, RPC interfaces, callback interfaces, and small cross-side helpers that are safe to use on both client and server.
+- `Server/Gateway/`
+  Client-facing service entry points, connection ingress, callback binding, reliable business push, and session integration.
+- `Server/State/`
+  Authoritative state services.
 - `Client/`
-  Unity or Godot project files, source-generator markers, and game scripts.
+  Unity or Godot project files and game scripts.
 - `ulinkgame.tool.json`
   ULinkGame project options.
 
-The easiest beginner mistake is putting everything into Edge. A sturdier split is:
+The easiest beginner mistake is putting everything into Gateway. A sturdier split is:
 
-- put network connections and RPC ingress in Edge
-- put long-lived state and serialized logic in ULinkActor-based state actors
+- put network connections and RPC ingress in Gateway
+- put long-lived state and serialized logic in state actors
 - keep shared contracts limited to DTOs and interfaces, not server implementations
 
-## How ULinkRPC And ULinkGame Split Responsibilities
+## Daily Development Flow
 
-ULinkRPC solves communication:
+Most feature work follows the same path:
 
-- contract definition
-- compile-time source generation
-- RPC client/server glue
-- transport
-- serializer
-- callback
+- define the service contract and DTOs in `Shared/Interfaces/` once
+- build or run the project normally after contract changes
+- implement the service in `Server/Gateway/Services/`
+- move long-lived state into the state process when the feature needs authoritative state
+- call the typed API from Unity, Godot, or a plain .NET client
+- add reliable push and acknowledgements only for notifications that must survive reconnects
 
-ULinkGame solves game-session infrastructure:
-
-- hosting RPC endpoints inside a .NET host
-- composing an in-process actor/mailbox runtime on top of ULinkActor
-- session identity and endpoint binding
-- reliable business push outbox
-- client-side reliable push inbox
-- reconnect and state-lost results
+The efficiency comes from avoiding duplicate definitions. The same C# contract that describes a server method also gives the client a typed call surface. The same payload class can be used by both sides, so a feature change usually starts with one shared edit instead of separate client and server protocol updates.
 
 The usual business-development flow is:
 
 1. Define RPC contracts in `Shared/Interfaces/`.
-2. Build the server or recompile the client so `ULinkRPC.Analyzers` generates RPC glue.
-3. Implement server logic in `Server/Edge/Services/` or in ULinkActor-based state actors.
-4. Call the generated `RpcApi` from the client.
+2. Build the server or recompile the client after contract changes.
+3. Implement server logic in `Server/Gateway/Services/` or in state actors.
+4. Call the typed `RpcApi` from the client.
 5. Add reliable push and acknowledgements when you need important server notifications.
 
 ## Choose Project Options
@@ -211,8 +199,7 @@ ulinkgame-tool new --name MyGame \
   --client-engine unity \
   --transport websocket \
   --network-profile simple \
-  --serializer json \
-  --persistence none
+  --serializer json
 ```
 
 Client engine options:
@@ -243,7 +230,7 @@ Network profile options:
 Persistence options:
 
 - `none`
-  Default local-development shape, with no business database assumed.
+  Default local-development shape, with no business database assumed. You can omit `--persistence` when you want this default.
 - `postgres`
   Generates PostgreSQL connection configuration and package references.
 - `mysql`
@@ -252,7 +239,7 @@ Persistence options:
 For a first integration, start with:
 
 ```bash
-ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json --persistence none
+ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json
 ```
 
 After the default connection test works, consider:
@@ -267,7 +254,7 @@ Do not enable `kcp`, `memorypack`, `realtime`, and database persistence all at o
 
 Generated projects usually have two server processes:
 
-- `Edge`
+- `Gateway`
   The RPC gateway, responsible for client connections and service-call ingress.
 - state process
   Hosts ULinkActor-based room, battle, or long-lived service state.
@@ -276,17 +263,17 @@ Start the state process first:
 
 ```bash
 cd MyGame
-dotnet run --project Server/Silo/Silo.csproj
+dotnet run --project Server/State/State.csproj
 ```
 
-Then start Edge:
+Then start Gateway:
 
 ```bash
 cd MyGame
-dotnet run --project Server/Edge/Edge.csproj
+dotnet run --project Server/Gateway/Gateway.csproj
 ```
 
-The default `simple + websocket` setup starts one WebSocket RPC endpoint on Edge. The default client test script connects to that endpoint and calls a default service once.
+The default `simple + websocket` setup starts one WebSocket RPC endpoint on Gateway. The default client test script connects to that endpoint and calls a default service once.
 
 If you changed transport:
 
@@ -311,7 +298,7 @@ After opening the project for the first time:
 2. Wait for NuGetForUnity to import.
 3. Run `NuGet -> Restore Packages`.
 4. Open the default connection test scene.
-5. Confirm that both the state process and Edge are running.
+5. Confirm that both the state process and Gateway are running.
 6. Click Play.
 
 Godot projects also live under:
@@ -325,71 +312,17 @@ For Godot:
 1. Open the project with Godot 4.x .NET.
 2. Wait for C# project generation and dependency restore.
 3. Open the default scene.
-4. Confirm that both the state process and Edge are running.
+4. Confirm that both the state process and Gateway are running.
 5. Click Play.
 
 If the client cannot connect, check in this order:
 
 1. Did the state process start successfully?
-2. Did Edge start successfully?
+2. Did Gateway start successfully?
 3. Does the transport match the generated project options?
 4. Is the WebSocket port already in use?
 5. Did Unity run `NuGet -> Restore Packages`?
 6. Did anyone manually edit the generated directory?
-
-## Refresh RPC Glue During Development
-
-Whenever you change RPC contracts under `Shared/Interfaces/`, rebuild the projects that depend on them. `ULinkRPC.Analyzers` generates the client API and server binder at compile time, so you do not need to run manual code generation.
-
-For the server, usually run:
-
-```bash
-dotnet build Server/Edge/Edge.csproj
-```
-
-For Unity or Tuanjie, recompile the editor project. For Godot, usually run:
-
-```bash
-dotnet build Client/Client.csproj
-```
-
-The exact client `.csproj` name depends on the generated project.
-
-Use a consistent development flow:
-
-```mermaid
-flowchart LR
-    A["Edit Shared/Interfaces<br/>DTOs / RPC interfaces"] --> B["Build server / recompile client"]
-    B --> C["source generator creates Edge glue"]
-    B --> D["source generator creates Client API"]
-    C --> E["Implement Edge service"]
-    E --> F["Call ULinkActor state actor when state is needed"]
-    D --> G["Client calls generated RpcApi"]
-    F --> H["Run integration test"]
-    G --> H
-```
-
-The rule is simple:
-
-**If you changed a Shared contract, rebuild the server and recompile the client.**
-
-Changes that require generated output to refresh include:
-
-- adding an RPC service
-- adding an RPC method
-- changing a request or response DTO
-- changing method parameters or return values
-- adding a callback interface
-- changing callback payloads
-
-Changes that do not require regeneration include:
-
-- changing only internal server query logic
-- changing only internal ULinkActor state-actor logic
-- changing only client UI
-- changing only logs, configuration, or styling
-
-Do not manually edit generated directories. Treat them as source artifacts generated from Shared contracts.
 
 ## A More Practical Extension Example
 
@@ -423,18 +356,18 @@ public interface IProfileService
 }
 ```
 
-Then immediately build the server so the source generator refreshes the binder:
+Then build the server:
 
 ```bash
-dotnet build Server/Edge/Edge.csproj
+dotnet build Server/Gateway/Gateway.csproj
 ```
 
-Next, implement the service under `Server/Edge/Services/`. Conceptually, it looks like this:
+Next, implement the service under `Server/Gateway/Services/`. Conceptually, it looks like this:
 
 ```csharp
 using Shared.Interfaces;
 
-namespace Edge.Services;
+namespace Gateway.Services;
 
 public sealed class ProfileService : IProfileService
 {
@@ -450,9 +383,9 @@ public sealed class ProfileService : IProfileService
 }
 ```
 
-If this profile should be read from authoritative state, `ProfileService` should call a ULinkActor-based state actor or your project's own state service instead of putting long-lived state directly inside a normal RPC service implementation.
+If this profile should be read from authoritative state, `ProfileService` should call a state actor or your project's own state service instead of putting long-lived state directly inside a normal service implementation.
 
-On the client, call the strongly typed API generated at compile time. The exact name depends on the source generator namespace settings, but the shape is:
+On the client, call the strongly typed API. The exact namespace depends on your project settings, but the shape is:
 
 ```csharp
 var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
@@ -465,42 +398,9 @@ var reply = await rpc.Api.Shared.Profile.GetProfileAsync(
 The important path is:
 
 - contracts live in Shared
-- glue code is generated by `ULinkRPC.Analyzers` at compile time
-- Edge exposes RPC services
-- ULinkActor state actors host authoritative state
-- Client calls the generated API
-
-## When To Use Reliable Push
-
-Not every server notification needs reliable push.
-
-Temporary logs, transient hints, and state that will be refreshed next frame can use normal callbacks.
-
-These events usually should be handled reliably:
-
-- match found
-- room entered
-- settlement completed
-- reward granted
-- mail arrived
-- key business events that require the client to switch UI state
-
-The reason is simple: reliable transport is not the same thing as reliable business handling.
-
-For example, the server may write `Matched` to the connection just as the client reconnects. The old connection is gone, and the server does not know whether the client actually applied the event. The server may believe the player entered the room while the client is still waiting in matchmaking.
-
-ULinkGame's reliable business push model is:
-
-1. The server assigns an increasing sequence to each important push for each owner.
-2. The server outbox stores pushes that have not been acknowledged.
-3. The client only applies pushes newer than its local latest sequence.
-4. After applying a push, the client acknowledges the latest sequence.
-5. After reconnect, the server replays pending pushes.
-6. If the client sees a duplicate sequence, it ignores it.
-
-After the default RPC path works, read the dedicated reliable-push article:
-
-- [Reliable Business Push: Why Reliable Transport Is Not Enough](/ULinkGame/posts/reliable-business-push/)
+- Gateway exposes RPC services
+- state actors host authoritative state
+- Client calls the typed API
 
 ## Reconnect And State Lost
 
@@ -561,7 +461,7 @@ Reasons:
 - Unity's first dependency import has fewer variables
 - the default test is faster to get working
 
-Once structure, connection, source generation, and business calls are stable, consider:
+Once structure, connection, and business calls are stable, consider:
 
 ```bash
 --transport websocket --serializer memorypack
@@ -577,7 +477,7 @@ Or:
 
 ## Choose Persistence
 
-The default `--persistence none` helps you get the local path working quickly.
+Persistence is optional. If you omit `--persistence`, the generated project uses the same local-development shape as `--persistence none`, with no business database assumed.
 
 If authoritative state or business data needs a database, choose:
 
@@ -611,10 +511,10 @@ In daily development, you mostly maintain:
 
 - `Shared/Interfaces/`
   RPC interfaces, DTOs, and callback contracts.
-- `Server/Edge/Services/`
+- `Server/Gateway/Services/`
   RPC service implementations, connection ingress, and reliable push integration.
-- `Server/Silo/` or `Server/ActorHost/`
-  Authoritative state and long-lived business state. Newer projects should prefer `Server/State/` or `Server/ActorHost/` naming.
+- `Server/State/`
+  Authoritative state and long-lived business state.
 - `Client/`
   Unity/Godot game scripts, UI, and scenes.
 - `ulinkgame.tool.json`
@@ -622,10 +522,10 @@ In daily development, you mostly maintain:
 
 Do not manually maintain:
 
-- ULinkRPC generated source in compiler output directories
+- compiler output directories
 - intermediate files generated by Unity, Godot, or the build system
 
-When contracts change, rebuild. Do not treat RPC generated source as project source code.
+Treat generated and intermediate files as build output, not project source code.
 
 ## FAQ
 
@@ -635,20 +535,20 @@ Because ULinkGame.Tool does not reinvent the lower-level RPC project template.
 
 It first calls `ulinkrpc-starter` to generate a base `Shared + Server + Client` project, then adds the ULinkGame-owned pieces:
 
-- `Server/Edge`
-- `Server/Silo` or `Server/ActorHost`
+- `Server/Gateway`
+- `Server/State`
 - authoritative state service configuration
 - ULinkGame runtime package references
 - `ulinkgame.tool.json`
-- `ULinkRPC.Analyzers` source-generator configuration
+- project generation configuration
 
 ### Why Does The Server Usually Have Two Processes?
 
-Because Edge and the state process have different responsibilities.
+Because Gateway and the state process have different responsibilities.
 
-Edge faces client connections and is a good place for the RPC gateway, callbacks, session binding, and reliable push delivery.
+Gateway faces client connections and is a good place for the RPC gateway, callbacks, session binding, and reliable push delivery.
 
-The state process faces authoritative state and is a better place for player state, room state, matchmaking queues, leaderboards, and other long-lived state. In-process actor/mailbox execution is built on the separate ULinkActor package.
+The state process faces authoritative state and is a better place for player state, room state, matchmaking queues, leaderboards, and other long-lived state. Its actor/mailbox execution model keeps this state serialized and easier to reason about.
 
 In local development they can run on the same machine. In production, you can scale them separately according to load and deployment boundaries.
 
@@ -656,7 +556,7 @@ In local development they can run on the same machine. In production, you can sc
 
 Yes, but it is not recommended for a first integration.
 
-Beginners should start with `ulinkgame-tool new` because it generates a runnable project structure in one step. After you understand how Edge, the state process, Shared, and Client relate to each other, manual restructuring is much safer.
+Beginners should start with `ulinkgame-tool new` because it generates a runnable project structure in one step. After you understand how Gateway, the state process, Shared, and Client relate to each other, manual restructuring is much safer.
 
 ### Does ULinkGame Implement Matchmaking And Rooms For Me?
 
@@ -671,14 +571,16 @@ Matchmaking rules, room rules, gameplay simulation, and product DTOs should stil
 After the default test works, continue in this order:
 
 1. Add your own RPC service, such as `ProfileService` or `InventoryService`.
-2. Practice the full `Shared -> source generation -> Edge service -> Client call` flow once.
-3. Move long-lived state into an in-process actor based on ULinkActor.
+2. Practice the full `Shared -> Gateway service -> Client call` flow once.
+3. Move long-lived state into an in-process state actor.
 4. Then add reliable push, reconnect, and state-lost handling.
+
+Reliable push is for important server notifications that should survive a short disconnect window, such as match found, room entered, settlement completed, reward granted, or mail arrived. You do not need to understand the full mechanism before the default project runs.
 
 Related guides:
 
 - [Reliable Business Push: Why Reliable Transport Is Not Enough](/ULinkGame/posts/reliable-business-push/)
-- [ULinkRPC Getting Started](/ULinkRPC/posts/ulinkrpc-getting-started/)
+- [Deploying A ULinkGame Server To Multiple Linux Machines](/ULinkGame/posts/deploy-ulinkgame-server-linux-multi-machine/)
 
 ## Summary
 
@@ -686,8 +588,8 @@ The recommended ULinkGame starting path is clear:
 
 1. Install `ULinkRPC.Starter` and `ULinkGame.Tool`.
 2. Generate a project with `ulinkgame-tool new`.
-3. First get the default test working with `simple + websocket + json + none`.
-4. Develop business code in the `Shared -> source generation -> Edge/StateActor -> Client` order.
+3. First get the default test working with `simple + websocket + json` and default persistence.
+4. Develop business code in the `Shared -> Gateway/StateActor -> Client` order.
 5. After the foundation is stable, upgrade to `memorypack`, `kcp`, `realtime`, or database persistence.
 
 Do not rush to change the generated directory structure during the first integration. Get the tool-generated structure running, understand what each layer owns, then replace pieces with your own business code.
