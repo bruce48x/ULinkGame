@@ -61,27 +61,27 @@ internal sealed class ToolText
             ULinkGame.Tool
 
             命令:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   通过 ulinkrpc-starter 生成 ULinkRPC 项目，然后补充 ULinkGame.Server、ULinkGame.Client 和 ULinkGame actor runtime。
-                  默认使用 --network-profile simple，只创建一个 RPC endpoint。使用 realtime 可生成独立的 control 和 realtime endpoints；使用 cluster 可生成显式集群配置骨架。
+                  默认生成显式 cluster 配置骨架，无需传入 network profile 参数。
             """,
         ToolLanguage.TraditionalChinese =>
             """
             ULinkGame.Tool
 
             命令:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   透過 ulinkrpc-starter 生成 ULinkRPC 專案，然後補充 ULinkGame.Server、ULinkGame.Client 和 ULinkGame actor runtime。
-                  預設使用 --network-profile simple，只建立一個 RPC endpoint。使用 realtime 可生成獨立的 control 和 realtime endpoints；使用 cluster 可生成明確的叢集設定骨架。
+                  預設生成明確的 cluster 設定骨架，無需傳入 network profile 參數。
             """,
         _ =>
             """
             ULinkGame.Tool
 
             Commands:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and the ULinkGame actor runtime.
-                  Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime for separate control and realtime endpoints; use cluster for explicit cluster configuration scaffolding.
+                  Generates explicit cluster configuration scaffolding by default; no network profile argument is required.
             """
     };
 
@@ -160,9 +160,9 @@ internal sealed class ToolText
 
     public string StartServerStep => Language switch
     {
-        ToolLanguage.SimplifiedChinese => "  2) dotnet run --project \"Server/Edge/Edge.csproj\"",
-        ToolLanguage.TraditionalChinese => "  2) dotnet run --project \"Server/Edge/Edge.csproj\"",
-        _ => "  2) dotnet run --project \"Server/Edge/Edge.csproj\""
+        ToolLanguage.SimplifiedChinese => "  2) dotnet run --project \"Server/Server/Server.csproj\"",
+        ToolLanguage.TraditionalChinese => "  2) dotnet run --project \"Server/Server/Server.csproj\"",
+        _ => "  2) dotnet run --project \"Server/Server/Server.csproj\""
     };
 
     public string RebuildContractsStep => Language switch

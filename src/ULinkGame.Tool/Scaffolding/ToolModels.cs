@@ -4,19 +4,17 @@ internal static class ProjectConventions
     public const string DefaultProjectName = "MyGame";
     public const string DefaultClientEngine = "unity";
     public const string DefaultTransport = "kcp";
-    public const string DefaultNetworkProfile = "simple";
+    public const string DefaultNetworkProfile = "cluster";
     public const string DefaultSerializer = "memorypack";
     public const string DefaultPersistence = "none";
     public const string DefaultNuGetForUnitySource = "embedded";
     public const string DefaultDeployProfile = "none";
     public const string StarterServerProjectPath = "Server/Server";
-    public const string EdgeProjectPath = "Server/Edge";
     public const string StarterServerGeneratedNamespace = "Server.Generated";
-    public const string EdgeGeneratedNamespace = "Edge.Generated";
 
     public static readonly string[] SupportedClientEngines = ["unity", "unity-cn", "tuanjie", "godot"];
     public static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
-    public static readonly string[] SupportedNetworkProfiles = ["simple", "realtime", "cluster"];
+    public static readonly string[] SupportedNetworkProfiles = ["cluster"];
     public static readonly string[] SupportedSerializers = ["json", "memorypack"];
     public static readonly string[] SupportedPersistence = ["none", "mysql", "postgres"];
     public static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];

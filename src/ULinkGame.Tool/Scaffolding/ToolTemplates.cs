@@ -5,12 +5,12 @@ internal static class ToolTemplates
         return """
         <Solution>
           <Project Path="../Shared/Shared.csproj" />
-          <Project Path="Edge/Edge.csproj" />
+          <Project Path="Server/Server.csproj" />
         </Solution>
         """;
     }
 
-    public static string RenderEdgeProgram(NewCommandOptions options)
+    public static string RenderServerProgram(NewCommandOptions options)
     {
         if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
@@ -22,7 +22,7 @@ internal static class ToolTemplates
             using Microsoft.Extensions.DependencyInjection;
             using Microsoft.Extensions.Hosting;
             using Microsoft.Extensions.Logging;
-            using Edge.Hosting;
+            using Server.Hosting;
             using ULinkGame.Server;
             using ULinkGame.Server.Hosting;
 
@@ -37,15 +37,15 @@ internal static class ToolTemplates
 
             builder.Services.AddULinkGameServer();
             builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-                EdgeRpcServerOptions.FromConfiguration(
+                ServerRpcServerOptions.FromConfiguration(
                     builder.Configuration,
                     "ControlPlane",
-                    new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
+                    new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
             builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-                EdgeRpcServerOptions.FromConfiguration(
+                ServerRpcServerOptions.FromConfiguration(
                     builder.Configuration,
                     "Realtime",
-                    new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
+                    new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
             builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
             builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
             builder.Services.AddULinkGameServerGateway();
@@ -63,7 +63,7 @@ internal static class ToolTemplates
         using Microsoft.Extensions.DependencyInjection;
         using Microsoft.Extensions.Hosting;
         using Microsoft.Extensions.Logging;
-        using Edge.Hosting;
+        using Server.Hosting;
         using ULinkGame.Server;
         using ULinkGame.Server.Hosting;
 
@@ -79,10 +79,10 @@ internal static class ToolTemplates
         builder.Services.AddULinkGameServer();
         {{RenderClusterServiceRegistration(options)}}
         builder.Services.AddSingleton(_ =>
-            EdgeRpcServerOptions.FromConfiguration(
+            ServerRpcServerOptions.FromConfiguration(
                 builder.Configuration,
                 "Endpoint",
-                new EdgeRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
+                new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
         builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
         builder.Services.AddULinkGameServerGateway();
 
@@ -92,7 +92,7 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeProject(NewCommandOptions options)
+    public static string RenderServerProject(NewCommandOptions options)
     {
         var persistenceReferences = RenderPersistencePackageReferences(options.Persistence, includeDapper: true);
         var clusterReferences = RenderClusterPackageReferences(options);
@@ -104,11 +104,11 @@ internal static class ToolTemplates
             <TargetFramework>net10.0</TargetFramework>
             <ImplicitUsings>enable</ImplicitUsings>
             <Nullable>enable</Nullable>
-            <RootNamespace>Edge</RootNamespace>
+            <RootNamespace>Server</RootNamespace>
             <BuildInParallel>false</BuildInParallel>
             <RestoreBuildInParallel>false</RestoreBuildInParallel>
             <ULinkRPCGenerateServer>true</ULinkRPCGenerateServer>
-            <ULinkRPCServerGeneratedNamespace>Edge.Generated</ULinkRPCServerGeneratedNamespace>
+            <ULinkRPCServerGeneratedNamespace>Server.Generated</ULinkRPCServerGeneratedNamespace>
           </PropertyGroup>
 
           <ItemGroup>
@@ -132,7 +132,7 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeAppSettings(NewCommandOptions options)
+    public static string RenderServerAppSettings(NewCommandOptions options)
     {
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
@@ -149,7 +149,7 @@ internal static class ToolTemplates
                     "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
                   },
                   "Cluster": {
-                    "NodeId": "edge-1",
+                    "NodeId": "gateway-1",
                     "NodeEpoch": 1,
                     "InternalEndpoint": "tcp://127.0.0.1:21000",
                     "RouteDirectoryEndpoint": "tcp://127.0.0.1:21001",
@@ -190,30 +190,30 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderEdgeRpcServerOptions()
+    public static string RenderServerRpcServerOptions()
     {
         return @"using Microsoft.Extensions.Configuration;
 
-namespace Edge.Hosting;
+namespace Server.Hosting;
 
-internal sealed class EdgeRpcServerOptions
+internal sealed class ServerRpcServerOptions
 {
     public string Transport { get; init; } = ""websocket"";
     public string Host { get; init; } = ""127.0.0.1"";
     public int Port { get; init; } = 20000;
     public string Path { get; init; } = """";
 
-    public static EdgeRpcServerOptions FromConfiguration(
+    public static ServerRpcServerOptions FromConfiguration(
         IConfiguration configuration,
         string sectionName,
-        EdgeRpcServerOptions defaults)
+        ServerRpcServerOptions defaults)
     {
         var section = configuration.GetSection(sectionName);
         var transport = NormalizeTransport(section[""Transport""], defaults.Transport);
         var host = section[""Host""];
         var path = section[""Path""];
 
-        return new EdgeRpcServerOptions
+        return new ServerRpcServerOptions
         {
             Transport = transport,
             Host = string.IsNullOrWhiteSpace(host) ? defaults.Host : host,
@@ -240,16 +240,16 @@ internal sealed class EdgeRpcServerOptions
 
     public static string RenderNamedRpcServerOptions(string typeName)
     {
-        return $@"namespace Edge.Hosting;
+        return $@"namespace Server.Hosting;
 
 internal sealed class {typeName}
 {{
-    public {typeName}(EdgeRpcServerOptions endpoint)
+    public {typeName}(ServerRpcServerOptions endpoint)
     {{
         Endpoint = endpoint;
     }}
 
-    public EdgeRpcServerOptions Endpoint {{ get; }}
+    public ServerRpcServerOptions Endpoint {{ get; }}
 }}";
     }
 
@@ -257,11 +257,11 @@ internal sealed class {typeName}
     {
         return @"using Microsoft.Extensions.Configuration;
 
-namespace Edge.Hosting;
+namespace Server.Hosting;
 
 internal sealed class ClusterOptions
 {
-    public string NodeId { get; init; } = ""edge-1"";
+    public string NodeId { get; init; } = ""gateway-1"";
     public long NodeEpoch { get; init; } = 1;
     public string InternalEndpoint { get; init; } = ""tcp://127.0.0.1:21000"";
     public string RouteDirectoryEndpoint { get; init; } = ""tcp://127.0.0.1:21001"";
@@ -303,7 +303,7 @@ internal sealed class ClusterOptions
 
     public static string RenderClusterHealthCheck()
     {
-        return @"namespace Edge.Hosting;
+        return @"namespace Server.Hosting;
 
 internal static class ClusterHealthCheck
 {
@@ -351,18 +351,18 @@ internal static class ClusterHealthCheck
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using Edge.Generated;
+        return $@"using Server.Generated;
 using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
-namespace Edge.Hosting;
+namespace Server.Hosting;
 
 internal sealed class DefaultRpcServerConfigurator : IULinkRpcServerConfigurator
 {{
-    private readonly EdgeRpcServerOptions _options;
+    private readonly ServerRpcServerOptions _options;
 
-    public DefaultRpcServerConfigurator(EdgeRpcServerOptions options)
+    public DefaultRpcServerConfigurator(ServerRpcServerOptions options)
     {{
         _options = options;
     }}
@@ -384,16 +384,16 @@ internal sealed class DefaultRpcServerConfigurator : IULinkRpcServerConfigurator
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using Edge.Generated;
+        return $@"using Server.Generated;
 using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
-namespace Edge.Hosting;
+namespace Server.Hosting;
 
 internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServerConfigurator
 {{
-    private readonly EdgeRpcServerOptions _options;
+    private readonly ServerRpcServerOptions _options;
 
     public DefaultControlPlaneRpcServerConfigurator(ControlPlaneRpcServerOptions options)
     {{
@@ -417,16 +417,16 @@ internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServer
         var (serializerPackage, serializerType) = PackageCatalog.GetSerializerArtifacts(options.Serializer);
         var (transportPackage, _) = PackageCatalog.GetTransportArtifacts(options.Transport);
 
-        return $@"using Edge.Generated;
+        return $@"using Server.Generated;
 using ULinkGame.Server.Hosting;
 using {serializerPackage.Namespace};
 using {transportPackage.Namespace};
 
-namespace Edge.Hosting;
+namespace Server.Hosting;
 
 internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConfigurator
 {{
-    private readonly EdgeRpcServerOptions _options;
+    private readonly ServerRpcServerOptions _options;
 
     public DefaultRealtimeRpcServerConfigurator(RealtimeRpcServerOptions options)
     {{
@@ -511,23 +511,23 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
         WORKDIR /src
         COPY . .
-        RUN dotnet publish Server/Edge/Edge.csproj -c Release -o /app
+        RUN dotnet publish Server/Server/Server.csproj -c Release -o /app
 
         FROM mcr.microsoft.com/dotnet/runtime:10.0
         WORKDIR /app
         COPY --from=build /app .
-        ENTRYPOINT ["dotnet", "Edge.dll"]
+        ENTRYPOINT ["dotnet", "Server.dll"]
         """;
     }
 
     public static string RenderClusterCompose(NewCommandOptions options)
     {
         var endpointPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
-        var healthCommand = "dotnet Edge.dll --health-check";
+        var healthCommand = "dotnet Server.dll --health-check";
 
         return $$"""
         services:
-          edge:
+          gateway:
             build:
               context: .
               dockerfile: Server/Dockerfile
@@ -536,10 +536,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
               Endpoint__Host: "0.0.0.0"
               Endpoint__Port: "20000"
               Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
-              Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-edge-1}"
+              Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-gateway-1}"
               Cluster__NodeEpoch: "${ULINKGAME_CLUSTER_NODE_EPOCH:-1}"
-              Cluster__InternalEndpoint: "${ULINKGAME_CLUSTER_INTERNAL_ENDPOINT:-tcp://edge:21000}"
-              Cluster__RouteDirectoryEndpoint: "${ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT:-tcp://edge:21001}"
+              Cluster__InternalEndpoint: "${ULINKGAME_CLUSTER_INTERNAL_ENDPOINT:-tcp://gateway:21000}"
+              Cluster__RouteDirectoryEndpoint: "${ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT:-tcp://gateway:21001}"
               Cluster__RouteLeaseSeconds: "${ULINKGAME_CLUSTER_ROUTE_LEASE_SECONDS:-30}"
               Cluster__SendTimeoutMilliseconds: "${ULINKGAME_CLUSTER_SEND_TIMEOUT_MILLISECONDS:-2000}"
             ports:
@@ -558,10 +558,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         return """
         # This file intentionally contains no production secrets.
         # Put node authentication and TLS material in your deployment platform secret store.
-        ULINKGAME_CLUSTER_NODE_ID=edge-1
+        ULINKGAME_CLUSTER_NODE_ID=gateway-1
         ULINKGAME_CLUSTER_NODE_EPOCH=1
-        ULINKGAME_CLUSTER_INTERNAL_ENDPOINT=tcp://edge:21000
-        ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT=tcp://edge:21001
+        ULINKGAME_CLUSTER_INTERNAL_ENDPOINT=tcp://gateway:21000
+        ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT=tcp://gateway:21001
         ULINKGAME_CLUSTER_ROUTE_LEASE_SECONDS=30
         ULINKGAME_CLUSTER_SEND_TIMEOUT_MILLISECONDS=2000
         """;
@@ -588,7 +588,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         Health check:
 
         ```bash
-        dotnet Edge.dll --health-check
+        dotnet Server.dll --health-check
         ```
 
         The generated health check validates local cluster configuration. Remote route-directory and node-messenger dependency checks should be wired by the project host using `ULinkRpcClusterDependencyProbe` once the project chooses its concrete topology and secret policy.

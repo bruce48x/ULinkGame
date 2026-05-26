@@ -42,7 +42,7 @@ Start from a project that already runs locally:
 ulinkgame-tool new --name MyGame --client-engine unity --transport websocket --serializer json
 cd MyGame
 dotnet run --project Server/State/State.csproj
-dotnet run --project Server/Gateway/Gateway.csproj
+dotnet run --project Server/Server/Server.csproj
 ```
 
 Use your generated project's actual state project path if you renamed it.
@@ -67,11 +67,11 @@ load-balancer-1
   public 443 -> gateway-1:20000 and gateway-2:20000
 
 gateway-1
-  runs Server/Gateway
+  runs Server/Server
   listens on 0.0.0.0:20000 inside the private network
 
 gateway-2
-  runs Server/Gateway
+  runs Server/Server
   listens on 0.0.0.0:20000 inside the private network
 
 state-1
@@ -94,14 +94,14 @@ For the first production deployment, keep the routing model boring:
 Build on CI or on a build machine that has the .NET SDK installed:
 
 ```bash
-dotnet publish Server/Gateway/Gateway.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64/gateway
+dotnet publish Server/Server/Server.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64/gateway
 dotnet publish Server/State/State.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64/state
 ```
 
 This is the recommended Debian 13 path for a first deployment because the published directory contains the runtime it needs. If your operations team already manages .NET runtime versions on every host, you can use framework-dependent output instead:
 
 ```bash
-dotnet publish Server/Gateway/Gateway.csproj -c Release -o artifacts/linux-x64/gateway
+dotnet publish Server/Server/Server.csproj -c Release -o artifacts/linux-x64/gateway
 dotnet publish Server/State/State.csproj -c Release -o artifacts/linux-x64/state
 ```
 
@@ -203,7 +203,7 @@ WantedBy=multi-user.target
 For a framework-dependent build, use `dotnet` and the DLL instead:
 
 ```ini
-ExecStart=/usr/bin/dotnet /opt/mygame/gateway/Gateway.dll
+ExecStart=/usr/bin/dotnet /opt/mygame/gateway/Server.dll
 ```
 
 Start it:
@@ -371,7 +371,7 @@ cd /opt/mygame/gateway
 ./Gateway --health-check
 ```
 
-For a framework-dependent build, use `dotnet Gateway.dll --health-check` instead.
+For a framework-dependent build, use `dotnet Server.dll --health-check` instead.
 
 Use it from systemd, CI smoke tests, or your load balancer health probe when appropriate. A basic manual check is:
 
@@ -397,7 +397,7 @@ For production, add structured logs, metrics, and alerts around:
 For a local cluster deployment rehearsal, generate with:
 
 ```bash
-ulinkgame-tool new --name MyGame --network-profile cluster --deploy-profile compose
+ulinkgame-tool new --name MyGame --deploy-profile compose
 ```
 
 That profile can generate:

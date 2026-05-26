@@ -2,13 +2,13 @@ internal sealed class ProjectScaffolder
 {
     public async Task AugmentProjectWithULinkGameAsync(string projectRoot, NewCommandOptions options)
     {
-        await MoveStarterServerProjectToEdgeAsync(projectRoot).ConfigureAwait(false);
+        EnsureStarterServerProjectDirectory(projectRoot);
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
-        await WriteEdgeProgramAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
-        await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteServerProgramAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteServerProjectAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteServerAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteServerConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteOperationsScaffoldingAsync(projectRoot, options).ConfigureAwait(false);
     }
 
@@ -80,82 +80,24 @@ internal sealed class ProjectScaffolder
         return WriteAsync(Path.Combine(projectRoot, "Server", "Server.slnx"), ToolTemplates.RenderServerSolution());
     }
 
-    private static async Task MoveStarterServerProjectToEdgeAsync(string projectRoot)
+    private static void EnsureStarterServerProjectDirectory(string projectRoot)
     {
         var starterServerDirectory = Path.Combine(projectRoot, ToNativePath(ProjectConventions.StarterServerProjectPath));
-        var edgeDirectory = Path.Combine(projectRoot, ToNativePath(ProjectConventions.EdgeProjectPath));
 
-        if (Directory.Exists(starterServerDirectory))
-        {
-            if (Directory.Exists(edgeDirectory))
-            {
-                throw new InvalidOperationException($"Both generated server directories exist: {starterServerDirectory} and {edgeDirectory}");
-            }
-
-            Directory.Move(starterServerDirectory, edgeDirectory);
-        }
-        else
-        {
-            Directory.CreateDirectory(edgeDirectory);
-        }
-
-        await RenameStarterServerNamespacesAsync(edgeDirectory).ConfigureAwait(false);
-        MoveStarterServerProjectFileToEdge(edgeDirectory);
+        Directory.CreateDirectory(starterServerDirectory);
     }
 
-    private static void MoveStarterServerProjectFileToEdge(string edgeDirectory)
+    private static Task WriteServerProgramAsync(string projectRoot, NewCommandOptions options)
     {
-        var starterProject = Path.Combine(edgeDirectory, "Server.csproj");
-        var edgeProject = Path.Combine(edgeDirectory, "Edge.csproj");
-
-        if (!File.Exists(starterProject))
-        {
-            return;
-        }
-
-        if (File.Exists(edgeProject))
-        {
-            throw new InvalidOperationException($"Both generated server project files exist: {starterProject} and {edgeProject}");
-        }
-
-        File.Move(starterProject, edgeProject);
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "Program.cs"), ToolTemplates.RenderServerProgram(options));
     }
 
-    private static async Task RenameStarterServerNamespacesAsync(string edgeDirectory)
+    private static async Task WriteServerProjectAsync(string projectRoot, NewCommandOptions options)
     {
-        if (!Directory.Exists(edgeDirectory))
-        {
-            return;
-        }
-
-        foreach (var file in Directory.EnumerateFiles(edgeDirectory, "*.cs", SearchOption.AllDirectories))
-        {
-            var content = await File.ReadAllTextAsync(file).ConfigureAwait(false);
-            var updated = content.Replace(
-                ProjectConventions.StarterServerGeneratedNamespace,
-                ProjectConventions.EdgeGeneratedNamespace,
-                StringComparison.Ordinal)
-                .Replace("namespace Server.", "namespace Edge.", StringComparison.Ordinal)
-                .Replace("using Server.", "using Edge.", StringComparison.Ordinal);
-
-            if (!string.Equals(content, updated, StringComparison.Ordinal))
-            {
-                await File.WriteAllTextAsync(file, updated).ConfigureAwait(false);
-            }
-        }
-    }
-
-    private static Task WriteEdgeProgramAsync(string projectRoot, NewCommandOptions options)
-    {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "Program.cs"), ToolTemplates.RenderEdgeProgram(options));
-    }
-
-    private static async Task WriteEdgeProjectAsync(string projectRoot, NewCommandOptions options)
-    {
-        var path = Path.Combine(projectRoot, "Server", "Edge", "Edge.csproj");
+        var path = Path.Combine(projectRoot, "Server", "Server", "Server.csproj");
         if (!File.Exists(path))
         {
-            await WriteAsync(path, ToolTemplates.RenderEdgeProject(options)).ConfigureAwait(false);
+            await WriteAsync(path, ToolTemplates.RenderServerProject(options)).ConfigureAwait(false);
             return;
         }
 
@@ -167,11 +109,11 @@ internal sealed class ProjectScaffolder
         RemoveProperty(project, "TargetFrameworks");
         SetProperty(project, "ImplicitUsings", "enable");
         SetProperty(project, "Nullable", "enable");
-        SetProperty(project, "RootNamespace", "Edge");
+        SetProperty(project, "RootNamespace", "Server");
         SetProperty(project, "BuildInParallel", "false");
         SetProperty(project, "RestoreBuildInParallel", "false");
         SetProperty(project, "ULinkRPCGenerateServer", "true");
-        SetProperty(project, "ULinkRPCServerGeneratedNamespace", ProjectConventions.EdgeGeneratedNamespace);
+        SetProperty(project, "ULinkRPCServerGeneratedNamespace", ProjectConventions.StarterServerGeneratedNamespace);
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
@@ -182,20 +124,20 @@ internal sealed class ProjectScaffolder
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
 
-    private static Task WriteEdgeAppSettingsAsync(string projectRoot, NewCommandOptions options)
+    private static Task WriteServerAppSettingsAsync(string projectRoot, NewCommandOptions options)
     {
-        return WriteAsync(Path.Combine(projectRoot, "Server", "Edge", "appsettings.json"), ToolTemplates.RenderEdgeAppSettings(options));
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "appsettings.json"), ToolTemplates.RenderServerAppSettings(options));
     }
 
-    private static Task WriteEdgeConfiguratorsAsync(string projectRoot, NewCommandOptions options)
+    private static Task WriteServerConfiguratorsAsync(string projectRoot, NewCommandOptions options)
     {
-        var hostingDirectory = Path.Combine(projectRoot, "Server", "Edge", "Hosting");
+        var hostingDirectory = Path.Combine(projectRoot, "Server", "Server", "Hosting");
         Directory.CreateDirectory(hostingDirectory);
 
         if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
             return Task.WhenAll(
-                WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
+                WriteAsync(Path.Combine(hostingDirectory, "ServerRpcServerOptions.cs"), ToolTemplates.RenderServerRpcServerOptions()),
                 WriteAsync(Path.Combine(hostingDirectory, "ControlPlaneRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
                 WriteAsync(Path.Combine(hostingDirectory, "RealtimeRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
                 WriteAsync(Path.Combine(hostingDirectory, "DefaultControlPlaneRpcServerConfigurator.cs"), ToolTemplates.RenderControlPlaneConfigurator(options)),
@@ -204,7 +146,7 @@ internal sealed class ProjectScaffolder
 
         var writes = new List<Task>
         {
-            WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
+            WriteAsync(Path.Combine(hostingDirectory, "ServerRpcServerOptions.cs"), ToolTemplates.RenderServerRpcServerOptions()),
             WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options))
         };
 

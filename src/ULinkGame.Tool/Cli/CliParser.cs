@@ -21,7 +21,6 @@ internal static class CliParser
         string? outputPath = null;
         var clientEngine = ProjectConventions.DefaultClientEngine;
         var transport = ProjectConventions.DefaultTransport;
-        var networkProfile = ProjectConventions.DefaultNetworkProfile;
         var serializer = ProjectConventions.DefaultSerializer;
         var persistence = ProjectConventions.DefaultPersistence;
         var nuGetForUnitySource = ProjectConventions.DefaultNuGetForUnitySource;
@@ -44,7 +43,7 @@ internal static class CliParser
                     transport = ValidateChoice("--transport", ReadOptionValue(args, ref index, "--transport", text), ProjectConventions.SupportedTransports, text);
                     break;
                 case "--network-profile":
-                    networkProfile = ValidateChoice("--network-profile", ReadOptionValue(args, ref index, "--network-profile", text), ProjectConventions.SupportedNetworkProfiles, text);
+                    ValidateChoice("--network-profile", ReadOptionValue(args, ref index, "--network-profile", text), ProjectConventions.SupportedNetworkProfiles, text);
                     break;
                 case "--serializer":
                     serializer = ValidateChoice("--serializer", ReadOptionValue(args, ref index, "--serializer", text), ProjectConventions.SupportedSerializers, text);
@@ -63,7 +62,7 @@ internal static class CliParser
             }
         }
 
-        return new NewCommandOptions(name, outputPath, clientEngine, transport, networkProfile, serializer, persistence, nuGetForUnitySource, deployProfile);
+        return new NewCommandOptions(name, outputPath, clientEngine, transport, ProjectConventions.DefaultNetworkProfile, serializer, persistence, nuGetForUnitySource, deployProfile);
     }
 
     private static string ReadOptionValue(string[] args, ref int index, string optionName, ToolText text)
