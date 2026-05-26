@@ -61,27 +61,27 @@ internal sealed class ToolText
             ULinkGame.Tool
 
             命令:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   通过 ulinkrpc-starter 生成 ULinkRPC 项目，然后补充 ULinkGame.Server、ULinkGame.Client 和 ULinkGame actor runtime。
-                  默认使用 --network-profile simple，只创建一个 RPC endpoint。使用 realtime 可生成独立的 control 和 realtime endpoints。
+                  默认使用 --network-profile simple，只创建一个 RPC endpoint。使用 realtime 可生成独立的 control 和 realtime endpoints；使用 cluster 可生成显式集群配置骨架。
             """,
         ToolLanguage.TraditionalChinese =>
             """
             ULinkGame.Tool
 
             命令:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   透過 ulinkrpc-starter 生成 ULinkRPC 專案，然後補充 ULinkGame.Server、ULinkGame.Client 和 ULinkGame actor runtime。
-                  預設使用 --network-profile simple，只建立一個 RPC endpoint。使用 realtime 可生成獨立的 control 和 realtime endpoints。
+                  預設使用 --network-profile simple，只建立一個 RPC endpoint。使用 realtime 可生成獨立的 control 和 realtime endpoints；使用 cluster 可生成明確的叢集設定骨架。
             """,
         _ =>
             """
             ULinkGame.Tool
 
             Commands:
-              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm]
+              new [--name MyGame] [--output .] [--client-engine unity|unity-cn|tuanjie|godot] [--transport tcp|websocket|kcp] [--network-profile simple|realtime|cluster] [--serializer json|memorypack] [--persistence none|mysql|postgres] [--nugetforunity-source embedded|openupm] [--deploy-profile none|compose]
                   Generate a ULinkRPC project via ulinkrpc-starter, then augment it with ULinkGame.Server, ULinkGame.Client, and the ULinkGame actor runtime.
-                  Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime to generate separate control and realtime endpoints.
+                  Defaults to --network-profile simple, which creates one RPC endpoint. Use realtime for separate control and realtime endpoints; use cluster for explicit cluster configuration scaffolding.
             """
     };
 

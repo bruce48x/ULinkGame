@@ -6,12 +6,18 @@ namespace ULinkGame.Cluster
 {
     public interface IRouteDirectory
     {
-        ValueTask RegisterAsync(
+        ValueTask<RouteRegistrationStatus> RegisterAsync(
             RouteLocation location,
             CancellationToken cancellationToken = default);
 
         ValueTask<RouteLocation?> ResolveAsync(
             RouteKey route,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default);
+
+        ValueTask<RouteLeaseRefreshStatus> RefreshLeaseAsync(
+            RouteLocation expectedLocation,
+            DateTimeOffset expiresAt,
             DateTimeOffset now,
             CancellationToken cancellationToken = default);
 
@@ -21,6 +27,11 @@ namespace ULinkGame.Cluster
 
         ValueTask<int> ClearByNodeAsync(
             NodeId node,
+            CancellationToken cancellationToken = default);
+
+        ValueTask<int> ClearByNodeEpochAsync(
+            NodeId node,
+            long nodeEpoch,
             CancellationToken cancellationToken = default);
     }
 }

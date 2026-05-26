@@ -8,6 +8,7 @@ internal static class ProjectConventions
     public const string DefaultSerializer = "memorypack";
     public const string DefaultPersistence = "none";
     public const string DefaultNuGetForUnitySource = "embedded";
+    public const string DefaultDeployProfile = "none";
     public const string StarterServerProjectPath = "Server/Server";
     public const string EdgeProjectPath = "Server/Edge";
     public const string StarterServerGeneratedNamespace = "Server.Generated";
@@ -15,10 +16,11 @@ internal static class ProjectConventions
 
     public static readonly string[] SupportedClientEngines = ["unity", "unity-cn", "tuanjie", "godot"];
     public static readonly string[] SupportedTransports = ["tcp", "websocket", "kcp"];
-    public static readonly string[] SupportedNetworkProfiles = ["simple", "realtime"];
+    public static readonly string[] SupportedNetworkProfiles = ["simple", "realtime", "cluster"];
     public static readonly string[] SupportedSerializers = ["json", "memorypack"];
     public static readonly string[] SupportedPersistence = ["none", "mysql", "postgres"];
     public static readonly string[] SupportedNuGetForUnitySources = ["embedded", "openupm"];
+    public static readonly string[] SupportedDeployProfiles = ["none", "compose"];
 
     public static bool IsGodot(string clientEngine)
     {
@@ -30,9 +32,19 @@ internal static class ProjectConventions
         return string.Equals(networkProfile, "realtime", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsClusterNetworkProfile(string networkProfile)
+    {
+        return string.Equals(networkProfile, "cluster", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool UsesExternalPersistence(string persistence)
     {
         return !string.Equals(persistence, DefaultPersistence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool UsesComposeDeployProfile(string deployProfile)
+    {
+        return string.Equals(deployProfile, "compose", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -60,7 +72,8 @@ internal sealed class ToolConfig
                 NetworkProfile = options.NetworkProfile,
                 Serializer = options.Serializer,
                 Persistence = options.Persistence,
-                NuGetForUnitySource = options.NuGetForUnitySource
+                NuGetForUnitySource = options.NuGetForUnitySource,
+                DeployProfile = options.DeployProfile
             }
         };
     }
@@ -75,6 +88,7 @@ internal sealed class ProjectConfig
     public string Serializer { get; set; } = ProjectConventions.DefaultSerializer;
     public string Persistence { get; set; } = ProjectConventions.DefaultPersistence;
     public string NuGetForUnitySource { get; set; } = ProjectConventions.DefaultNuGetForUnitySource;
+    public string DeployProfile { get; set; } = ProjectConventions.DefaultDeployProfile;
 }
 
 internal readonly record struct NewCommandOptions(
@@ -85,7 +99,8 @@ internal readonly record struct NewCommandOptions(
     string NetworkProfile,
     string Serializer,
     string Persistence,
-    string NuGetForUnitySource);
+    string NuGetForUnitySource,
+    string DeployProfile);
 
 internal readonly record struct ProcessInvocation(string FileName, IReadOnlyList<string> Arguments, bool CanFallback);
 

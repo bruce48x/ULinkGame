@@ -14,14 +14,18 @@ await routes.RegisterAsync(
         "control/local",
         "node-a",
         new NodeEndpoint("in-memory://node-a"),
-        now.AddMinutes(1)));
+        now.AddMinutes(1),
+        nodeEpoch: 1,
+        generation: 1));
 
 await routes.RegisterAsync(
     new RouteLocation(
         ClusterActorRouteKeys.ForActor("worker/demo"),
         "node-b",
         new NodeEndpoint("in-memory://node-b"),
-        now.AddMinutes(1)));
+        now.AddMinutes(1),
+        nodeEpoch: 1,
+        generation: 1));
 
 var router = new ClusterRouter(
     "node-a",

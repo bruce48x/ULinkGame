@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>ULinkGame.Cluster</RootNamespace>
     <PackageId>ULinkGame.Cluster</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Description>Optional explicit cluster routing contracts and in-memory runtime primitives for ULinkGame.</Description>
     <PackageTags>ulinkgame;game;cluster;routing;actor</PackageTags>
   </PropertyGroup>

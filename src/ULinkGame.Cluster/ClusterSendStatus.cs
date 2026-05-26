@@ -8,6 +8,8 @@ namespace ULinkGame.Cluster
         Backpressure = 3,
         HandlerUnavailable = 4,
         Timeout = 5,
-        Failed = 6
+        Failed = 6,
+        StaleRoute = 7,
+        NodeEpochMismatch = 8
     }
 }

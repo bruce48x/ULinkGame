@@ -66,6 +66,8 @@ dotnet add package ULinkActor
 dotnet add package ULinkActor.SourceGenerator
 ```
 
+`ULinkGame.Server` currently integrates with `ULinkActor` `0.2.0` through its process-local actor facade. Add `ULinkActor.SourceGenerator` directly only when your game project uses native ULinkActor typed actors or generated actor clients.
+
 Register and use `ULinkActor` in the same .NET host that runs your ULinkGame gateway services:
 
 ```csharp

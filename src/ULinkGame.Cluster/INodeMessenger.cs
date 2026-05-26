@@ -6,7 +6,7 @@ namespace ULinkGame.Cluster
     public interface INodeMessenger
     {
         ValueTask<ClusterSendStatus> SendAsync(
-            NodeId target,
+            RouteLocation target,
             ClusterMessage message,
             CancellationToken cancellationToken = default);
     }

@@ -13,7 +13,7 @@ public sealed class InMemoryLoopbackNodeMessengerTests
         var message = NewMessage();
         messenger.RegisterNode("node-a", handler);
 
-        var status = await messenger.SendAsync("node-a", message, TestContext.Current.CancellationToken);
+        var status = await messenger.SendAsync(NewLocation("node-a"), message, TestContext.Current.CancellationToken);
 
         Assert.Equal(ClusterSendStatus.Accepted, status);
         Assert.Same(message, Assert.Single(handler.Messages));
@@ -24,7 +24,7 @@ public sealed class InMemoryLoopbackNodeMessengerTests
     {
         var messenger = new InMemoryLoopbackNodeMessenger();
 
-        var status = await messenger.SendAsync("node-a", NewMessage(), TestContext.Current.CancellationToken);
+        var status = await messenger.SendAsync(NewLocation("node-a"), NewMessage(), TestContext.Current.CancellationToken);
 
         Assert.Equal(ClusterSendStatus.HandlerUnavailable, status);
     }
@@ -35,7 +35,7 @@ public sealed class InMemoryLoopbackNodeMessengerTests
         var messenger = new InMemoryLoopbackNodeMessenger();
         messenger.RegisterNode("node-a", new RecordingHandler(ClusterSendStatus.Backpressure));
 
-        var status = await messenger.SendAsync("node-a", NewMessage(), TestContext.Current.CancellationToken);
+        var status = await messenger.SendAsync(NewLocation("node-a"), NewMessage(), TestContext.Current.CancellationToken);
 
         Assert.Equal(ClusterSendStatus.Backpressure, status);
     }
@@ -48,6 +48,15 @@ public sealed class InMemoryLoopbackNodeMessengerTests
             new byte[] { 1 },
             DateTimeOffset.UtcNow.AddMinutes(1),
             "source");
+    }
+
+    private static RouteLocation NewLocation(NodeId node)
+    {
+        return new RouteLocation(
+            "room/1",
+            node,
+            new NodeEndpoint("in-memory://" + node),
+            DateTimeOffset.UtcNow.AddMinutes(1));
     }
 
     private sealed class RecordingHandler : IClusterMessageHandler

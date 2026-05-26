@@ -9,6 +9,7 @@ internal sealed class ProjectScaffolder
         await WriteEdgeProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteEdgeConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteOperationsScaffoldingAsync(projectRoot, options).ConfigureAwait(false);
     }
 
     private static Task WriteClientPackageReferenceAsync(string projectRoot, NewCommandOptions options)
@@ -174,6 +175,7 @@ internal sealed class ProjectScaffolder
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
+        EnsureClusterPackageReferences(project, options);
         EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: true);
         EnsureNoneUpdate(project, "appsettings.json", "PreserveNewest");
 
@@ -200,13 +202,38 @@ internal sealed class ProjectScaffolder
                 WriteAsync(Path.Combine(hostingDirectory, "DefaultRealtimeRpcServerConfigurator.cs"), ToolTemplates.RenderRealtimeConfigurator(options)));
         }
 
-        return Task.WhenAll(
+        var writes = new List<Task>
+        {
             WriteAsync(Path.Combine(hostingDirectory, "EdgeRpcServerOptions.cs"), ToolTemplates.RenderEdgeRpcServerOptions()),
-            WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options)));
+            WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options))
+        };
+
+        if (ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile))
+        {
+            writes.Add(WriteAsync(Path.Combine(hostingDirectory, "ClusterOptions.cs"), ToolTemplates.RenderClusterOptions()));
+            writes.Add(WriteAsync(Path.Combine(hostingDirectory, "ClusterHealthCheck.cs"), ToolTemplates.RenderClusterHealthCheck()));
+        }
+
+        return Task.WhenAll(writes);
+    }
+
+    private static Task WriteOperationsScaffoldingAsync(string projectRoot, NewCommandOptions options)
+    {
+        if (!ProjectConventions.UsesComposeDeployProfile(options.DeployProfile))
+        {
+            return Task.CompletedTask;
+        }
+
+        return Task.WhenAll(
+            WriteAsync(Path.Combine(projectRoot, "Server", "Dockerfile"), ToolTemplates.RenderServerDockerfile()),
+            WriteAsync(Path.Combine(projectRoot, "docker-compose.cluster.yml"), ToolTemplates.RenderClusterCompose(options)),
+            WriteAsync(Path.Combine(projectRoot, ".env.cluster.example"), ToolTemplates.RenderClusterEnvExample()),
+            WriteAsync(Path.Combine(projectRoot, "ops", "CLUSTER_OPERATIONS.md"), ToolTemplates.RenderClusterOperationsGuide()));
     }
 
     private static Task WriteAsync(string path, string content)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
         return File.WriteAllTextAsync(path, content + Environment.NewLine);
     }
 
@@ -298,6 +325,17 @@ internal sealed class ProjectScaffolder
         }
 
         EnsurePackageReference(project, "Npgsql", ToolPackageVersions.Npgsql);
+    }
+
+    private static void EnsureClusterPackageReferences(System.Xml.Linq.XElement project, NewCommandOptions options)
+    {
+        if (!ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile))
+        {
+            return;
+        }
+
+        EnsurePackageReference(project, "ULinkGame.Cluster", ToolPackageVersions.ULinkGameCluster);
+        EnsurePackageReference(project, "ULinkGame.Cluster.ULinkRPC", ToolPackageVersions.ULinkGameClusterULinkRpc);
     }
 
     private static void EnsureNuGetForUnityPackage(System.Xml.Linq.XElement packages, string id, string version)

@@ -33,10 +33,15 @@ namespace ULinkGame.Cluster
         }
 
         public async ValueTask<ClusterSendStatus> SendAsync(
-            NodeId target,
+            RouteLocation target,
             ClusterMessage message,
             CancellationToken cancellationToken = default)
         {
+            if (target is null)
+            {
+                throw new ArgumentNullException(nameof(target));
+            }
+
             if (message is null)
             {
                 throw new ArgumentNullException(nameof(message));
@@ -47,7 +52,7 @@ namespace ULinkGame.Cluster
             IClusterMessageHandler? handler;
             lock (_gate)
             {
-                _handlers.TryGetValue(target, out handler);
+                _handlers.TryGetValue(target.Node, out handler);
             }
 
             if (handler is null)

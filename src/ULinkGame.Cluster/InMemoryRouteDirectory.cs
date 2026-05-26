@@ -11,7 +11,7 @@ namespace ULinkGame.Cluster
         private readonly object _gate = new object();
         private readonly Dictionary<RouteKey, RouteLocation> _routes = new Dictionary<RouteKey, RouteLocation>();
 
-        public ValueTask RegisterAsync(
+        public ValueTask<RouteRegistrationStatus> RegisterAsync(
             RouteLocation location,
             CancellationToken cancellationToken = default)
         {
@@ -19,10 +19,22 @@ namespace ULinkGame.Cluster
 
             lock (_gate)
             {
+                if (_routes.TryGetValue(location.Route, out var existing))
+                {
+                    if (existing.IsExpired(DateTimeOffset.UtcNow))
+                    {
+                        _routes.Remove(location.Route);
+                    }
+                    else if (IsStaleRegistration(existing, location))
+                    {
+                        return new ValueTask<RouteRegistrationStatus>(RouteRegistrationStatus.StaleLocation);
+                    }
+                }
+
                 _routes[location.Route] = location;
             }
 
-            return default;
+            return new ValueTask<RouteRegistrationStatus>(RouteRegistrationStatus.Registered);
         }
 
         public ValueTask<RouteLocation?> ResolveAsync(
@@ -46,6 +58,37 @@ namespace ULinkGame.Cluster
                 }
 
                 return new ValueTask<RouteLocation?>(location);
+            }
+        }
+
+        public ValueTask<RouteLeaseRefreshStatus> RefreshLeaseAsync(
+            RouteLocation expectedLocation,
+            DateTimeOffset expiresAt,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            lock (_gate)
+            {
+                if (!_routes.TryGetValue(expectedLocation.Route, out var current))
+                {
+                    return new ValueTask<RouteLeaseRefreshStatus>(RouteLeaseRefreshStatus.RouteNotFound);
+                }
+
+                if (current.IsExpired(now))
+                {
+                    _routes.Remove(expectedLocation.Route);
+                    return new ValueTask<RouteLeaseRefreshStatus>(RouteLeaseRefreshStatus.Expired);
+                }
+
+                if (!current.HasSameOwner(expectedLocation))
+                {
+                    return new ValueTask<RouteLeaseRefreshStatus>(RouteLeaseRefreshStatus.StaleLocation);
+                }
+
+                _routes[expectedLocation.Route] = current.WithExpiresAt(expiresAt);
+                return new ValueTask<RouteLeaseRefreshStatus>(RouteLeaseRefreshStatus.Refreshed);
             }
         }
 
@@ -91,6 +134,54 @@ namespace ULinkGame.Cluster
 
                 return new ValueTask<int>(stale.Length);
             }
+        }
+
+        public ValueTask<int> ClearByNodeEpochAsync(
+            NodeId node,
+            long nodeEpoch,
+            CancellationToken cancellationToken = default)
+        {
+            if (nodeEpoch < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(nodeEpoch), "Node epoch cannot be negative.");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            lock (_gate)
+            {
+                var stale = _routes
+                    .Where(route => route.Value.Node == node && route.Value.NodeEpoch == nodeEpoch)
+                    .Select(route => route.Key)
+                    .ToArray();
+
+                foreach (var route in stale)
+                {
+                    _routes.Remove(route);
+                }
+
+                return new ValueTask<int>(stale.Length);
+            }
+        }
+
+        private static bool IsStaleRegistration(RouteLocation existing, RouteLocation candidate)
+        {
+            if (candidate.Generation < existing.Generation)
+            {
+                return true;
+            }
+
+            if (candidate.Generation > existing.Generation)
+            {
+                return false;
+            }
+
+            if (candidate.Node != existing.Node)
+            {
+                return true;
+            }
+
+            return candidate.NodeEpoch < existing.NodeEpoch;
         }
     }
 }

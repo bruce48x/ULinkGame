@@ -85,7 +85,8 @@ public sealed class ClusterRouterTests
         Assert.Equal(ClusterSendStatus.Accepted, status);
         Assert.Empty(handler.Messages);
         var sent = Assert.Single(messenger.Messages);
-        Assert.Equal(new NodeId("remote"), sent.Target);
+        Assert.Equal(new NodeId("remote"), sent.Target.Node);
+        Assert.Equal("in-memory://remote", sent.Target.Endpoint.Address);
         Assert.Same(message, sent.Message);
         Assert.Equal("corr-1", sent.Message.CorrelationId);
         Assert.Equal("trace-1", sent.Message.TraceId);
@@ -208,10 +209,10 @@ public sealed class ClusterRouterTests
             _status = status;
         }
 
-        public List<(NodeId Target, ClusterMessage Message)> Messages { get; } = new();
+        public List<(RouteLocation Target, ClusterMessage Message)> Messages { get; } = new();
 
         public ValueTask<ClusterSendStatus> SendAsync(
-            NodeId target,
+            RouteLocation target,
             ClusterMessage message,
             CancellationToken cancellationToken = default)
         {
@@ -225,11 +226,11 @@ public sealed class ClusterRouterTests
     {
         public int ResolveCount { get; private set; }
 
-        public ValueTask RegisterAsync(
+        public ValueTask<RouteRegistrationStatus> RegisterAsync(
             RouteLocation location,
             CancellationToken cancellationToken = default)
         {
-            return default;
+            return new ValueTask<RouteRegistrationStatus>(RouteRegistrationStatus.Registered);
         }
 
         public ValueTask<RouteLocation?> ResolveAsync(
@@ -248,8 +249,25 @@ public sealed class ClusterRouterTests
             return new ValueTask<int>(0);
         }
 
+        public ValueTask<RouteLeaseRefreshStatus> RefreshLeaseAsync(
+            RouteLocation expectedLocation,
+            DateTimeOffset expiresAt,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<RouteLeaseRefreshStatus>(RouteLeaseRefreshStatus.RouteNotFound);
+        }
+
         public ValueTask<int> ClearByNodeAsync(
             NodeId node,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<int>(0);
+        }
+
+        public ValueTask<int> ClearByNodeEpochAsync(
+            NodeId node,
+            long nodeEpoch,
             CancellationToken cancellationToken = default)
         {
             return new ValueTask<int>(0);

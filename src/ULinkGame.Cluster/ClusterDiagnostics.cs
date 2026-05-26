@@ -8,8 +8,8 @@ namespace ULinkGame.Cluster
         public const string MeterName = "ULinkGame.Cluster";
         public const string ActivitySourceName = "ULinkGame.Cluster";
 
-        public static readonly Meter Meter = new Meter(MeterName, "0.1.0");
-        public static readonly ActivitySource ActivitySource = new ActivitySource(ActivitySourceName, "0.1.0");
+        public static readonly Meter Meter = new Meter(MeterName, "0.1.1");
+        public static readonly ActivitySource ActivitySource = new ActivitySource(ActivitySourceName, "0.1.1");
 
         internal static readonly Counter<long> RouteLookupCounter = Meter.CreateCounter<long>(
             "ulinkgame.cluster.route.lookup");

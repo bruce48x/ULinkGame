@@ -5,16 +5,35 @@
 ### Released
 
 - `ULinkGame.Cluster` `0.1.0`
+- `ULinkGame.Cluster` `0.1.1`
+- `ULinkGame.Cluster.ULinkRPC` `0.1.0`
 - `ULinkGame.Server` `0.1.6`
+- `ULinkGame.Server` `0.1.7`
+- `ULinkGame.Tool` `0.2.2`
+- `ULinkGame.Tool` `0.2.3`
 
 ### Added
 
 - Added the initial `ULinkGame.Cluster` package with explicit node/route/message contracts, actor route envelopes, in-memory route directory, loopback messenger, router diagnostics, and unit tests.
+- Added route generation, node epoch, stale route registration rejection, conditional lease refresh, node-epoch clearing, and explicit stale route status values to `ULinkGame.Cluster`.
+- Added the initial `ULinkGame.Cluster.ULinkRPC` adapter package with a ULinkRPC cluster send method descriptor, node messenger, client factory, transport factory boundary, TCP transport factory, server binder, and unit tests.
+- Added a TCP smoke test proving that `ULinkGame.Cluster.ULinkRPC` can send a `ClusterMessage` through a ULinkRPC server binder.
+- Added `ULinkRpcRouteDirectory` and `ULinkRpcRouteDirectoryBinder` so route register, resolve, expiration, lease refresh, clear-by-node, and clear-by-node-epoch can run through a ULinkRPC-managed route directory service.
+- Added a TCP smoke test proving the ULinkRPC route directory adapter preserves route generation and node epoch semantics across the transport.
+- Added `samples/Cluster.TwoNode`, a cross-process ULinkRPC cluster smoke sample that starts separate route-directory and worker processes and verifies local dispatch, remote dispatch, route-not-found, expiration, timeout, handler-unavailable, backpressure, stale registration rejection, node-epoch clearing, and node restart.
+- Added explicit `ulinkgame-tool new --network-profile cluster` scaffolding for cluster package references, environment-variable-friendly cluster node, endpoint, lease, send-timeout settings, and a local `--health-check` configuration probe.
+- Added explicit `ulinkgame-tool new --deploy-profile compose` scaffolding for local cluster deployment rehearsal with Dockerfile, compose healthcheck, `.env.cluster.example`, and an operations note that avoids production secrets.
+- Added `ULinkRpcClusterDependencyProbe` so hosts can check ULinkRPC route-directory dependency health with bounded timeout and explicit healthy/timeout/unhealthy results.
 - Added `ClusterActorDispatcher<TActor>` in `ULinkGame.Server` to adapt explicit cluster actor envelopes into the local `IActorRuntime` mailbox without exposing transparent remote actor references.
 - Added a minimal `samples/Cluster.Loopback` sample that demonstrates in-memory local dispatch, remote loopback dispatch, route-not-found, expiration, timeout, and backpressure.
 
 ### Changed
 
+- Updated `ULinkRpcClusterClientFactory` so client cache reuse is scoped by node epoch and endpoint address, preventing a restarted node with the same `NodeId` from inheriting a stale connection.
+- Updated `ULinkGame.Server` to consume `ULinkActor` `0.2.0` while preserving the existing process-local `IActorRuntime` facade.
+- Updated `ULinkGame.Tool` so generated project templates consume `ULinkGame.Server` `0.1.7`.
+- Updated the cluster loopback sample to register generation-aware route locations.
+- Reorganized `CONTRIBUTING.md` around repository workflow, package boundaries, runtime architecture, cluster architecture, and the current development plan.
 - Documented the production cluster adapter decision: ULinkRPC is the first adapter direction, implemented as a separate transport package only after a real cross-process consumer exists.
 - Removed completed or external cluster planning tasks from `CONTRIBUTING.md`; the next implementation should start only when the production adapter gates are met.
 

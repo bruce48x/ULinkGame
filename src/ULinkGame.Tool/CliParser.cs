@@ -9,7 +9,8 @@ internal static class CliParser
         "--network-profile",
         "--serializer",
         "--persistence",
-        "--nugetforunity-source"
+        "--nugetforunity-source",
+        "--deploy-profile"
     ];
 
     public static NewCommandOptions ParseNewOptions(string[] args) => ParseNewOptions(args, ToolText.Current);
@@ -24,6 +25,7 @@ internal static class CliParser
         var serializer = ProjectConventions.DefaultSerializer;
         var persistence = ProjectConventions.DefaultPersistence;
         var nuGetForUnitySource = ProjectConventions.DefaultNuGetForUnitySource;
+        var deployProfile = ProjectConventions.DefaultDeployProfile;
 
         for (var index = 0; index < args.Length; index++)
         {
@@ -53,12 +55,15 @@ internal static class CliParser
                 case "--nugetforunity-source":
                     nuGetForUnitySource = ValidateChoice("--nugetforunity-source", ReadOptionValue(args, ref index, "--nugetforunity-source", text), ProjectConventions.SupportedNuGetForUnitySources, text);
                     break;
+                case "--deploy-profile":
+                    deployProfile = ValidateChoice("--deploy-profile", ReadOptionValue(args, ref index, "--deploy-profile", text), ProjectConventions.SupportedDeployProfiles, text);
+                    break;
                 default:
                     throw CreateUnsupportedArgumentException(args[index], NewOptions, text);
             }
         }
 
-        return new NewCommandOptions(name, outputPath, clientEngine, transport, networkProfile, serializer, persistence, nuGetForUnitySource);
+        return new NewCommandOptions(name, outputPath, clientEngine, transport, networkProfile, serializer, persistence, nuGetForUnitySource, deployProfile);
     }
 
     private static string ReadOptionValue(string[] args, ref int index, string optionName, ToolText text)

@@ -65,7 +65,7 @@ public sealed class ClusterDiagnosticsTests
             NewMessage(now.AddMinutes(1), correlationId: "corr-1", traceId: "trace-1"),
             TestContext.Current.CancellationToken);
 
-        var activity = Assert.Single(collector.Stopped, activity =>
+        var activity = Assert.Single(collector.Snapshot(), activity =>
             activity.OperationName == "send" &&
             Equals(activity.GetTagItem("ulinkgame.cluster.status"), "accepted") &&
             Equals(activity.GetTagItem("ulinkgame.cluster.message.kind"), "command"));
@@ -130,7 +130,7 @@ public sealed class ClusterDiagnosticsTests
         }
 
         public ValueTask<ClusterSendStatus> SendAsync(
-            NodeId target,
+            RouteLocation target,
             ClusterMessage message,
             CancellationToken cancellationToken = default)
         {
@@ -141,7 +141,9 @@ public sealed class ClusterDiagnosticsTests
 
     private sealed class ActivityCollector : IDisposable
     {
+        private readonly object _gate = new();
         private readonly ActivityListener _listener;
+        private readonly List<Activity> _stopped = new();
 
         public ActivityCollector()
         {
@@ -149,12 +151,24 @@ public sealed class ClusterDiagnosticsTests
             {
                 ShouldListenTo = source => source.Name == ClusterDiagnostics.ActivitySourceName,
                 Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-                ActivityStopped = activity => Stopped.Add(activity)
+                ActivityStopped = activity =>
+                {
+                    lock (_gate)
+                    {
+                        _stopped.Add(activity);
+                    }
+                }
             };
             ActivitySource.AddActivityListener(_listener);
         }
 
-        public List<Activity> Stopped { get; } = new();
+        public Activity[] Snapshot()
+        {
+            lock (_gate)
+            {
+                return _stopped.ToArray();
+            }
+        }
 
         public void Dispose()
         {

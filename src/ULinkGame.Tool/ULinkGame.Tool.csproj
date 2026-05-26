@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ulinkgame-tool</ToolCommandName>
     <PackageId>ULinkGame.Tool</PackageId>
-    <Version>0.2.1</Version>
+    <Version>0.2.3</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and source-generator based RPC workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;source-generator</PackageTags>
   </PropertyGroup>
@@ -32,6 +32,16 @@
       Query="/Project/PropertyGroup/Version/text()">
       <Output TaskParameter="Result" PropertyName="ULinkGameServerPackageVersion" />
     </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Cluster\ULinkGame.Cluster.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameClusterPackageVersion" />
+    </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Cluster.ULinkRPC\ULinkGame.Cluster.ULinkRPC.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameClusterULinkRpcPackageVersion" />
+    </XmlPeek>
 
     <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(GeneratedToolPackageVersionsFile)'))" />
 
@@ -41,6 +51,8 @@
       <GeneratedToolPackageVersionsLine Include="{" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClient = &quot;$(ULinkGameClientPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServer = &quot;$(ULinkGameServerPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameCluster = &quot;$(ULinkGameClusterPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClusterULinkRpc = &quot;$(ULinkGameClusterULinkRpcPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="}" />
     </ItemGroup>
 

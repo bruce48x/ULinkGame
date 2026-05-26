@@ -74,7 +74,7 @@ namespace ULinkGame.Cluster
 
             activity?.SetTag("ulinkgame.cluster.delivery", "remote");
             var remoteStatus = await _nodeMessenger.SendAsync(
-                location.Node,
+                location,
                 message,
                 cancellationToken).ConfigureAwait(false);
             RecordCompletion(activity, remoteStatus, "remote", message.Kind);
