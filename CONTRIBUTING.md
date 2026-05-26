@@ -2,7 +2,7 @@
 
 This document is for people working on the ULinkGame repository itself. User-facing package information belongs in `README.md`.
 
-## Project Layout
+## Repository Map
 
 ```txt
 src/
@@ -29,6 +29,121 @@ blog/
 ```
 
 User-facing articles live in the Hugo site under root `blog/`. Do not put internal architecture RFCs, repository design decisions, migration plans, or contributor-only technical notes under `blog/`; keep cross-cutting package decisions and repository architecture notes in this guide. Package-specific design notes are maintained in this guide when they affect package boundaries, server behavior, client behavior, or sample integration.
+
+### Samples
+
+The repository currently contains two sample clients:
+
+```txt
+samples/Agar.Unity/
+  Shared/  MemoryPack contracts and shared gameplay kernel
+  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
+  Client/  Unity client
+
+samples/Agar.Godot/
+  Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
+```
+
+`samples/Agar.Unity` demonstrates:
+
+- a Unity client plus .NET server game layout
+- WebSocket as the long-lived control connection
+- KCP for realtime gameplay traffic
+- reconnect-aware login flow
+- business-level reliable push for server notifications
+- an agar-style arena built on a shared simulation kernel
+
+`samples/Agar.Godot` is intentionally smaller. It is an offline Godot .NET client playground that reuses the shared agar gameplay kernel and `ULinkGame.Client` reliable push helpers.
+
+Sample-specific documentation and local infrastructure live with the sample:
+
+- `samples/Agar.Unity/README.md`
+- `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`
+- `samples/Agar.Unity/docs/DEVELOPMENT_PLAN.md`
+- `samples/Agar.Unity/docker-compose.yml`
+- `samples/Agar.Unity/.env.example`
+- `samples/Agar.Unity/infra/`
+
+Run the sample server:
+
+```powershell
+dotnet run --project samples/Agar.Unity/Server/Gateway/Gateway.csproj
+```
+
+Open `samples/Agar.Unity/Client` in Unity for the client.
+
+Open `samples/Agar.Godot` in Godot 4 .NET for the Godot client playground.
+
+## Contributor Workflow
+
+### Build And Test
+
+Build framework projects:
+
+```powershell
+dotnet build src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj
+dotnet build src/ULinkGame.Server/ULinkGame.Server.csproj
+dotnet build src/ULinkGame.Client/ULinkGame.Client.csproj
+dotnet build src/ULinkGame.Cluster/ULinkGame.Cluster.csproj
+dotnet build src/ULinkGame.Tool/ULinkGame.Tool.csproj
+```
+
+Build and run unit tests:
+
+```powershell
+dotnet test Tests/tests.slnx
+```
+
+Sample-specific tests live with their sample, for example `samples/Agar.Unity/tests/BusinessLogic.Tests`.
+
+The Unity project may generate local `Library`, `Temp`, `obj`, and restored NuGet package folders. These are ignored and should not be committed.
+
+### NuGet Release
+
+Framework packages are published to nuget.org by the `Publish NuGet` GitHub Actions workflow:
+
+```txt
+.github/workflows/publish-nuget.yml
+```
+
+The workflow runs automatically on pushes to `main` when one of these paths changes:
+
+- `.github/workflows/publish-nuget.yml`
+- `Directory.Build.props`
+- `NuGet.config`
+- `src/**`
+- `Tests/**`
+
+The workflow uses .NET `10.0.x`, restores all test and package projects, runs the client and server package tests, packs every project under `src/*/*.csproj`, then pushes all generated `.nupkg` files to nuget.org with `--skip-duplicate`.
+
+The packages currently published by this workflow are:
+
+- `ULinkGame.Abstractions`, versioned in `src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj`
+- `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
+- `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
+- `ULinkGame.Cluster`, versioned in `src/ULinkGame.Cluster/ULinkGame.Cluster.csproj`
+- `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
+
+Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
+
+To release a new package version:
+
+1. Update the `<Version>` in the owning `.csproj`.
+2. Update `CHANGELOG.md` with the released package id and version.
+3. Update generated template constants or sample package references if the released package is consumed by scaffolding or samples.
+4. Run the relevant local tests before merging.
+5. Merge or push to `main`; the GitHub Actions workflow publishes the packages.
+
+Useful local checks:
+
+```powershell
+dotnet test Tests/tests.slnx
+dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Cluster/ULinkGame.Cluster.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
+```
 
 ## Package Boundaries
 
@@ -101,35 +216,7 @@ When `ulinkgame-tool new` augments a generated project, it should preserve start
 
 If a generated project needs a different `ULinkRPC.*` package version or client layout, fix `ulinkrpc-starter` first and then update the `ulinkrpc-starter` version consumed by `ULinkGame.Tool`.
 
-## Package Decision
-
-### Background
-
-The framework started as a thin server-hosting layer: it wired ULinkRPC servers, dependency injection, and process lifetime. ULinkGame now focuses on game-session infrastructure above raw RPC: endpoint hosting, reconnect decisions, reliable business push, and client/server session state. Process-local actor mailbox execution has been split into the standalone `ULinkActor` package so the lightweight game-oriented runtime can evolve independently and outlive ULinkGame if needed.
-
-- reconnect versus new-session decisions
-- business push sequencing
-- client acknowledgement semantics
-- replay after reconnect
-- state-mismatch handling when the server no longer has compatible session state
-
-The old `Host` name now undersells the scope and can imply a server-only library.
-
-### Decision
-
-Rename the framework family to `ULinkGame`.
-
-The first package split is:
-
-- `ULinkGame.Abstractions`
-- `ULinkGame.Server`
-- `ULinkGame.Client`
-
-Do not introduce `ULinkGame.Shared` yet.
-
-Do not introduce `ULinkGame.Unity` yet.
-
-### Why ULinkGame
+## Product Line Boundaries
 
 `ULinkGame` clearly communicates that this layer is above raw RPC and standalone actor hosting, and is intended for game networking workflows. The relationship should be:
 
@@ -140,7 +227,7 @@ Do not introduce `ULinkGame.Unity` yet.
 
 This keeps the product line understandable without forcing a thick game framework.
 
-### Why ULinkGame.Abstractions, Not ULinkGame.Shared
+### Shared Contracts
 
 `ULinkGame.Abstractions` exists because session identity, reliable push sequence values, and acknowledgement outcomes are now genuinely shared framework concepts. Keeping these types in either `ULinkGame.Server` or `ULinkGame.Client` makes the opposite side depend on the wrong runtime package.
 
@@ -162,7 +249,7 @@ For now, shared business contracts should remain in the user's own shared projec
 
 `ULinkGame.Abstractions` communicates framework-owned contracts only. Keep it limited to primitives that both runtime packages need.
 
-### Why Not ULinkGame.Unity Now
+### Unity Package Boundary
 
 Unity-specific integration is useful, but it should not be the first client package. The reusable core should not depend on:
 
@@ -175,8 +262,6 @@ Unity-specific integration is useful, but it should not be the first client pack
 The first client package should be a plain .NET library. Unity projects can consume it through normal package/import mechanisms while keeping Unity-specific glue in the sample or in the user's project.
 
 `ULinkGame.Unity` can be added later only when repeated Unity-specific integration code becomes stable enough to justify a package.
-
-### First Client Library Boundary
 
 `ULinkGame.Client` should own client-side mechanisms that are not engine-specific:
 
@@ -200,132 +285,7 @@ Unity sample code should remain responsible for:
 - choosing how to display reconnect/new-session outcomes
 - calling generated RPC clients
 
-### Migration Plan
-
-1. Keep reusable framework code under `src/ULinkGame.Abstractions`, `src/ULinkGame.Server`, `src/ULinkGame.Client`, and `src/ULinkGame.Tool`.
-2. Keep sample-owned `Shared`, `Server`, and `Client` projects under `samples/Agar.Unity`.
-3. Keep business DTOs in the sample or consuming game's `Shared` project.
-4. Keep cross-package framework decisions in this guide, package-specific design with the owning package when the scope is local, and sample design under `samples/Agar.Unity/docs`.
-5. Replace sample-local reliable sequence bookkeeping with `ULinkGame.Client` where practical.
-
-### Compatibility Note
-
-During early development, breaking namespace and project-name changes are acceptable. Once packaged, add compatibility shims or a migration guide only if external users already depend on older package names.
-
-## Samples
-
-The repository currently contains two sample clients:
-
-```txt
-samples/Agar.Unity/
-  Shared/  MemoryPack contracts and shared gameplay kernel
-  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
-  Client/  Unity client
-
-samples/Agar.Godot/
-  Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
-```
-
-`samples/Agar.Unity` demonstrates:
-
-- a Unity client plus .NET server game layout
-- WebSocket as the long-lived control connection
-- KCP for realtime gameplay traffic
-- reconnect-aware login flow
-- business-level reliable push for server notifications
-- an agar-style arena built on a shared simulation kernel
-
-`samples/Agar.Godot` is intentionally smaller. It is an offline Godot .NET client playground that reuses the shared agar gameplay kernel and `ULinkGame.Client` reliable push helpers.
-
-Sample-specific documentation and local infrastructure live with the sample:
-
-- `samples/Agar.Unity/README.md`
-- `samples/Agar.Unity/docs/GAMEPLAY_DESIGN.md`
-- `samples/Agar.Unity/docs/DEVELOPMENT_PLAN.md`
-- `samples/Agar.Unity/docker-compose.yml`
-- `samples/Agar.Unity/.env.example`
-- `samples/Agar.Unity/infra/`
-
-Run the sample server:
-
-```powershell
-dotnet run --project samples/Agar.Unity/Server/Gateway/Gateway.csproj
-```
-
-Open `samples/Agar.Unity/Client` in Unity for the client.
-
-Open `samples/Agar.Godot` in Godot 4 .NET for the Godot client playground.
-
-## Build And Test
-
-Build framework projects:
-
-```powershell
-dotnet build src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj
-dotnet build src/ULinkGame.Server/ULinkGame.Server.csproj
-dotnet build src/ULinkGame.Client/ULinkGame.Client.csproj
-dotnet build src/ULinkGame.Cluster/ULinkGame.Cluster.csproj
-dotnet build src/ULinkGame.Tool/ULinkGame.Tool.csproj
-```
-
-Build and run unit tests:
-
-```powershell
-dotnet test Tests/tests.slnx
-```
-
-Sample-specific tests live with their sample, for example `samples/Agar.Unity/tests/BusinessLogic.Tests`.
-
-The Unity project may generate local `Library`, `Temp`, `obj`, and restored NuGet package folders. These are ignored and should not be committed.
-
-## NuGet Release
-
-Framework packages are published to nuget.org by the `Publish NuGet` GitHub Actions workflow:
-
-```txt
-.github/workflows/publish-nuget.yml
-```
-
-The workflow runs automatically on pushes to `main` when one of these paths changes:
-
-- `.github/workflows/publish-nuget.yml`
-- `Directory.Build.props`
-- `NuGet.config`
-- `src/**`
-- `Tests/**`
-
-The workflow uses .NET `10.0.x`, restores all test and package projects, runs the client and server package tests, packs every project under `src/*/*.csproj`, then pushes all generated `.nupkg` files to nuget.org with `--skip-duplicate`.
-
-The packages currently published by this workflow are:
-
-- `ULinkGame.Abstractions`, versioned in `src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj`
-- `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
-- `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
-- `ULinkGame.Cluster`, versioned in `src/ULinkGame.Cluster/ULinkGame.Cluster.csproj`
-- `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
-
-Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
-
-To release a new package version:
-
-1. Update the `<Version>` in the owning `.csproj`.
-2. Update `CHANGELOG.md` with the released package id and version.
-3. Update generated template constants or sample package references if the released package is consumed by scaffolding or samples.
-4. Run the relevant local tests before merging.
-5. Merge or push to `main`; the GitHub Actions workflow publishes the packages.
-
-Useful local checks:
-
-```powershell
-dotnet test Tests/tests.slnx
-dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Cluster/ULinkGame.Cluster.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
-```
-
-## Design Boundary
+## Framework Scope
 
 ULinkGame should not become a full game business framework. Keep the boundary narrow:
 
@@ -334,11 +294,7 @@ ULinkGame should not become a full game business framework. Keep the boundary na
 
 When a capability is only useful to one sample, keep it under that sample in `samples/`. Move it into `src` only when it is demonstrably reusable across games.
 
-## Runtime And Cluster Architecture
-
-This section consolidates the repository architecture notes. It records direction for future framework work; it is not a claim that every capability already exists in `src/`.
-
-### Framework Admission Rules
+### Admission Rules
 
 A concept belongs in ULinkGame only when it is infrastructure, not gameplay semantics; useful across multiple game genres; compatible with low-latency online workflows; and able to expose failure, backpressure, and state mismatch explicitly.
 
@@ -362,7 +318,9 @@ Bad candidates:
 - inventory, guild, leaderboard policy, rewards, quests, or product DTOs
 - Unity/Godot UI architecture
 
-### ULinkActor Boundary
+## Runtime Architecture
+
+### Actor Runtime Boundary
 
 `ULinkActor` owns the process-local actor/mailbox runtime. ULinkGame builds on it but should not absorb it.
 
@@ -385,64 +343,190 @@ ULinkGame is responsible for:
 
 ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
 
-### ULinkActor 0.2.0 Upgrade Plan
+### Endpoint Model
 
-`ULinkActor` `0.2.0` adds runtime features that are useful to ULinkGame, so the dependency update should be treated as a small integration change rather than a version-only bump.
+ULinkGame should support multiple named RPC endpoints or channels, but it should not force every game to understand a fixed "control connection plus realtime connection" split.
 
-Current ULinkGame dependency:
+The reusable framework capability is:
 
-- `src/ULinkGame.Server/ULinkGame.Server.csproj` references `ULinkActor` `0.1.9`.
-- `ULinkGame.Server` wraps `ULinkActor.ActorSystem` behind `IActorRuntime`, `Actor`, `ActorContext`, and `ULinkActorRuntime`.
-- ULinkGame does not reference `ULinkActor.SourceGenerator` directly today; consuming game projects may add it when they use native ULinkActor typed actors or generated actor clients.
+- host several named ULinkRPC servers in the same .NET process
+- let projects choose transport, serializer, endpoint names, and lifecycle policy
+- provide connection/session lifecycle helpers that can work with one endpoint or several endpoints
+- keep logging, health checks, and diagnostics understandable per endpoint
 
-Upgrade objectives:
+The default user mental model should remain simple: one session endpoint can handle login, normal requests, reliable business push, and reconnect for light online games.
 
-- Update `ULinkGame.Server` to consume `ULinkActor` `0.2.0`.
-- Preserve ULinkGame's narrow actor facade for sample and framework code that uses `IActorRuntime`.
-- Decide explicitly which new ULinkActor features should surface through ULinkGame and which should remain available only through direct ULinkActor usage.
-- Keep ULinkActor's process-local boundary intact. Do not use this upgrade to add transparent remote actors, distributed actor proxies, persistence, gameplay concepts, or cluster transport.
+The control/realtime split is only an optional example for games that need high-frequency, low-latency gameplay traffic. In that model:
 
-Required implementation work before the version bump is complete:
+- the control endpoint handles login, matchmaking, room entry, settlement, low-frequency queries, and reliable business push
+- the realtime endpoint handles input, snapshots, and other high-frequency gameplay traffic
 
-1. Update the `ULinkActor` package reference in `ULinkGame.Server`.
-2. Build `ULinkGame.Server` against `ULinkActor` `0.2.0` and adjust only for real compile or behavior changes.
-3. Review `ULinkActorRuntime` message delivery:
-   - keep `AskAsync` on `Call<T>` so call timeouts continue to flow through ULinkActor diagnostics;
-   - decide whether `TellAsync` should continue to await `Send` or expose a new immediate-send path that maps `ActorRef<TMessage>.TrySend(...)` to a ULinkGame result type;
-   - do not hide mailbox-full or actor-unavailable conditions behind best-effort fire-and-forget behavior.
-4. Review timer behavior:
-   - ULinkGame's current timer wrapper posts back through `TellAsync`;
-   - decide whether this remains sufficient or should be replaced by native ULinkActor mailbox timers in a later API;
-   - failed timer posts must be observable and must not disappear silently.
-5. Wire useful diagnostics without creating ULinkGame-specific duplicates:
-   - make `ActorSystem.CallTimedOut`, dead-letter, and slow-message events reachable through logging or options if ULinkGame owns the actor runtime instance;
-   - rely on ULinkActor's `Meter` and `ActivitySource` names for low-level actor metrics/tracing;
-   - keep ULinkGame metrics focused on game-session, endpoint, reliable-push, and later cluster behavior.
-6. Decide whether ULinkGame needs stop/drain APIs:
-   - ULinkActor `0.2.0` exposes bounded stop/drain results;
-   - ULinkGame should add a facade only if gateway shutdown, session teardown, or tests need actor drain semantics at the ULinkGame layer.
-7. Review lifecycle hooks:
-   - ULinkGame actors currently activate through `Actor.ActivateAsync(ActorContext, CancellationToken)`;
-   - do not mix ULinkGame activation with ULinkActor native `IActorStarted<TMessage>` / `IActorStopping<TMessage>` unless there is a clear adapter contract.
-8. Update user-facing server documentation only after the runtime behavior is final:
-   - mention `ULinkActor` `0.2.0` where package install examples imply a concrete version;
-   - explain when users should add `ULinkActor.SourceGenerator` directly to their game projects.
-9. Update `CHANGELOG.md` with the exact package versions released by ULinkGame and a short note about ULinkActor `0.2.0` integration.
+This split belongs in samples or templates that explicitly opt into that shape. It should not become a mandatory package concept, and starter output should avoid introducing realtime attach, room runtime, or dual-connection terminology unless the selected project shape needs it.
 
-Required tests:
+### Reliable Business Push
 
-- Existing actor runtime tests still pass after the package update.
-- Add a mailbox backpressure test if ULinkGame exposes a non-throwing immediate-send API.
-- Add a call-timeout diagnostic test if ULinkGame wires `ActorSystem.CallTimedOut` through options or logging.
-- Add a timer failure or observability test if timer posts can be rejected by mailbox backpressure.
-- Run `dotnet test Tests/tests.slnx` before releasing any ULinkGame package that consumes the new actor version.
+#### Problem
 
-Release impact:
+Server callbacks are currently fire-and-forget at the business layer. A transport can report that a push write was accepted, while the target player reconnects before the client applies the business event.
 
-- If only `ULinkGame.Server` changes, release at least `ULinkGame.Server`.
-- If generated templates or package constants consume the updated server package, release `ULinkGame.Tool` as well.
-- If sample package references or docs change, update the relevant sample docs in the same change.
-- Do not bump `ULinkGame.Client` or `ULinkGame.Abstractions` unless their public API or package metadata changes.
+Example:
+
+1. Players A and B enter matchmaking.
+2. The server creates a room and pushes `Matched` to both clients.
+3. A receives and handles the push.
+4. B reconnects during the push window.
+5. The old connection is gone, but the server has no business-level proof that B handled `Matched`.
+6. B may stay on the waiting screen forever.
+
+The transport can reduce packet loss, but it cannot prove that the client applied a business event after a reconnect. The fix needs to be above transport: reliable, idempotent business push.
+
+#### Recommended Model
+
+Use at-least-once delivery with per-player monotonic sequence numbers.
+
+This is a better fit than trying to implement exactly-once delivery:
+
+- Exactly-once is not realistic across reconnects, retries, client crashes, and server failover.
+- At-least-once plus idempotent client handling is predictable and common for low-frequency session and business flows.
+- Sequence numbers let clients discard duplicates and let servers prune acknowledged messages.
+- The mechanism is generic enough for `ULinkGame.Server`; matchmaking, rooms, mail, rewards, and other features can opt in without entering host core as business concepts.
+
+#### Layering
+
+`ULinkGame.Server` owns the generic mechanism:
+
+- allocate a per-owner sequence number
+- store pending reliable push records
+- replay pending records after reconnect
+- accept acknowledgements and prune old records
+- apply retention and pending-count limits
+
+Business code owns business semantics:
+
+- choose which push messages require reliability
+- include the reliable sequence in its payload
+- expose an ack RPC or piggyback ack on an existing request
+- make client handlers idempotent by ignoring already applied sequence numbers
+
+This keeps `ULinkGame.Server` as host infrastructure rather than a matchmaking or room framework.
+
+#### Message Flow
+
+Publishing a reliable push:
+
+1. Business code asks `IReliablePushOutbox` to publish a payload for `ownerKey`.
+2. The outbox assigns `sequence = lastSequence(ownerKey) + 1`.
+3. The outbox stores `{ ownerKey, sequence, kind, payload }`.
+4. The business delivery delegate sends the payload to the current callback, including `sequence`.
+5. If the current callback is missing or disconnected, the record stays pending.
+
+Acknowledging:
+
+1. The client applies the business message.
+2. The client sends the latest applied sequence to the server.
+3. The outbox removes records with `sequence <= latestAppliedSequence`.
+
+Reconnecting:
+
+1. The client reconnects through normal login/resume flow.
+2. The server rebinds the new callback.
+3. The server calls `ReplayPendingAsync(ownerKey, deliver)`.
+4. Pending records are pushed again through the new callback.
+5. The client ignores duplicates whose sequence is not newer than its local latest applied sequence.
+
+#### State Mismatch
+
+Reliable push must also handle the case where the client believes it is resuming a valid session, but the server no longer has compatible state. This can happen when:
+
+- the client stayed offline beyond the reconnect grace period
+- the gateway process restarted and lost its in-memory outbox
+- server-side cleanup removed the session before the client returned
+
+The server should not silently accept this as a successful reconnect. It must return an explicit "state lost" result and require a new session.
+
+Prefer authoritative-state refresh before declaring the session lost:
+
+```mermaid
+flowchart TD
+    A["Client reconnects or sends reliable-push ack"] --> B["Server validates session token and generation"]
+    B -->|invalid| L["StateLost / NewSessionRequired"]
+    B -->|valid| C["Server compares client sequence and session state"]
+    C -->|compatible| R["Resume and replay pending records"]
+    C -->|mismatch| D["Can server validate authoritative session state?"]
+    D -->|yes| E["StateRefreshRequired"]
+    E --> F["Client clears transient state and reliable sequence"]
+    F --> G["Client fetches authoritative session snapshot"]
+    G --> H["Client resumes lobby, match, room, or settlement from snapshot"]
+    D -->|no| L
+    L --> I["Client clears cached session, room, match, endpoint binding, and reliable sequence"]
+    I --> J["Client starts a new login/session flow"]
+```
+
+There are two detection points:
+
+- `LoginAsync(reconnect: true)`: before accepting the reconnect, the server verifies that the session still exists and that the token matches. If not, it returns a reconnect-state-lost code.
+- reliable push ack: if the client acknowledges a sequence greater than the server's last known sequence, the server knows the client has state from a different or expired server session. The ack response should request a new session.
+
+Client behavior:
+
+1. Stop treating the current flow as recoverable.
+2. Clear cached room, endpoint bindings, pending callbacks, and latest reliable sequence.
+3. Start a normal login/new-session flow instead of retrying reconnect.
+4. Return the player to a coherent lobby or login state; do not leave them on a stale matchmaking or in-match screen.
+
+#### Persistence
+
+The default outbox is process-local and in-memory. Reliable push is a short-window, low-frequency session/business notification mechanism, not a durable business event log and not the source of truth for game state.
+
+If a server process restarts or otherwise loses the outbox, the server should not pretend that replay is still possible. It should return an explicit state-lost result when reconnect or acknowledgement proves that the client has state the server can no longer validate. The client must then clear local session state, reset reliable sequence tracking, and start a new session or return to a coherent lobby/login flow.
+
+Business code should recover from missing reliable pushes through authoritative state queries when the authoritative state still exists. If the authoritative state is gone, forcing a new session is preferred over replaying stale notifications.
+
+Projects may still replace `IReliablePushOutbox` with a durable implementation for specialized low-frequency business events, but that is a project-specific choice. A durable outbox must preserve consistency with the authoritative business state and absorb the added performance, storage, retention, and operations costs. It should not be the ULinkGame default or a reason to turn framework reliable push into a general event-sourcing system.
+
+#### Retention
+
+Reliable push is not an infinite event log.
+
+Defaults:
+
+- pending retention: 2 minutes
+- max pending records per owner: 256
+
+If a client does not reconnect and ack within the retention window, business code must recover via authoritative state queries or force the player back to a coherent screen.
+
+#### Client Rules
+
+Clients must:
+
+- store the latest applied reliable sequence per player/session
+- apply messages only when `sequence > latestAppliedSequence`
+- ack only after the UI/session state transition has been applied
+- tolerate receiving the same business message more than once
+
+Reliable push is for low-frequency business or session transitions where missing one event can block the user flow. High-frequency realtime snapshots should be superseded by newer snapshots, not replayed as reliable history.
+
+### Hotfix Boundary
+
+Hotfix is an engineering goal, but it should not pollute the core actor or session APIs.
+
+Recommended model:
+
+```txt
+stable runtime state + replaceable business logic
+```
+
+Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
+
+First versions should avoid hotfixing:
+
+- actor runtime internals
+- serializer protocol structure
+- transport protocol structure
+- persistent state schema
+- low-level schedulers
+
+## Cluster Architecture
 
 ### Node And Execution Model
 
@@ -486,7 +570,7 @@ Expected flow:
 
 The first implementation should provide in-memory directory and loopback messenger behavior for tests. Production adapters should be pluggable and added only after the abstractions are validated by a sample or generated template. Candidate adapters include ULinkRPC internal transport, gRPC, Redis pub/sub, or a custom message bus.
 
-### Cluster Production Adapter Decision
+### Production Adapter Decision
 
 The first production adapter should be a ULinkRPC internal transport adapter, but it should be implemented only when a real sample, generated template, or consuming project needs cross-process cluster routing.
 
@@ -508,6 +592,8 @@ Implementation gates before adding `ULinkGame.Cluster.ULinkRPC`:
 4. Metrics and activity spans preserve the current low-cardinality cluster tags.
 5. The adapter does not change `IRouteDirectory`, `IClusterRouter`, `INodeMessenger`, or `IClusterMessageHandler` into transport-specific APIs.
 
+### Prior Art And Direction
+
 Skynet-derived cluster principles:
 
 - Keep cluster support as infrastructure, not a full distributed actor platform. Provide node identity, route location, message delivery, diagnostics, and explicit failure results first.
@@ -515,6 +601,15 @@ Skynet-derived cluster principles:
 - Treat overload as a normal result, not an exceptional surprise. Route lookup success does not guarantee delivery; node messenger, remote inbox, and target actor mailbox can all reject work with backpressure.
 - Keep trace context in the message envelope. Cluster messages should carry correlation data that lets tools reconstruct route lookup, remote send, receive, local dispatch, and actor handling time.
 - Do not use `ClusterMessage` as a generic large-state sync protocol. Large snapshots, fanout target sets, and repeated state should use application-owned versioning, caching, or diff protocols.
+
+Skynet and ET framework comparison:
+
+- Skynet cluster RPC is closest to explicit node-to-node message delivery. Callers address a node plus service name or address, the local cluster sender writes a request over TCP, the remote cluster agent dispatches to the target service, and call responses are correlated back to the waiting coroutine by session id. This is useful prior art for a future `INodeMessenger`: keep node messaging simple, expose send versus call semantics clearly, and do not pretend the cluster is a complete deployment, discovery, or failover system.
+- ET's ActorLocation model is closer to location-transparent actor messaging. A stable entity id is resolved through a Location Server to a current actor instance id; senders cache the resolved location, retry after actor-not-found or migration failures, and use location locks during migration so concurrent sends can wait for a new location. This is useful prior art for route directory behavior: generation-aware locations, cache invalidation, bounded retry, and migration or rebinding locks.
+- ULinkGame should borrow ET's location-directory mechanics without adopting ET's transparent remote actor surface. A future route location layer may support stable route keys, node epochs, location generations, stale-location detection, and bounded re-resolution after `RouteNotFound`, `HandlerUnavailable`, timeout, or state-moved results. The public API should still require callers to use explicit route or cluster APIs and handle remote failure outcomes.
+- Do not add a generated remote actor client that has the same method shape as a process-local actor reference. If request/reply is added above `IClusterRouter`, name it as remote work, require timeout and expiration, and return a structured delivery or call result.
+- Do not turn route lookup into a hidden global singleton. If the framework adds cached route senders, cache lifetime, invalidation, node epoch mismatch, and retry count must be visible in options and diagnostics.
+- Do not make migration a default framework promise. ULinkGame may support rebinding route locations and rejecting stale generations; application-owned room transfer, snapshot handoff, and authoritative state repair remain game protocols unless repeated projects prove a reusable infrastructure shape.
 
 ### Cluster Management
 
@@ -533,26 +628,6 @@ Recommended lifecycle:
 
 Shutdown should use explicit draining rather than destructor-style cleanup. A draining node should stop accepting new route ownership, reject or redirect new remote sends, finish only bounded in-flight work, close external connections, flush required state, and then let process shutdown terminate anything still unfinished. The framework should not promise that every pending distributed request naturally completes during shutdown.
 
-### Hotfix Boundary
-
-Hotfix is an engineering goal, but it should not pollute the core actor or session APIs.
-
-Recommended model:
-
-```txt
-stable runtime state + replaceable business logic
-```
-
-Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
-
-First versions should avoid hotfixing:
-
-- actor runtime internals
-- serializer protocol structure
-- transport protocol structure
-- persistent state schema
-- low-level schedulers
-
 ### Deferred Cluster Capabilities
 
 Do not implement these as default framework behavior in the first cluster module:
@@ -566,779 +641,166 @@ Do not implement these as default framework behavior in the first cluster module
 - Raft-based cluster consensus
 - cross-node shared mutable objects
 
-## Endpoint Model Boundary
-
-ULinkGame should support multiple named RPC endpoints or channels, but it should not force every game to understand a fixed "control connection plus realtime connection" split.
-
-The reusable framework capability is:
-
-- host several named ULinkRPC servers in the same .NET process
-- let projects choose transport, serializer, endpoint names, and lifecycle policy
-- provide connection/session lifecycle helpers that can work with one endpoint or several endpoints
-- keep logging, health checks, and diagnostics understandable per endpoint
-
-The default user mental model should remain simple: one session endpoint can handle login, normal requests, reliable business push, and reconnect for light online games.
-
-The control/realtime split is only an optional example for games that need high-frequency, low-latency gameplay traffic. In that model:
-
-- the control endpoint handles login, matchmaking, room entry, settlement, low-frequency queries, and reliable business push
-- the realtime endpoint handles input, snapshots, and other high-frequency gameplay traffic
-
-This split belongs in samples or templates that explicitly opt into that shape. It should not become a mandatory package concept, and starter output should avoid introducing realtime attach, room runtime, or dual-connection terminology unless the selected project shape needs it.
-
-## Reliable Business Push Design
-
-### Problem
-
-Server callbacks are currently fire-and-forget at the business layer. A transport can report that a push write was accepted, while the target player reconnects before the client applies the business event.
-
-Example:
-
-1. Players A and B enter matchmaking.
-2. The server creates a room and pushes `Matched` to both clients.
-3. A receives and handles the push.
-4. B reconnects during the push window.
-5. The old connection is gone, but the server has no business-level proof that B handled `Matched`.
-6. B may stay on the waiting screen forever.
-
-The transport can reduce packet loss, but it cannot prove that the client applied a business event after a reconnect. The fix needs to be above transport: reliable, idempotent business push.
-
-### Recommended Model
-
-Use at-least-once delivery with per-player monotonic sequence numbers.
-
-This is a better fit than trying to implement exactly-once delivery:
-
-- Exactly-once is not realistic across reconnects, retries, client crashes, and server failover.
-- At-least-once plus idempotent client handling is predictable and common for low-frequency session and business flows.
-- Sequence numbers let clients discard duplicates and let servers prune acknowledged messages.
-- The mechanism is generic enough for `ULinkGame.Server`; matchmaking, rooms, mail, rewards, and other features can opt in without entering host core as business concepts.
-
-### Layering
-
-`ULinkGame.Server` owns the generic mechanism:
-
-- allocate a per-owner sequence number
-- store pending reliable push records
-- replay pending records after reconnect
-- accept acknowledgements and prune old records
-- apply retention and pending-count limits
-
-Business code owns business semantics:
-
-- choose which push messages require reliability
-- include the reliable sequence in its payload
-- expose an ack RPC or piggyback ack on an existing request
-- make client handlers idempotent by ignoring already applied sequence numbers
-
-This keeps `ULinkGame.Server` as host infrastructure rather than a matchmaking or room framework.
-
-### Message Flow
-
-Publishing a reliable push:
-
-1. Business code asks `IReliablePushOutbox` to publish a payload for `ownerKey`.
-2. The outbox assigns `sequence = lastSequence(ownerKey) + 1`.
-3. The outbox stores `{ ownerKey, sequence, kind, payload }`.
-4. The business delivery delegate sends the payload to the current callback, including `sequence`.
-5. If the current callback is missing or disconnected, the record stays pending.
-
-Acknowledging:
-
-1. The client applies the business message.
-2. The client sends the latest applied sequence to the server.
-3. The outbox removes records with `sequence <= latestAppliedSequence`.
-
-Reconnecting:
-
-1. The client reconnects through normal login/resume flow.
-2. The server rebinds the new callback.
-3. The server calls `ReplayPendingAsync(ownerKey, deliver)`.
-4. Pending records are pushed again through the new callback.
-5. The client ignores duplicates whose sequence is not newer than its local latest applied sequence.
-
-### State Mismatch
-
-Reliable push must also handle the case where the client believes it is resuming a valid session, but the server no longer has compatible state. This can happen when:
-
-- the client stayed offline beyond the reconnect grace period
-- the gateway process restarted and lost its in-memory outbox
-- server-side cleanup removed the session before the client returned
-
-The server should not silently accept this as a successful reconnect. It must return an explicit "state lost" result and require a new session.
-
-Prefer authoritative-state refresh before declaring the session lost:
-
-```mermaid
-flowchart TD
-    A["Client reconnects or sends reliable-push ack"] --> B["Server validates session token and generation"]
-    B -->|invalid| L["StateLost / NewSessionRequired"]
-    B -->|valid| C["Server compares client sequence and session state"]
-    C -->|compatible| R["Resume and replay pending records"]
-    C -->|mismatch| D["Can server validate authoritative session state?"]
-    D -->|yes| E["StateRefreshRequired"]
-    E --> F["Client clears transient state and reliable sequence"]
-    F --> G["Client fetches authoritative session snapshot"]
-    G --> H["Client resumes lobby, match, room, or settlement from snapshot"]
-    D -->|no| L
-    L --> I["Client clears cached session, room, match, endpoint binding, and reliable sequence"]
-    I --> J["Client starts a new login/session flow"]
-```
-
-There are two detection points:
-
-- `LoginAsync(reconnect: true)`: before accepting the reconnect, the server verifies that the session still exists and that the token matches. If not, it returns a reconnect-state-lost code.
-- reliable push ack: if the client acknowledges a sequence greater than the server's last known sequence, the server knows the client has state from a different or expired server session. The ack response should request a new session.
-
-Client behavior:
-
-1. Stop treating the current flow as recoverable.
-2. Clear cached room, endpoint bindings, pending callbacks, and latest reliable sequence.
-3. Start a normal login/new-session flow instead of retrying reconnect.
-4. Return the player to a coherent lobby or login state; do not leave them on a stale matchmaking or in-match screen.
-
-### Persistence
-
-The default outbox is process-local and in-memory. Reliable push is a short-window, low-frequency session/business notification mechanism, not a durable business event log and not the source of truth for game state.
-
-If a server process restarts or otherwise loses the outbox, the server should not pretend that replay is still possible. It should return an explicit state-lost result when reconnect or acknowledgement proves that the client has state the server can no longer validate. The client must then clear local session state, reset reliable sequence tracking, and start a new session or return to a coherent lobby/login flow.
-
-Business code should recover from missing reliable pushes through authoritative state queries when the authoritative state still exists. If the authoritative state is gone, forcing a new session is preferred over replaying stale notifications.
-
-Projects may still replace `IReliablePushOutbox` with a durable implementation for specialized low-frequency business events, but that is a project-specific choice. A durable outbox must preserve consistency with the authoritative business state and absorb the added performance, storage, retention, and operations costs. It should not be the ULinkGame default or a reason to turn framework reliable push into a general event-sourcing system.
-
-### Retention
-
-Reliable push is not an infinite event log.
-
-Defaults:
-
-- pending retention: 2 minutes
-- max pending records per owner: 256
-
-If a client does not reconnect and ack within the retention window, business code must recover via authoritative state queries or force the player back to a coherent screen.
-
-### Client Rules
-
-Clients must:
-
-- store the latest applied reliable sequence per player/session
-- apply messages only when `sequence > latestAppliedSequence`
-- ack only after the UI/session state transition has been applied
-- tolerate receiving the same business message more than once
-
-### Current Sample Integration
-
-The sample uses reliable push for `MatchmakingStatusUpdate`, because missing `Matched` blocks the user flow.
-
-`WorldState` is intentionally not reliable through this mechanism. It is high-frequency realtime state and should be replaced by newer snapshots, not replayed as history.
-
-Implementation points:
-
-- `ULinkGame.Server.ReliablePush.IReliablePushOutbox` is the generic host-level abstraction.
-- `ULinkGame.Server.ReliablePush.InMemoryReliablePushOutbox` is the current short-gap implementation.
-- `Server.Services.ReliableMatchmakingPublisher` adapts matchmaking status pushes to the generic outbox.
-- `IPlayerService.AckReliablePushAsync` is the sample ack RPC.
-- `MatchmakingStatusUpdate.ReliableSequence` carries the sequence to the Unity client.
-- The Unity client acks after applying a newer sequence and ignores duplicate older sequences.
-
-## ULinkGame.Client API Direction
-
-`ULinkGame.Client` should expose `ULinkGameClient` as the recommended main entry point. `ReliablePushTracker.Decide(...)`, `MarkApplied(...)`, `Reset()`, and `ReliablePushInbox` remain useful lower-level building blocks, but application code should not have to manually preserve the correct order:
-
-1. decide whether a push is new
-2. apply the business payload
-3. mark the sequence as applied only after successful application
-4. acknowledge the latest applied sequence
-5. react to state-lost or session-mismatch acknowledgement results
-
-That order is easy to get wrong. The main client API should keep the low-level primitives available, but make the correct inbox/session flow natural.
-
-The preferred shape is:
-
-```csharp
-public sealed class ULinkGameClient
-{
-    public ClientSessionSnapshot Snapshot { get; }
-
-    public void StartSession(GameSessionKey session, long lastReliableSequence = 0);
-
-    public void EndSession();
-
-    public ValueTask<ReliablePushProcessResult> ProcessReliablePushAsync<TPayload>(
-        ReliablePushSequence sequence,
-        TPayload payload,
-        Func<TPayload, CancellationToken, ValueTask> applyAsync,
-        Func<ReliablePushAck, CancellationToken, ValueTask<ReliablePushAckOutcome>> acknowledgeAsync,
-        CancellationToken cancellationToken = default);
-}
-```
-
-Usage should be closer to:
-
-```csharp
-await client.ProcessReliablePushAsync(
-    ReliablePushSequence.From(update.ReliableSequence),
-    update,
-    applyAsync: ApplyMatchmakingUpdateAsync,
-    acknowledgeAsync: ack => playerService.AckReliablePushAsync(ack, ct),
-    ct);
-```
-
-The API should avoid bool-heavy result types. Prefer explicit enums and value objects:
-
-```csharp
-public enum ReliablePushDecisionKind
-{
-    ApplyAndAck,
-    AckDuplicate,
-    RejectNoSession,
-    RejectSessionMismatch
-}
-
-public enum ReliablePushAckStatus
-{
-    Accepted,
-    Duplicate,
-    StateRefreshRequired,
-    StateLost,
-    SessionMismatch
-}
-
-public readonly struct GameSessionKey { }
-
-public readonly struct ReliablePushSequence { }
-
-public readonly struct ReliablePushAck
-{
-    public GameSessionKey Session { get; }
-    public ReliablePushSequence Sequence { get; }
-}
-```
-
-Reliable sequence state should be scoped to a session or generation, not only to a player id. This prevents a new session from acknowledging an old session's sequence and gives the client a clean reset boundary after `StateLost` or `NewSessionRequired`.
-
-`ReliablePushSequence` should be a value object for positive reliable sequences. Messages without a positive reliable sequence are not reliable push messages and should bypass this API instead of being treated as a special reliable case.
-
-Client-side cursor storage can be added behind an engine-neutral interface:
-
-```csharp
-public interface IReliablePushCursorStore
-{
-    ValueTask<long> LoadAsync(GameSessionKey session, CancellationToken cancellationToken = default);
-
-    ValueTask SaveAsync(GameSessionKey session, long sequence, CancellationToken cancellationToken = default);
-
-    ValueTask ClearAsync(GameSessionKey session, CancellationToken cancellationToken = default);
-}
-```
-
-The framework can provide an in-memory implementation. Unity, Godot, and application-specific persistence should stay in the consuming project unless repeated glue code becomes stable enough to justify a separate package.
-
-Implementation order:
-
-1. Add shared session and reliable push primitives to `ULinkGame.Abstractions`.
-2. Keep `ReliablePushTracker` and `ReliablePushInbox` as lower-level primitives.
-3. Recommend `ULinkGameClient` in user-facing documentation.
-4. Keep Unity/Godot persistence and engine dispatch outside the framework.
-
-## Framework Architecture Roadmap
-
-This section records architecture guidance for framework work that is worth extracting from samples into `src/`. These are design targets, not completed capabilities. Keep every item infrastructure-oriented and avoid importing Agar-specific DTOs, account rules, matchmaking policy, room rules, gameplay simulation, leaderboard rules, or Unity UI.
-
-### ULinkGame.Server.Sessions
-
-Goal: provide reusable server-side session lifecycle primitives without defining the game's account model, login RPC, token format, room model, or callback DTOs.
-
-The package should live under `ULinkGame.Server.Sessions` and own these generic concepts:
-
-- session identity: owner key, session id, generation, created time, last seen time
-- endpoint binding: endpoint name, connection id, callback object, bind time, disconnect time
-- lifecycle decisions: new session, resume accepted, state refresh required, state lost, unauthorized
-- cleanup policy: disconnect grace period, max idle session age, endpoint-specific detach rules
-- extension hooks: token validation, authoritative state probe, optional custom metadata
-
-Suggested API shape:
-
-```csharp
-public readonly struct GameSessionKey { }
-
-public readonly struct GameEndpointName { }
-
-public sealed record SessionEndpointKey(
-    GameSessionKey Session,
-    GameEndpointName EndpointName);
-
-public enum SessionResumeStatus
-{
-    Resumed,
-    StateRefreshRequired,
-    StateLost,
-    Unauthorized
-}
-
-public sealed class SessionResumeDecision
-{
-    public SessionResumeStatus Status { get; }
-    public GameSessionKey? Session { get; }
-    public string? Reason { get; }
-}
-
-public interface IGameSessionDirectory
-{
-    ValueTask<GameSessionKey> StartNewSessionAsync(
-        string ownerKey,
-        CancellationToken cancellationToken = default);
-
-    ValueTask<SessionResumeDecision> TryResumeAsync(
-        GameSessionKey session,
-        CancellationToken cancellationToken = default);
-
-    ValueTask BindEndpointAsync<TCallback>(
-        SessionEndpointKey endpoint,
-        string connectionId,
-        TCallback callback,
-        CancellationToken cancellationToken = default)
-        where TCallback : class;
-
-    ValueTask MarkEndpointDisconnectedAsync(
-        SessionEndpointKey endpoint,
-        string? connectionId = null,
-        CancellationToken cancellationToken = default);
-
-    ValueTask<TCallback?> GetCallbackAsync<TCallback>(
-        SessionEndpointKey endpoint,
-        CancellationToken cancellationToken = default)
-        where TCallback : class;
-}
-```
-
-The exact API can change during implementation, but keep these constraints:
-
-- Store generated RPC callback instances as opaque typed bindings. Framework code must not know callback methods such as `OnMatched`.
-- Treat endpoint names as data. `control` and `realtime` are sample/template names, not mandatory framework concepts.
-- Scope reliable sequence tracking to `GameSessionKey` or an equivalent generation-bearing identity.
-- The first implementation should be in-memory and process-local. Durable session stores are project-specific until repeated use proves a framework need.
-- Token validation should be a hook, not a framework account system.
-
-Implementation order:
-
-1. Extract a minimal in-memory directory from the sample shape: start session, bind endpoint, detach endpoint, expire disconnected endpoints.
-2. Add generation-aware resume decisions and state-lost result types.
-3. Wire reliable push ack/session checks to the session identity instead of plain player id.
-4. Add cleanup hosted service helpers only after the directory API is stable.
-5. Add diagnostics counters and logs for start, resume, bind, detach, expire, state refresh, and state lost.
-
-Test requirements:
-
-- duplicate bind replaces only the matching endpoint binding
-- stale connection id cannot detach a newer binding
-- two distinct named endpoint bindings can be independently detached
-- session generation prevents old acknowledgements from affecting new sessions
-- expired sessions return `StateLost`, not silent success
-
-### Reconnect And State-Lost Semantics
-
-Goal: make reconnect outcomes explicit and shared by server and client helpers while still letting the game decide what authoritative state means.
-
-ULinkGame should distinguish three cases:
-
-- `Resumed`: session token, generation, and authoritative state are compatible; pending reliable pushes can be replayed.
-- `StateRefreshRequired`: the session is valid but transient client state or reliable sequence state is stale; client must clear transient state and fetch an authoritative snapshot.
-- `StateLost`: the server cannot validate the client's claimed state; client must clear session-local state and start a new session.
-
-Suggested server-side result types:
-
-```csharp
-public enum ReconnectStatus
-{
-    Resumed,
-    StateRefreshRequired,
-    StateLost,
-    Unauthorized
-}
-
-public enum ReliablePushAckStatus
-{
-    Accepted,
-    Duplicate,
-    StateRefreshRequired,
-    StateLost,
-    SessionMismatch
-}
-```
-
-The framework should provide decision helpers, not business snapshots. A game should be able to plug in an authoritative state probe:
-
-```csharp
-public interface IAuthoritativeSessionStateProbe<TSnapshot>
-{
-    ValueTask<AuthoritativeStateProbeResult<TSnapshot>> ProbeAsync(
-        GameSessionKey session,
-        CancellationToken cancellationToken = default);
-}
-```
-
-Guidance:
-
-- Never repair state mismatch by replaying untrusted or stale reliable pushes.
-- If authoritative state exists, prefer `StateRefreshRequired` and let the client fetch a snapshot.
-- If authoritative state does not exist, return `StateLost` or `NewSessionRequired`.
-- If a client acknowledges a sequence for a different session/generation, return `SessionMismatch` or `StateLost`.
-- Do not silently reset sequence numbers on the server while treating reconnect as successful; make the reset visible through an explicit result.
-
-Implementation order:
-
-1. Add framework result types for reconnect and ack outcomes.
-2. Update client helper design to consume those outcomes.
-3. Add sample migration after framework primitives exist.
-4. Add docs showing the difference between replay, refresh, and new session.
-
-Test requirements:
-
-- valid session and compatible sequence returns resume/accepted
-- valid session with missing transient outbox but existing authoritative state returns refresh required
-- invalid token returns unauthorized
-- missing authoritative state returns state lost
-- old generation ack does not mutate the current generation cursor
-
-### Cluster Routing
-
-Goal: provide optional infrastructure for cluster deployments where a player's current RPC connection and the authoritative location for an application-defined route may live on different nodes.
-
-This is not required for light online games. It should live in an optional package and namespace such as `ULinkGame.Cluster` and remain independent of any gameplay DTO. Realtime multiplayer is one possible consumer, not the naming or design center of the module.
-
-Framework-owned concepts:
-
-- node identity: stable node id, endpoint addresses, health state
-- route key: application-defined key such as room id, match id, or shard id
-- route location: the node currently authoritative for a route key
-- cluster message: route key, ordering key, expiration time, payload, content type, correlation id
-- delivery result: accepted, expired, route not found, backpressure, failed
-
-Suggested API shape:
-
-```csharp
-namespace ULinkGame.Cluster;
-
-public sealed record NodeId(string Value);
-
-public sealed record RouteKey(string Value);
-
-public sealed record RouteLocation(
-    RouteKey Route,
-    NodeId Node,
-    DateTimeOffset ExpiresAt);
-
-public sealed record ClusterMessage(
-    RouteKey Route,
-    string Kind,
-    ReadOnlyMemory<byte> Payload,
-    string? OrderedBy = null,
-    DateTimeOffset? ExpiresAt = null,
-    string? CorrelationId = null,
-    string? TraceId = null,
-    NodeId? SourceNode = null);
-
-public enum ClusterSendStatus
-{
-    Accepted,
-    Expired,
-    RouteNotFound,
-    Backpressure,
-    Failed
-}
-
-public interface IRouteDirectory
-{
-    ValueTask RegisterAsync(RouteLocation location, CancellationToken cancellationToken = default);
-
-    ValueTask<RouteLocation?> GetAsync(RouteKey route, CancellationToken cancellationToken = default);
-
-    ValueTask ClearAsync(RouteKey route, NodeId node, CancellationToken cancellationToken = default);
-}
-
-public interface IClusterRouter
-{
-    ValueTask<ClusterSendStatus> SendAsync(
-        ClusterMessage message,
-        CancellationToken cancellationToken = default);
-}
-```
-
-Cluster node communication:
-
-`IClusterRouter` owns route lookup and delivery policy. It should not own a concrete network stack. The lower layer is a node-to-node messenger that sends a `ClusterMessage` to a specific `NodeId`.
-
-```csharp
-public sealed record NodeEndpoint(
-    NodeId Node,
-    string Name,
-    Uri Address,
-    IReadOnlyDictionary<string, string>? Metadata = null);
-
-public interface INodeMessenger
-{
-    ValueTask<ClusterSendStatus> SendAsync(
-        NodeId target,
-        ClusterMessage message,
-        CancellationToken cancellationToken = default);
-}
-
-public interface IClusterMessageHandler
-{
-    ValueTask<ClusterSendStatus> HandleAsync(
-        ClusterMessage message,
-        CancellationToken cancellationToken = default);
-}
-```
-
-Expected flow:
-
-1. The caller sends a `ClusterMessage` through `IClusterRouter`.
-2. The router rejects expired messages before any directory or network work.
-3. The router asks `IRouteDirectory` for the current `RouteLocation`.
-4. If the target node is local, the message is dispatched directly to the local `IClusterMessageHandler`.
-5. If the target node is remote, the router calls `INodeMessenger.SendAsync(location.Node, message)`.
-6. The receiving node authenticates the cluster request at the adapter boundary, then hands the message to its local `IClusterMessageHandler`.
-7. The handler dispatches by route/kind to application-owned code, actor runtime code, or sample-owned room code.
-
-Guidance:
-
-- Do not serialize live RPC callback objects into Redis, durable state, streams, or route records.
-- Do not expose transparent remote objects. Cross-node work must stay explicit message delivery or explicit request/reply in a later API.
-- Do not generate remote actor proxies that use the same surface as process-local actor calls. Remote actor APIs must make timeout, expiration, serialization, delivery status, and backpressure visible.
-- Do not let route records target `LogicThread` or any other node-local execution lane. Route records target `NodeId`; the destination node's actor runtime owns mailbox and execution-lane dispatch.
-- Payload serialization belongs to the application or adapter. The cluster route layer can move bytes plus metadata.
-- Large state synchronization, large fanout target sets, and repeated snapshots belong to application protocols with versioning or diff semantics, not to the generic cluster message envelope.
-- Node-to-node authentication, TLS, compression, and wire format belong to the `INodeMessenger` adapter, not to the route directory.
-- Ordering should be scoped by an explicit key such as player id or route id, not globally.
-- Expiration is mandatory for short-lived route messages; stale inputs, stale commands, and stale snapshots should be dropped, not replayed indefinitely.
-- Backpressure must be visible through return values and metrics.
-- Trace propagation should be built in from the first implementation: route lookup, local dispatch, remote send, receive, and actor handling should be measurable under one correlation or trace id.
-- Provide adapters later, for example ULinkRPC internal transport, gRPC, Redis pub/sub, custom message buses, or in-process loopback. Start with an in-memory loopback adapter for tests.
-
-Implementation order:
-
-1. Define route directory and router abstractions with in-memory implementation.
-2. Define `INodeMessenger` and `IClusterMessageHandler` with in-memory loopback implementation.
-3. Add route location registration and expiration tests.
-4. Add send result, TTL, local dispatch, remote dispatch, and backpressure behavior.
-5. Add trace propagation and per-stage metrics for route lookup, node send, receive, local dispatch, and target handler execution.
-6. Add one production node messenger adapter only after a sample or generated template proves the abstraction.
-7. Migrate a sample multi-node route flow as the first real consumer.
-
-Test requirements:
-
-- only one active location is returned for a route
-- location expiration makes the route unavailable
-- expired envelopes are dropped before delivery
-- local routes dispatch without network adapter calls
-- remote routes call `INodeMessenger` with the resolved `NodeId`
-- receiving node dispatches through `IClusterMessageHandler`
-- route-not-found and backpressure are surfaced as explicit statuses
-- trace/correlation data survives local and remote delivery
-- callback objects never appear in serialized route state
-
-### Engine-Neutral Client Session State
-
-Goal: give Unity, Godot, and plain .NET clients reusable state helpers without depending on an engine, generated RPC client, transport package, UI thread, or local storage mechanism.
-
-This layer should build on `ReliablePushInbox`, not replace it.
-
-Suggested concepts:
-
-- client session identity: owner key, session id, generation
-- connection phase: signed out, connecting, active, reconnecting, refresh required, state lost
-- endpoint state: disconnected, connecting, connected, failed
-- transient state reset: reliable sequence cursor, endpoint binding, pending local callbacks
-- application hooks: connect, disconnect, fetch snapshot, start new session
-
-Suggested API shape:
-
-```csharp
-public enum ClientSessionPhase
-{
-    SignedOut,
-    Connecting,
-    Active,
-    Reconnecting,
-    RefreshRequired,
-    StateLost
-}
-
-public sealed record ClientSessionSnapshot(
-    ClientSessionPhase Phase,
-    GameSessionKey? Session,
-    long LastReliableSequence);
-
-public sealed class ClientSessionController
-{
-    public ClientSessionSnapshot Snapshot { get; }
-
-    public void StartSession(GameSessionKey session, long lastReliableSequence = 0);
-
-    public void MarkReconnecting();
-
-    public void ApplyAckOutcome(ReliablePushAckOutcome outcome);
-
-    public void MarkStateLost();
-
-    public void EndSession();
-}
-```
-
-Guidance:
-
-- Keep it synchronous where possible; async belongs to app-provided connect/fetch delegates.
-- Do not dispatch to Unity main thread, Godot main loop, or SynchronizationContext inside the framework.
-- Do not store UI text or user-visible messages.
-- Do not create transports or generated RPC clients.
-- Provide snapshots and explicit transitions so applications can render their own UI and logs.
-- Make `StateLost` terminal until `StartSession` is called again.
-
-Implementation order:
-
-1. Implement `ReliablePushInbox`.
-2. Add session/generation-aware cursor store.
-3. Add `ClientSessionController` with pure transition tests.
-4. Add README examples for Unity/Godot/plain .NET without engine dependencies.
-
-Test requirements:
-
-- state lost clears reliable sequence and endpoint-like transient state
-- refresh required does not imply new login
-- new session starts with isolated cursor
-- duplicate push ack outcome does not change phase
-- all transitions are deterministic and engine-neutral
-
-### Diagnostics, Health Checks, And Metrics
-
-Goal: make ULinkGame infrastructure observable without hard-coding any game's business metrics.
-
-Use standard .NET primitives:
-
-- `ILogger` for structured logs
-- `System.Diagnostics.Metrics` for counters, histograms, and gauges
-- `Microsoft.Extensions.Diagnostics.HealthChecks` for readiness/liveness checks where applicable
-
-Suggested namespaces:
-
-- `ULinkGame.Server.Diagnostics`
-- `ULinkGame.Server.Hosting` for endpoint hosted-service diagnostics
-- `ULinkGame.Server.ReliablePush` for outbox metrics
-- `ULinkGame.Server.Sessions` for session lifecycle metrics once sessions exist
-- `ULinkGame.Cluster` for route directory and router metrics once cluster routing exists
-
-Suggested metrics:
-
-- `ulinkgame.rpc.endpoint.started`
-- `ulinkgame.rpc.endpoint.stopped`
-- `ulinkgame.rpc.endpoint.failure`
-- `ulinkgame.reliable_push.published`
-- `ulinkgame.reliable_push.replayed`
-- `ulinkgame.reliable_push.acked`
-- `ulinkgame.reliable_push.pending`
-- `ulinkgame.session.started`
-- `ulinkgame.session.resumed`
-- `ulinkgame.session.state_lost`
-- `ulinkgame.route.sent`
-- `ulinkgame.route.dropped`
-- `ulinkgame.route.backpressure`
-
-Suggested health checks:
-
-- ULinkActor state runtime is registered for gateway/state processes that own actor execution
-- configured state runtime services have started for state processes
-- configured RPC endpoints have started listening
-- reliable push outbox service is registered
-- optional route backend is reachable
-
-Guidance:
-
-- Metrics must use low-cardinality tags. Endpoint name, status, and reason category are acceptable; player id, room id, session id, and connection id are not.
-- Logs may include correlation ids and endpoint names, but avoid secrets and raw tokens.
-- Framework diagnostics should expose infrastructure behavior. Business events such as score, ranking, rewards, or inventory belong to the game.
-- Health checks should separate liveness from readiness. A process can be alive but not ready to accept RPC traffic.
-
-Implementation order:
-
-1. Add stable event ids and log scopes for RPC endpoint startup/shutdown/failure.
-2. Add reliable push counters and pending gauge.
-3. Add health checks for ULinkActor state runtime services and endpoint hosted service state.
-4. Add session and routing metrics when those packages exist.
-5. Update tool templates to register health checks in generated server projects.
-
-Test requirements:
-
-- endpoint startup failure is logged with endpoint name
-- reliable push publish/replay/ack increments metrics through a test meter listener
-- health check reports unhealthy when required services are missing or not started
-- metrics do not tag high-cardinality user/session/room identifiers
-
-### ULinkGame.Tool Production Templates
-
-Goal: generate production-ready infrastructure scaffolding without taking ownership of ULinkRPC starter output or game business code.
-
-The tool has historically created an Edge/Silo layout and unconditionally generated control and realtime endpoints. Future work should use Gateway/State naming and split templates by project shape:
-
-- simple online game: one session endpoint
-- multi-endpoint game: one session/control-like endpoint plus an additional application-defined endpoint, for example high-frequency gameplay traffic
-- server-only or client-engine variants only when supported by `ulinkrpc-starter`
-
-Template-owned additions:
-
-- `ULinkGame.Server` and `ULinkGame.Client` package references
-- Gateway/state host startup using ULinkGame helpers
-- environment-variable driven `appsettings.json`
-- `.env.example` with development-only defaults
-- optional Dockerfile and compose/override files for Gateway and state runtime processes
-- health check registration and endpoint
-- ULinkRPC source-generator properties and generation marker files when the selected client shape needs them
-- README next steps that match the selected project shape
-
-Template non-goals:
-
-- do not rewrite `ULinkRPC.*` package versions generated by `ulinkrpc-starter`
-- do not own game RPC contracts, business DTOs, account schema, leaderboard schema, or room rules
-- do not generate multi-endpoint or realtime terminology for simple single-endpoint projects
-- do not include production secrets or real connection strings
-
-Suggested options:
-
-```txt
-ulinkgame-tool new --name MyGame --client-engine unity --network-profile simple
-ulinkgame-tool new --name MyGame --client-engine unity --network-profile realtime
-ulinkgame-tool new --name MyGame --client-engine unity --with-docker
-ulinkgame-tool new --name MyGame --client-engine unity --with-health-checks
-```
-
-The exact option names can change, but the project shape should be explicit. Avoid making realtime multiplayer or any other multi-endpoint architecture the implicit default for every new project.
-
-Implementation order:
-
-1. Introduce an internal `NetworkProfile` model with `simple` and `realtime`.
-2. Make the existing dual-endpoint template the `realtime` profile.
-3. Add a simple single-endpoint template and make it the default if that does not break existing users.
-4. Add Docker/compose/health-check output behind explicit options.
-5. Update verification scripts to generate and build both profiles.
-
-Test requirements:
-
-- simple profile generates exactly one endpoint configurator
-- realtime profile generates separate session/control and realtime configurators
-- generated projects build and regenerate RPC glue through `ULinkRPC.Analyzers`
-- generated appsettings can be overridden by environment variables
-- Docker template does not contain secrets
-- tool still preserves starter-owned package references and generated layout
-
 ## Next Development Plan
 
 This plan tracks framework-level work only. Keep completed milestones out of this section, and do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
 
-There is currently no active framework implementation milestone in this section. The next cluster implementation should start with `ULinkGame.Cluster.ULinkRPC` only after the production adapter gates above are met.
+The next framework milestone is to update the process-local actor foundation first, then move `ULinkGame.Cluster` from in-memory contract validation toward multi-physical-machine readiness while preserving explicit remote boundaries. The cluster plan borrows Skynet's simple node-to-node RPC shape and ET's location-directory mechanics, but does not adopt transparent remote actor references.
 
 ULinkGame must not depend on ULinkActor scheduler internals. Any cluster-to-actor bridge should call public actor runtime APIs only.
+
+### P0: ULinkActor 0.2.0 Upgrade
+
+Goal: update `ULinkGame.Server` to `ULinkActor` `0.2.0` before expanding cluster work, because cluster-to-actor dispatch should build on the current public actor runtime behavior.
+
+Current dependency:
+
+- `src/ULinkGame.Server/ULinkGame.Server.csproj` references `ULinkActor` `0.1.9`.
+- `ULinkGame.Server` wraps `ULinkActor.ActorSystem` behind `IActorRuntime`, `Actor`, `ActorContext`, and `ULinkActorRuntime`.
+- ULinkGame does not reference `ULinkActor.SourceGenerator` directly today; consuming game projects may add it when they use native ULinkActor typed actors or generated actor clients.
+
+Scope:
+
+- Update `ULinkGame.Server` to consume `ULinkActor` `0.2.0`.
+- Preserve ULinkGame's narrow actor facade for sample and framework code that uses `IActorRuntime`.
+- Decide explicitly which new ULinkActor features should surface through ULinkGame and which should remain available only through direct ULinkActor usage.
+- Keep ULinkActor's process-local boundary intact. Do not use this upgrade to add transparent remote actors, distributed actor proxies, persistence, gameplay concepts, or cluster transport.
+- Review `ULinkActorRuntime` message delivery:
+  - keep `AskAsync` on `Call<T>` so call timeouts continue to flow through ULinkActor diagnostics;
+  - decide whether `TellAsync` should continue to await `Send` or expose a new immediate-send path that maps `ActorRef<TMessage>.TrySend(...)` to a ULinkGame result type;
+  - do not hide mailbox-full or actor-unavailable conditions behind best-effort fire-and-forget behavior.
+- Review timer behavior:
+  - ULinkGame's current timer wrapper posts back through `TellAsync`;
+  - decide whether this remains sufficient or should be replaced by native ULinkActor mailbox timers in a later API;
+  - failed timer posts must be observable and must not disappear silently.
+- Wire useful diagnostics without creating ULinkGame-specific duplicates:
+  - make `ActorSystem.CallTimedOut`, dead-letter, and slow-message events reachable through logging or options if ULinkGame owns the actor runtime instance;
+  - rely on ULinkActor's `Meter` and `ActivitySource` names for low-level actor metrics/tracing;
+  - keep ULinkGame metrics focused on game-session, endpoint, reliable-push, and later cluster behavior.
+- Decide whether ULinkGame needs stop/drain APIs:
+  - ULinkActor `0.2.0` exposes bounded stop/drain results;
+  - ULinkGame should add a facade only if gateway shutdown, session teardown, or tests need actor drain semantics at the ULinkGame layer.
+- Review lifecycle hooks:
+  - ULinkGame actors currently activate through `Actor.ActivateAsync(ActorContext, CancellationToken)`;
+  - do not mix ULinkGame activation with ULinkActor native `IActorStarted<TMessage>` / `IActorStopping<TMessage>` unless there is a clear adapter contract.
+- Update user-facing server documentation only after the runtime behavior is final:
+  - mention `ULinkActor` `0.2.0` where package install examples imply a concrete version;
+  - explain when users should add `ULinkActor.SourceGenerator` directly to their game projects.
+- Update `CHANGELOG.md` with the exact package versions released by ULinkGame and a short note about ULinkActor `0.2.0` integration.
+
+Tests:
+
+- Existing actor runtime tests still pass after the package update.
+- Add a mailbox backpressure test if ULinkGame exposes a non-throwing immediate-send API.
+- Add a call-timeout diagnostic test if ULinkGame wires `ActorSystem.CallTimedOut` through options or logging.
+- Add a timer failure or observability test if timer posts can be rejected by mailbox backpressure.
+- Run `dotnet test Tests/tests.slnx` before releasing any ULinkGame package that consumes the new actor version.
+
+Release impact:
+
+- If only `ULinkGame.Server` changes, release at least `ULinkGame.Server`.
+- If generated templates or package constants consume the updated server package, release `ULinkGame.Tool` as well.
+- If sample package references or docs change, update the relevant sample docs in the same change.
+- Do not bump `ULinkGame.Client` or `ULinkGame.Abstractions` unless their public API or package metadata changes.
+
+### M1: Route Location Semantics
+
+Goal: make route records strong enough for real distributed use before adding a production transport.
+
+Scope:
+
+- Add or formalize route location generation, node epoch, and stale-location detection.
+- Define whether `RouteLocation` lease refresh belongs in `IRouteDirectory` or a separate node/route lease service.
+- Add optional cached route sender behavior only if cache lifetime, invalidation, and retry counts are visible in options and diagnostics.
+- Add explicit result mapping for stale route, node epoch mismatch, handler unavailable, timeout, backpressure, and failed send.
+- Keep the API route-based. Do not add a remote actor proxy or local-looking generated actor client.
+
+Tests:
+
+- stale node epoch is rejected or forces re-resolution
+- expired route lease is unavailable
+- cached route invalidates after stale-location result
+- bounded re-resolution stops with a structured failure
+- route location records never contain live callbacks, actor references, scheduler lanes, or transport-specific connection objects
+
+### M2: Production Node Messenger Adapter
+
+Goal: add the first real cross-process `INodeMessenger` implementation in a separate package such as `ULinkGame.Cluster.ULinkRPC`.
+
+Scope:
+
+- Implement ULinkRPC-based node-to-node `ClusterMessage` delivery.
+- Keep the adapter outside `ULinkGame.Cluster` so core cluster contracts remain transport-neutral.
+- Map ULinkRPC connection failure, request timeout, remote handler unavailable, remote backpressure, and deserialization failure to explicit `ClusterSendStatus` values.
+- Provide adapter-owned authentication, TLS/compression hooks, wire format, node endpoint configuration, and trace propagation.
+- Do not include service discovery, durable route storage, gameplay DTOs, durable queues, actor migration, or transparent remote actor clients.
+
+Tests:
+
+- two independent .NET processes can exchange `ClusterMessage`
+- request/reply timeout returns a structured status
+- expired message is dropped before remote delivery
+- remote handler unavailable maps to `HandlerUnavailable`
+- backpressure maps to `Backpressure`
+- correlation and trace data survive send, receive, and dispatch
+
+### M3: Distributed Route Directory Adapter
+
+Goal: provide at least one route directory adapter suitable for multi-process validation.
+
+Scope:
+
+- Choose the first backend only after a sample needs it; likely candidates are Redis, PostgreSQL, or a small ULinkRPC-managed directory service.
+- Support route register, resolve, clear-by-node, expiration, and lease refresh.
+- Include node epoch in route records so restarted nodes cannot accidentally receive stale route ownership.
+- Expose backend health checks and low-cardinality metrics.
+- Keep backend-specific APIs out of `IRouteDirectory`.
+
+Tests:
+
+- concurrent register produces one active route location
+- expired leases disappear or resolve as unavailable
+- clear-by-node removes all routes for a dead node
+- node restart with new epoch invalidates old route records
+- backend outage returns explicit failures without hanging callers indefinitely
+
+### M4: Cross-Process Cluster Sample
+
+Goal: prove the framework contracts with a minimal cross-process sample before wiring a gameplay sample.
+
+Scope:
+
+- Add a sample that runs at least two nodes as separate processes.
+- Demonstrate local dispatch, remote dispatch, route not found, expired route, timeout, handler unavailable, backpressure, and stale route re-resolution.
+- Include a typed cluster actor envelope example that dispatches through public `IActorRuntime` APIs only.
+- Keep the sample free of matchmaking, room rules, account systems, and gameplay DTOs.
+
+Tests:
+
+- automated smoke test starts two nodes and verifies all expected statuses
+- killing one node produces unavailable/stale results for its routes
+- restarting a node with a new epoch does not receive old route traffic
+- metrics and traces are emitted with low-cardinality tags
+
+### M5: Template And Operations Support
+
+Goal: make generated projects ready to opt into multi-node infrastructure without making it the default for simple games.
+
+Scope:
+
+- Add explicit tool options only after M2-M4 prove the shape.
+- Generate node id, node endpoint, route backend, and cluster messenger configuration through environment-variable-friendly settings.
+- Add health check registration for node messenger, route directory backend, hosted RPC endpoints, and actor runtime where relevant.
+- Add Docker or compose scaffolding behind explicit flags; do not include production secrets.
+- Document operational expectations: node identity, endpoint exposure, lease duration, timeout defaults, draining, and failure modes.
+
+Tests:
+
+- simple profile remains single-endpoint and cluster-free
+- realtime or cluster-enabled profile generates explicit cluster configuration
+- generated configuration can be overridden by environment variables
+- generated Docker/compose files do not contain secrets
+- generated project builds and cluster smoke test passes when the cluster option is selected
 
 ### Deliberately Not Default Work
 
