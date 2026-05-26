@@ -1,8 +1,8 @@
 # ULinkGame
 
-ULinkGame helps you build the server and client foundation for online games without rebuilding the same session, reconnect, endpoint, and reliable-notification code in every project.
+A modern actor-based distributed game framework for C# Server and C# Client (Unity or Godot).
 
-It sits above [ULinkRPC](https://github.com/bruce48x/ulinkrpc) and [ULinkActor](https://www.nuget.org/packages/ULinkActor): ULinkRPC handles typed RPC, transports, serializers, generated bindings, and callbacks; ULinkActor handles process-local actor execution and typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame turns those lower-level pieces into game-ready infrastructure for sessions, reconnects, named RPC endpoints, and reliable business messages.
+It sits above [ULinkRPC](https://github.com/bruce48x/ulinkrpc) and [ULinkActor](https://www.nuget.org/packages/ULinkActor): ULinkRPC handles communications; ULinkActor handles process-local actor execution and typed actor helpers. ULinkGame turns those lower-level pieces into game-ready infrastructure for sessions, reconnects, named RPC endpoints, and reliable business messages.
 
 ## Why ULinkGame
 
