@@ -1,24 +1,26 @@
 # ULinkGame
 
-ULinkGame is a game-session infrastructure layer built on [ULinkRPC](https://github.com/bruce48x/ulinkrpc), [ULinkActor](https://www.nuget.org/packages/ULinkActor), and session/reconnect primitives for online game servers and clients.
+ULinkGame helps you build the server and client foundation for online games without rebuilding the same session, reconnect, endpoint, and reliable-notification code in every project.
 
-ULinkRPC provides typed RPC, generated client/server glue, transports, serializers, and callbacks. ULinkActor provides the foundational process-local actor/mailbox runtime and source-generated typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame owns the higher-level game infrastructure: session lifecycle, endpoint callback binding, reconnect semantics, named endpoint hosting, and reliable business push messages.
+It sits above [ULinkRPC](https://github.com/bruce48x/ulinkrpc) and [ULinkActor](https://www.nuget.org/packages/ULinkActor): ULinkRPC handles typed RPC, transports, serializers, generated bindings, and callbacks; ULinkActor handles process-local actor execution and typed actor helpers through [ULinkActor.SourceGenerator](https://www.nuget.org/packages/ULinkActor.SourceGenerator). ULinkGame turns those lower-level pieces into game-ready infrastructure for sessions, reconnects, named RPC endpoints, and reliable business messages.
 
 ## Why ULinkGame
 
-Online games need more than a request/response RPC pipe. A typical project quickly has to answer questions such as:
+Most online games start with RPC calls, then quickly run into the same product problems:
 
-- How do I host several RPC endpoints cleanly in the same .NET server?
-- How do I host one or more named RPC endpoints without hard-coding one game architecture?
-- How do I reconnect without losing important business notifications?
-- How do I keep Unity, Godot, and plain .NET clients from duplicating the same session-state bookkeeping?
-- How do I keep process-local game state execution close to gateway traffic without splitting gameplay across two frameworks?
+- A player disconnects during login, matchmaking, room entry, or settlement. What state should the server resume?
+- The server needs to send an important low-frequency notification. How does the client avoid missing it or applying it twice?
+- A game wants one RPC endpoint today, but may split control and realtime traffic later. How do you avoid hard-coding that decision?
+- Unity, Godot, and .NET clients all need the same reconnect and reliable-push bookkeeping. Where should that reusable logic live?
+- Room, battle, and service state should stay close to gateway traffic, but still run through a predictable actor/mailbox model.
 
-ULinkGame packages those repeatable pieces while leaving your actual game rules in your project.
+ULinkGame packages those repeatable pieces so your project can spend more time on accounts, matchmaking, gameplay, rewards, UI, and operations.
 
 ## What You Get
 
-`ULinkGame.Abstractions` provides cross-side framework primitives:
+### Shared primitives
+
+`ULinkGame.Abstractions` gives both server and client the same vocabulary for:
 
 - shared session identity
 - shared endpoint names
@@ -26,31 +28,38 @@ ULinkGame packages those repeatable pieces while leaving your actual game rules 
 - reliable push acknowledgement outcomes
 - session resume outcomes
 
-`ULinkGame.Server` provides server-side hosting helpers:
+### Server foundation
 
-- one main server entry point for sessions, endpoint bindings, and reliable push
+`ULinkGame.Server` gives your .NET server:
+
+- one main entry point for sessions, endpoint bindings, and reliable push
 - ULinkActor-based process-local game state execution for room, battle, and service runtime code
 - ULinkRPC server lifecycle integration with .NET hosting
-- multiple named RPC server configurators for projects that need more than one endpoint
-- a generic reliable push outbox for business-level notifications
+- named RPC endpoint hosting for projects that need one endpoint now and more later
+- a reliable push outbox for important business notifications
 - extension points that keep transport and serializer choices in your app
 
-`ULinkGame.Client` provides engine-neutral client helpers:
+### Client helpers
 
-- one main client entry point for reconnect state and reliable push processing
+`ULinkGame.Client` gives Unity, Godot, or plain .NET clients:
+
+- one main entry point for reconnect state and reliable push processing
 - reliable push sequence tracking
 - duplicate/stale push filtering
-- reusable state primitives that work in Unity, Godot, or plain .NET
+- reusable state primitives that stay independent of any game engine
 
-`ULinkGame.Tool` provides project scaffolding and maintenance commands:
+### Project tool
 
-- creates a ULinkRPC-based project through a pinned starter tool and prepares it for ULinkGame server hosting
-- augments the generated project with ULinkGame server/client runtime packages
-- keeps RPC glue on the ULinkRPC source-generator path instead of committing generated source
+`ULinkGame.Tool` creates and maintains project layouts:
+
+- starts from a ULinkRPC-based project template
+- adds ULinkGame server/client runtime packages
+- prepares ULinkGame server hosting
+- keeps RPC glue generated by source generators instead of checked in as generated source
 
 ## What It Does Not Do
 
-ULinkGame is not a full game business framework. It does not decide your:
+ULinkGame is deliberately not a full game business framework. It does not choose your:
 
 - account model
 - matchmaking policy
@@ -60,18 +69,20 @@ ULinkGame is not a full game business framework. It does not decide your:
 - product-specific DTOs
 - Unity or Godot UI architecture
 
-Those belong in your game. ULinkGame stays focused on the infrastructure that many online games have to rebuild.
+Those decisions belong to your game. ULinkGame focuses on the infrastructure that is common enough to reuse but still awkward to rebuild correctly.
 
 ## Create A Project
 
-Use `ULinkGame.Tool` to create a starter project instead of wiring the runtime packages by hand:
+Create a starter project with `ULinkGame.Tool`:
 
 ```powershell
 dotnet tool install --global ULinkGame.Tool
 ulinkgame-tool new --name MyGame --client-engine unity --transport kcp --serializer memorypack --persistence none
 ```
 
-The tool creates a ULinkRPC-based project, prepares ULinkGame server hosting, and adds ULinkGame server/client integration. RPC glue is generated by `ULinkRPC.Analyzers` during normal server builds and Unity/Godot client compilation. By default it generates one RPC endpoint using the selected transport; pass `--network-profile realtime` only for games that explicitly want separate control and high-frequency gameplay endpoints.
+The tool creates a ULinkRPC-based project, adds ULinkGame server/client integration, and prepares the server hosting code. RPC glue is generated by `ULinkRPC.Analyzers` during normal server builds and Unity/Godot client compilation, so you do not need to commit generated RPC source.
+
+By default, the starter creates one RPC endpoint with your selected transport. Use `--network-profile realtime` only when your game explicitly needs separate control and high-frequency gameplay endpoints.
 
 After changing shared RPC contracts, rebuild the server and recompile the client project so the source generator refreshes the RPC API.
 
@@ -79,11 +90,11 @@ For the full walkthrough, see [ULinkGame getting started](https://bruce48x.githu
 
 ## Package Guide
 
-Use `ULinkGame.Abstractions` in shared code when you need framework-owned session and reliable push primitives.
+Use `ULinkGame.Abstractions` in shared code when server and client both need ULinkGame session or reliable-push types.
 
-Use `ULinkGame.Server` in your .NET server process when you need ULinkRPC hosting, ULinkActor-based game-state execution, session lifecycle, endpoint callback bindings, or reliable push delivery.
+Use `ULinkGame.Server` in your .NET server process when you need session lifecycle, endpoint callback bindings, ULinkRPC hosting, ULinkActor-based game-state execution, or reliable push delivery.
 
-Use `ULinkGame.Client` in client-side code when you need reconnect state and reliable push tracking independent of Unity or Godot.
+Use `ULinkGame.Client` in client-side code when reconnect state and reliable push tracking should work outside any specific engine.
 
 Use `ULinkGame.Tool` when creating or maintaining a ULinkGame project layout.
 
