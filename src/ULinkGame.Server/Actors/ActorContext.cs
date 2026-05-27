@@ -58,6 +58,15 @@ public sealed class ActorContext
             throw new InvalidOperationException("Actor context is not initialized.");
         }
 
+        public ActorTellResult TryTell<TActor>(
+            ActorId id,
+            Func<TActor, CancellationToken, ValueTask> message,
+            CancellationToken cancellationToken = default)
+            where TActor : class, IActor
+        {
+            throw new InvalidOperationException("Actor context is not initialized.");
+        }
+
         public ValueTask<TResult> AskAsync<TActor, TResult>(
             ActorId id,
             Func<TActor, CancellationToken, ValueTask<TResult>> message,
@@ -73,6 +82,21 @@ public sealed class ActorContext
             TimeSpan? period,
             Func<TActor, CancellationToken, ValueTask> callback)
             where TActor : class, IActor
+        {
+            throw new InvalidOperationException("Actor context is not initialized.");
+        }
+
+        public bool TryGetMailboxMetrics(ActorId id, out ActorMailboxMetrics metrics)
+        {
+            throw new InvalidOperationException("Actor context is not initialized.");
+        }
+
+        public ValueTask StopAsync(ActorId id)
+        {
+            throw new InvalidOperationException("Actor context is not initialized.");
+        }
+
+        public ValueTask<ActorStopOutcome> StopAsync(ActorId id, TimeSpan drainTimeout)
         {
             throw new InvalidOperationException("Actor context is not initialized.");
         }

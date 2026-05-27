@@ -59,51 +59,69 @@ public sealed class ControlPlaneRpcServerConfigurator : IULinkRpcServerConfigura
 
 ## Use Actors
 
-ULinkGame's server-side actor execution model is built on the standalone `ULinkActor` packages:
-
-```powershell
-dotnet add package ULinkActor
-dotnet add package ULinkActor.SourceGenerator
-```
-
-`ULinkGame.Server` currently integrates with `ULinkActor` `0.2.0` through its process-local actor facade. Add `ULinkActor.SourceGenerator` directly only when your game project uses native ULinkActor typed actors or generated actor clients.
-
-Register and use `ULinkActor` in the same .NET host that runs your ULinkGame gateway services:
+ULinkGame's server-side actor execution model is built on the standalone `ULinkActor` runtime through a process-local facade. Register the ULinkGame server services in the same .NET host that runs your gateway:
 
 ```csharp
-using ULinkActor;
+using ULinkGame.Server;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddSingleton<ActorSystem>();
+builder.Services.AddULinkGameServer();
 ```
 
 Messages for the same actor are processed through one mailbox, so actor state can be written without locks:
 
 ```csharp
-using ULinkActor;
+using ULinkGame.Server.Actors;
 
-public readonly record struct JoinRoom(long PlayerId);
-
-public sealed class RoomActor : IActor<JoinRoom>
+public sealed class RoomActor : Actor
 {
     private int _joinedPlayers;
 
-    public ValueTask OnMessage(ActorContext ctx, JoinRoom message)
+    public int JoinedPlayers => _joinedPlayers;
+
+    public ValueTask JoinAsync(long playerId, CancellationToken cancellationToken)
     {
         _joinedPlayers++;
         return ValueTask.CompletedTask;
     }
 }
 
-var system = builder.Services.BuildServiceProvider().GetRequiredService<ActorSystem>();
-var room = system.Spawn("room/alpha", new RoomActor());
-
-await room.Send(new JoinRoom(10001));
+var provider = builder.Build().Services;
+var runtime = provider.GetRequiredService<IActorRuntime>();
+await runtime.TellAsync<RoomActor>(
+    ActorId.From("room/alpha"),
+    static (room, ct) => room.JoinAsync(10001, ct));
 ```
 
-ULinkActor is the foundation for actor/mailbox runtime concerns. ULinkGame.Server builds on it and keeps the game-session layer focused on session identity, endpoint binding, reconnect, and reliable push integration.
+Use `AskAsync` when the caller needs a response:
 
-`ClusterActorDispatcher<TActor>` can adapt an explicit `ULinkGame.Cluster` actor envelope into the local `IActorRuntime` mailbox. The adapter is intentionally typed and requires an application-provided handler delegate; it does not expose transparent remote actor references or generated remote actor proxies.
+```csharp
+var count = await runtime.AskAsync<RoomActor, int>(
+    ActorId.From("room/alpha"),
+    static (room, _) => ValueTask.FromResult(room.JoinedPlayers));
+```
+
+Use `TryTell` when a caller must fail fast instead of waiting for mailbox capacity:
+
+```csharp
+var result = runtime.TryTell<RoomActor>(
+    ActorId.From("room/alpha"),
+    static (room, ct) => room.JoinAsync(10002, ct));
+```
+
+`ActorTellResult.MailboxFull` means the actor's local mailbox rejected the immediate send. Callers can retry later, shed work, or map the result to cluster backpressure.
+
+The facade also supports explicit actor stop/drain, mailbox metrics, mailbox-delivered timers, and lifecycle hooks:
+
+- `StopAsync(id)` removes an actor after draining its mailbox.
+- `StopAsync(id, drainTimeout)` returns `ActorStopOutcome.TimedOut` when the actor cannot drain in time.
+- `TryGetMailboxMetrics(id, out metrics)` returns ULinkGame-owned mailbox metrics without exposing `ULinkActor` runtime types.
+- `Actor.Context.RegisterTimer(...)` and `IActorRuntime.RegisterTimer(...)` schedule timer ticks through the actor mailbox.
+- Override `OnActivateAsync` and `OnDeactivateAsync` for explicit startup and stop cleanup.
+
+ULinkActor is the foundation for actor/mailbox runtime concerns. ULinkGame.Server builds on it through its facade and keeps the game-session layer focused on session identity, endpoint binding, reconnect, and reliable push integration. Add `ULinkActor.SourceGenerator` directly only when your game project chooses native ULinkActor typed actors or generated actor clients.
+
+`ClusterActorDispatcher<TActor>` can adapt an explicit `ULinkGame.Cluster` actor envelope into the local `IActorRuntime` mailbox and wait for a handler result. `ClusterActorTellDispatcher<TActor>` is the one-way variant that uses `TryTell` and maps local mailbox pressure to `ClusterSendStatus.Backpressure`. Both adapters are intentionally typed and require application-provided handler delegates; they do not expose transparent remote actor references or generated remote actor proxies.
 
 ## Main Server API
 

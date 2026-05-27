@@ -4,27 +4,21 @@ using Xunit;
 
 namespace ULinkGame.Server.Tests;
 
-public sealed class ClusterActorDispatcherTests
+public sealed class ClusterActorTellDispatcherTests
 {
     [Fact]
-    public async Task DispatchesEnvelopeThroughActorRuntimeMailbox()
+    public async Task AcceptedTryTellReturnsAcceptedAndDispatchesThroughMailbox()
     {
-        var runtime = new RecordingActorRuntime();
-        var dispatcher = new ClusterActorDispatcher<TestActor>(
+        var runtime = new RecordingActorRuntime(ActorTellResult.Accepted);
+        var dispatcher = new ClusterActorTellDispatcher<TestActor>(
             runtime,
             static (actor, envelope, _) =>
             {
                 actor.HandledActorIds.Add(envelope.ActorId);
                 actor.HandledKinds.Add(envelope.Kind);
-                return ValueTask.FromResult(ClusterSendStatus.Accepted);
+                return ValueTask.CompletedTask;
             });
-        var message = new ClusterActorEnvelope(
-            ClusterActorRouteKeys.ForActor("room/42"),
-            "room/42",
-            "join",
-            new byte[] { 1 },
-            DateTimeOffset.UtcNow.AddMinutes(1),
-            "node-a").ToClusterMessage();
+        var message = CreateActorMessage("room/42");
 
         var status = await dispatcher.HandleAsync(message, TestContext.Current.CancellationToken);
 
@@ -35,12 +29,45 @@ public sealed class ClusterActorDispatcherTests
     }
 
     [Fact]
+    public async Task MailboxFullMapsToClusterBackpressure()
+    {
+        var runtime = new RecordingActorRuntime(ActorTellResult.MailboxFull);
+        var dispatcher = new ClusterActorTellDispatcher<TestActor>(
+            runtime,
+            static (_, _, _) => ValueTask.CompletedTask);
+
+        var status = await dispatcher.HandleAsync(
+            CreateActorMessage("room/42"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ClusterSendStatus.Backpressure, status);
+        Assert.Equal(ActorId.From("room/42"), runtime.LastActorId);
+        Assert.Empty(runtime.Actor.HandledActorIds);
+    }
+
+    [Fact]
+    public async Task ActorUnavailableMapsToHandlerUnavailable()
+    {
+        var runtime = new RecordingActorRuntime(ActorTellResult.ActorUnavailable);
+        var dispatcher = new ClusterActorTellDispatcher<TestActor>(
+            runtime,
+            static (_, _, _) => ValueTask.CompletedTask);
+
+        var status = await dispatcher.HandleAsync(
+            CreateActorMessage("room/42"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ClusterSendStatus.HandlerUnavailable, status);
+        Assert.Equal(ActorId.From("room/42"), runtime.LastActorId);
+    }
+
+    [Fact]
     public async Task NonActorRouteIsRejectedWithoutActorRuntimeDispatch()
     {
-        var runtime = new RecordingActorRuntime();
-        var dispatcher = new ClusterActorDispatcher<TestActor>(
+        var runtime = new RecordingActorRuntime(ActorTellResult.Accepted);
+        var dispatcher = new ClusterActorTellDispatcher<TestActor>(
             runtime,
-            static (_, _, _) => ValueTask.FromResult(ClusterSendStatus.Accepted));
+            static (_, _, _) => ValueTask.CompletedTask);
         var message = new ClusterMessage(
             "room/42",
             "join",
@@ -54,6 +81,17 @@ public sealed class ClusterActorDispatcherTests
         Assert.Equal(0, runtime.DispatchCount);
     }
 
+    private static ClusterMessage CreateActorMessage(string actorId)
+    {
+        return new ClusterActorEnvelope(
+            ClusterActorRouteKeys.ForActor(actorId),
+            actorId,
+            "join",
+            new byte[] { 1 },
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            "node-a").ToClusterMessage();
+    }
+
     private sealed class TestActor : IActor
     {
         public List<string> HandledActorIds { get; } = new();
@@ -63,6 +101,13 @@ public sealed class ClusterActorDispatcherTests
 
     private sealed class RecordingActorRuntime : IActorRuntime
     {
+        private readonly ActorTellResult _result;
+
+        public RecordingActorRuntime(ActorTellResult result)
+        {
+            _result = result;
+        }
+
         public TestActor Actor { get; } = new();
 
         public ActorId? LastActorId { get; private set; }
@@ -92,19 +137,25 @@ public sealed class ClusterActorDispatcherTests
             CancellationToken cancellationToken = default)
             where TActor : class, IActor
         {
-            throw new NotSupportedException();
+            LastActorId = id;
+            DispatchCount++;
+
+            if (_result == ActorTellResult.Accepted)
+            {
+                var actor = Assert.IsAssignableFrom<TActor>(Actor);
+                message(actor, cancellationToken).AsTask().GetAwaiter().GetResult();
+            }
+
+            return _result;
         }
 
-        public async ValueTask<TResult> AskAsync<TActor, TResult>(
+        public ValueTask<TResult> AskAsync<TActor, TResult>(
             ActorId id,
             Func<TActor, CancellationToken, ValueTask<TResult>> message,
             CancellationToken cancellationToken = default)
             where TActor : class, IActor
         {
-            LastActorId = id;
-            DispatchCount++;
-            var actor = Assert.IsAssignableFrom<TActor>(Actor);
-            return await message(actor, cancellationToken);
+            throw new NotSupportedException();
         }
 
         public IAsyncDisposable RegisterTimer<TActor>(

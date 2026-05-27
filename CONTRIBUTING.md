@@ -383,6 +383,26 @@ ULinkGame is responsible for:
 
 ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
 
+#### ULinkActor Facade Principles
+
+ULinkGame should expose its own narrow `ULinkGame.Server.Actors` facade instead of leaking `ULinkActor.ActorRef<TMessage>`, generated actor clients, scheduler details, or native typed actor message families into ULinkGame's public API. ULinkActor runtime capabilities belong in ULinkGame only when they strengthen the game-session infrastructure boundary.
+
+ULinkGame-owned actor facade capabilities should follow these rules:
+
+- Explicit local overload should be a normal result. Try-send APIs should map full or unavailable local actor mailboxes to ULinkGame-owned results, and one-way cluster-to-actor dispatch should translate local overload into `ClusterSendStatus.Backpressure`.
+- Actor stop and drain should be explicit. Stop APIs should remove local actors, optionally wait for mailbox drain, and return ULinkGame-owned outcomes that support room shutdown, matchmaking teardown, session actor cleanup, and node draining without exposing ULinkActor lifecycle enums directly.
+- Mailbox metrics should use ULinkGame-owned snapshots. Operators need capacity, queued count, processed count, rejected count, and completion state to diagnose hot rooms, overloaded queues, and stuck state services, but public APIs should not expose ULinkActor runtime types.
+- Timeout diagnostics should preserve root-cause distinctions such as queue timeout, response timeout, and circular wait. Publish these through logging, metrics, or tracing with low-cardinality fields.
+- Dead-letter and slow-message diagnostics should stay configurable through `ActorRuntimeOptions`, preserving low-cardinality metric and log fields.
+- Timers should be delivered through the actor mailbox. Timer callbacks must not bypass sequential actor execution.
+- Lifecycle hooks should be tied to explicit actor lifecycle operations. Startup should remain compatible with `Actor.OnActivateAsync`, and graceful deactivation should run only on explicit actor stop, not on best-effort process disposal cleanup.
+
+Do not adopt these as ULinkGame facade features by default:
+
+- ULinkActor source-generated actor clients, because they are useful for projects that choose native ULinkActor APIs but would make the ULinkGame facade thicker and less stable.
+- Native `ActorRef<TMessage>` exposure, because callers could accidentally depend on process-local runtime semantics or write local-looking code across future cluster boundaries.
+- ULinkActor named actor lookup as public ULinkGame API, unless it is first mapped to ULinkGame's own `ActorId` and route concepts.
+
 ### Endpoint Model
 
 ULinkGame should support multiple named RPC endpoints or channels, but it should not force every game to understand a fixed "control connection plus realtime connection" split.
@@ -682,16 +702,6 @@ Do not implement these as default framework behavior in the first cluster module
 - fully decentralized route directory
 - Raft-based cluster consensus
 - cross-node shared mutable objects
-
-## Next Development Plan
-
-This plan tracks framework-level work only. Keep completed milestones out of this section, and do not use it for sample gameplay, account systems, matchmaking policy, room rules, leaderboard rules, Unity UI, persistence schema, or other game-owned work.
-
-The next framework milestone is to move `ULinkGame.Cluster` from in-memory contract validation toward multi-physical-machine readiness while preserving explicit remote boundaries. The cluster plan borrows Skynet's simple node-to-node RPC shape and ET's location-directory mechanics, but does not adopt transparent remote actor references.
-
-ULinkGame must not depend on ULinkActor scheduler internals. Any cluster-to-actor bridge should call public actor runtime APIs only.
-
-There is no active implementation milestone in this section after the current cluster-readiness pass. Add a new milestone only when a consuming sample, generated template, or production adapter requirement proves the next reusable framework boundary.
 
 ### Deliberately Not Default Work
 

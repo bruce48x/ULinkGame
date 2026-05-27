@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-27
+
+### Released
+
+- `ULinkGame.Server` `0.1.8`
+- `ULinkGame.Tool` `0.2.7`
+
+### Added
+
+- Added ULinkGame-owned actor diagnostics for ULinkActor dead letters, slow messages, and call timeouts through `ActorRuntimeOptions`.
+- Added explicit local actor backpressure with `IActorRuntime.TryTell(...)` and `ActorTellResult`.
+- Added `ClusterActorTellDispatcher<TActor>` for one-way cluster actor dispatch that maps local mailbox pressure to `ClusterSendStatus.Backpressure`.
+- Added explicit actor stop/drain APIs with `ActorStopOutcome`.
+- Added ULinkGame-owned mailbox metrics through `IActorRuntime.TryGetMailboxMetrics(...)`.
+- Added mailbox-native timer registration through the actor runtime facade so timer ticks enter the actor mailbox.
+- Added `Actor.OnDeactivateAsync(...)` for explicit cleanup during actor stop.
+
+### Changed
+
+- Documented the ULinkActor facade design principles in `CONTRIBUTING.md`.
+- Updated `ULinkGame.Server` actor documentation to show the ULinkGame facade as the recommended API while keeping ULinkActor native APIs as an opt-in lower-level choice.
+- Updated `ULinkGame.Tool` so generated project templates consume `ULinkGame.Server` `0.1.8`.
+
 ## 2026-05-26
 
 ### Released

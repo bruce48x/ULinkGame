@@ -13,6 +13,12 @@ public interface IActorRuntime
         CancellationToken cancellationToken = default)
         where TActor : class, IActor;
 
+    ActorTellResult TryTell<TActor>(
+        ActorId id,
+        Func<TActor, CancellationToken, ValueTask> message,
+        CancellationToken cancellationToken = default)
+        where TActor : class, IActor;
+
     ValueTask<TResult> AskAsync<TActor, TResult>(
         ActorId id,
         Func<TActor, CancellationToken, ValueTask<TResult>> message,
@@ -25,4 +31,10 @@ public interface IActorRuntime
         TimeSpan? period,
         Func<TActor, CancellationToken, ValueTask> callback)
         where TActor : class, IActor;
+
+    bool TryGetMailboxMetrics(ActorId id, out ActorMailboxMetrics metrics);
+
+    ValueTask StopAsync(ActorId id);
+
+    ValueTask<ActorStopOutcome> StopAsync(ActorId id, TimeSpan drainTimeout);
 }

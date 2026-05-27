@@ -10,7 +10,17 @@ public abstract class Actor : IActor
         await OnActivateAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    internal async ValueTask DeactivateAsync(CancellationToken cancellationToken)
+    {
+        await OnDeactivateAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     protected virtual ValueTask OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return ValueTask.CompletedTask;
+    }
+
+    protected virtual ValueTask OnDeactivateAsync(CancellationToken cancellationToken)
     {
         return ValueTask.CompletedTask;
     }
