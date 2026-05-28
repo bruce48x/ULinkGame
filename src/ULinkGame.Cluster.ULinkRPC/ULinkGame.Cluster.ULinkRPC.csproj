@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>ULinkGame.Cluster.ULinkRPC</RootNamespace>
     <PackageId>ULinkGame.Cluster.ULinkRPC</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Description>ULinkRPC-based node messenger adapter for ULinkGame cluster routing.</Description>
     <PackageTags>ulinkgame;game;cluster;routing;ulinkrpc</PackageTags>
   </PropertyGroup>
