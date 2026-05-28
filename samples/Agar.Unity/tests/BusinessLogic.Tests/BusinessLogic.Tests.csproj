@@ -16,6 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../Shared/Shared.csproj" />
+    <ProjectReference Include="../../Server/Hotfix/Agar.Sample.Hotfix.csproj" />
     <ProjectReference Include="../../Server/State.Contracts/State.Contracts.csproj" />
     <ProjectReference Include="../../../../src/ULinkGame.Server.Hotfix.Abstractions/ULinkGame.Server.Hotfix.Abstractions.csproj" />
     <ProjectReference Include="../../../../src/ULinkGame.Server.Hotfix/ULinkGame.Server.Hotfix.csproj" />
@@ -25,13 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../../Shared/Gameplay/ArenaConfig.cs" Link="TestHooks/Shared/Gameplay/ArenaConfig.cs" />
-    <Compile Include="../../Shared/Gameplay/ArenaFood.cs" Link="TestHooks/Shared/Gameplay/ArenaFood.cs" />
-    <Compile Include="../../Shared/Gameplay/ArenaPlayer.cs" Link="TestHooks/Shared/Gameplay/ArenaPlayer.cs" />
-    <Compile Include="../../Shared/Gameplay/ArenaSimulation.cs" Link="TestHooks/Shared/Gameplay/ArenaSimulation.cs" />
-    <Compile Include="../../Shared/Gameplay/MatchSettlementResult.cs" Link="TestHooks/Shared/Gameplay/MatchSettlementResult.cs" />
-    <Compile Include="../../Shared/Gameplay/VictoryPointAwards.cs" Link="TestHooks/Shared/Gameplay/VictoryPointAwards.cs" />
-    <Compile Include="../../Shared/Interfaces/IPlayerService.cs" Link="TestHooks/Shared/Interfaces/IPlayerService.cs" />
     <Compile Include="../../Server/Gateway/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
     <Compile Include="../../Server/Gateway/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
   </ItemGroup>

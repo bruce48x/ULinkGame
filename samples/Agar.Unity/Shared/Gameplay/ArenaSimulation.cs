@@ -7,6 +7,7 @@ using Shared.Interfaces;
 using UnityEngine;
 #if NET10_0_OR_GREATER
 using ULinkGame.Server.Hotfix.Abstractions;
+using ULinkGame.Server.Hotfix.Dispatch;
 #endif
 
 namespace Shared.Gameplay
@@ -212,6 +213,11 @@ namespace Shared.Gameplay
 
         public ArenaStepResult Tick(float deltaTime)
         {
+            return TickCore(deltaTime);
+        }
+
+        internal ArenaStepResult TickCore(float deltaTime)
+        {
             _tick++;
             _pendingDeaths.Clear();
 
@@ -233,6 +239,24 @@ namespace Shared.Gameplay
             _pendingMatchEnd = null;
             return result;
         }
+
+#if NET10_0_OR_GREATER
+        public ArenaStepResult TickWithHotfix(float deltaTime)
+        {
+            return HotfixDispatch.Invoke<ArenaSimulation, float, ArenaStepResult>(
+                nameof(Tick),
+                this,
+                deltaTime);
+        }
+
+        public MatchSettlementResult SettleMatch(WorldState worldState)
+        {
+            return HotfixDispatch.Invoke<ArenaSimulation, WorldState, MatchSettlementResult>(
+                nameof(SettleMatch),
+                this,
+                worldState);
+        }
+#endif
 
         public WorldState CreateWorldState()
         {
