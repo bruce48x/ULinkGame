@@ -5,5 +5,6 @@
   <Project Path="ULinkGame.Cluster.ULinkRPC.Tests/ULinkGame.Cluster.ULinkRPC.Tests.csproj" />
   <Project Path="ULinkGame.Server.Tests/ULinkGame.Server.Tests.csproj" />
   <Project Path="ULinkGame.Server.Hotfix.Tests/ULinkGame.Server.Hotfix.Tests.csproj" />
+  <Project Path="ULinkGame.Server.Hotfix.Generators.Tests/ULinkGame.Server.Hotfix.Generators.Tests.csproj" />
   <Project Path="ULinkGame.Tool.Tests/ULinkGame.Tool.Tests.csproj" />
 </Solution>
