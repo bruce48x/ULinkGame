@@ -72,7 +72,7 @@ samples/Agar.Godot/
 
 `samples/Cluster.Loopback` demonstrates local cluster routing without network infrastructure.
 
-`samples/Cluster.TwoNode` starts a route-directory process and worker process, then verifies ULinkRPC-based route registration, local dispatch, remote dispatch, route not found, expired message rejection, timeout, handler unavailable, backpressure, stale registration rejection, clear-by-node-epoch, and node restart with a new epoch.
+`samples/Cluster.TwoNode` starts a directory process and worker process, then verifies ULinkRPC-based node registration, route registration, local dispatch, remote dispatch, route not found, expired message rejection, timeout, handler unavailable, backpressure, stale registration rejection, clear-by-node-epoch, and node restart with a new directory-assigned epoch.
 
 Run the cross-process cluster smoke sample:
 
@@ -215,11 +215,11 @@ It must stay small. User-owned contracts still belong in a game `Shared` project
 
 ### ULinkGame.Cluster
 
-`ULinkGame.Cluster` is the optional cluster routing package. It owns explicit node identity, route identity, route locations, message envelopes, route directory abstractions, router abstractions, and in-memory implementations for tests or local validation.
+`ULinkGame.Cluster` is the optional cluster routing package. It owns explicit node identity, node directory abstractions, route identity, route locations, message envelopes, route directory abstractions, router abstractions, and in-memory implementations for tests or local validation.
 
-It must stay transport-neutral and actor-boundary-aware. The package must not provide transparent remote actor references, actor migration, durable route storage, Redis-specific state, service discovery, production transport, or gameplay concepts. Production adapters should be added only after the in-memory contract proves route lookup, expiration, local dispatch, remote dispatch, backpressure, and trace propagation.
+It must stay transport-neutral and actor-boundary-aware. The package must not provide transparent remote actor references, actor migration, durable route storage, Redis-specific state, external platform discovery bindings, production transport, or gameplay concepts. Production adapters should be added only after the in-memory contract proves route lookup, expiration, local dispatch, remote dispatch, backpressure, and trace propagation.
 
-`ULinkGame.Cluster.ULinkRPC` is the first transport adapter package. It owns the ULinkRPC method contract, client-side node messenger, client cache over ULinkRPC transports, endpoint parsing, TCP transport factory, server-side binder for internal node traffic, and a ULinkRPC-managed remote route directory client/binder. It must not own durable route storage, service discovery, durable queues, gameplay DTOs, actor migration, or transparent remote actor clients. Additional concrete transports must come with cross-process smoke tests.
+`ULinkGame.Cluster.ULinkRPC` is the first transport adapter package. It owns the ULinkRPC method contract, client-side node messenger, client cache over ULinkRPC transports, endpoint parsing, TCP transport factory, server-side binder for internal node traffic, and ULinkRPC-managed remote node-directory and route-directory clients/binders. It must not own durable route storage, external platform discovery bindings, durable queues, gameplay DTOs, actor migration, or transparent remote actor clients. Additional concrete transports must come with cross-process smoke tests.
 
 ### ULinkGame.Tool
 
@@ -590,14 +590,16 @@ First versions should avoid hotfixing:
 
 ### Node And Execution Model
 
-A node is a server process participating in a ULinkGame cluster. The framework should prefer neutral node concepts over business node types. `Gateway`, `State`, `Match`, `Room`, or `Battle` are deployment roles, labels, or sample terms, not core identity types.
+A node is a server process participating in a ULinkGame cluster. In ULinkGame cluster terminology, machine, process, and node are treated as the same deployment unit; use `node` when discussing cluster membership and lifecycle. The framework should prefer neutral node concepts over business node types. `Gateway`, `Lobby`, `Match`, `Room`, `Chat`, or `Battle` are services that can be composed inside a node, not fixed node types.
+
+Services are node-local capabilities loaded by configuration. A development node may run gateway, lobby, match, room, chat, node-directory, and route-directory services in one process. A production deployment may split those same services across several nodes. This difference should be a deployment configuration choice, not a different programming model.
 
 Suggested node concepts:
 
 - `NodeId`: stable runtime node identity
 - node epoch/generation: changes when the process re-registers after restart
 - node exposure: client-facing or internal-only
-- node capabilities: actor host, client session host, reliable push host, route directory host, scheduler host
+- node services: configured service descriptors such as gateway, lobby, match, room, chat, node-directory, route-directory, actor host, client session host, reliable push host, or scheduler host
 - node endpoints: named addresses for internal or external communication
 - node state: starting, ready, draining, suspect, dead
 
@@ -641,7 +643,7 @@ Decision:
 - Preferred first adapter: ULinkRPC internal transport.
 - Package shape: keep it outside `ULinkGame.Cluster` as `ULinkGame.Cluster.ULinkRPC`, so the core cluster contracts remain transport-neutral and do not force ULinkRPC server/client packages into every cluster consumer.
 - ULinkRPC adapter scope: node-to-node `ClusterMessage` delivery, remote `IRouteDirectory` calls, adapter-owned authentication/TLS/compression/wire format, trace propagation, timeout mapping, and explicit `ClusterSendStatus` results.
-- ULinkRPC adapter non-goals: durable route storage, service discovery, gameplay DTOs, durable queues, remote actor proxies, generated remote actor clients, or transparent local-looking actor references.
+- ULinkRPC adapter non-goals: durable route storage, external platform discovery bindings, gameplay DTOs, durable queues, remote actor proxies, generated remote actor clients, or transparent local-looking actor references.
 - Direction for gRPC: keep as the second candidate when a project needs a conventional service-to-service protocol or polyglot operations story.
 - Direction for Redis pub/sub or streams: use only for fanout or brokered delivery after ordering, backpressure, expiry, and observability semantics are explicit; do not serialize live RPC callbacks or actor references into Redis.
 - Direction for custom message buses: keep as an adapter pattern, not a framework default.
@@ -677,18 +679,44 @@ Skynet and ET framework comparison:
 
 The first cluster model should be simple and lease-based. Avoid starting with a fully decentralized consensus system.
 
+Cluster membership should follow a static-bootstrap plus dynamic-node-directory model. Static configuration should only tell a node how to join the cluster: cluster name, its own node id, advertised endpoints, configured services, labels, and one or more seed or directory endpoints. It should not be the source of truth for every live node in the cluster.
+
+The live cluster view should come from a dynamic node directory. The node-directory service is configured like any other node-local service; development deployments may run it in the same all-in-one node as gateway, lobby, match, room, and chat, while production deployments may place it on a dedicated control node or another operationally suitable node. A node registers itself with the directory, receives or records a `NodeEpoch`, publishes its service descriptors and endpoints, and refreshes a lease through heartbeat. Other nodes may cache directory results for short windows, but stale cached entries must be handled as a normal distributed condition through re-resolution and explicit send failures.
+
+The first node-directory version must support persistence. In-memory mode is still required for tests, local validation, and simple development, but production-oriented configuration must be able to use a durable backing store so node epochs do not roll back after a directory restart and active leases can be recovered or expired consistently. Persistence is for live membership metadata and epoch monotonicity, not a durable business event log.
+
+The node directory and route directory are separate responsibilities:
+
+- `NodeDirectory`: tracks live nodes, node epochs, service descriptors, endpoints, labels, readiness, draining state, and leases.
+- `RouteDirectory`: tracks application route ownership such as `RouteKey -> RouteLocation`, using node id and node epoch to prevent old locations from surviving node restarts. Routes may also record the target service name or service kind when a node hosts multiple services.
+
 The route directory should treat locations as expiring records. When a node dies or stops heartbeating, its temporary route locations should expire or be cleared. A stale location is a normal distributed condition, not a fatal error.
 
 Recommended lifecycle:
 
-1. Node starts and reads cluster name, node id, capabilities, endpoints, and labels.
-2. Node registers with the route or node directory.
-3. Directory assigns or records a node epoch and lease.
-4. Node heartbeats until it drains or dies.
-5. During draining, node stops accepting new ownership but may finish existing work.
-6. Expired leases make affected routes unavailable until another node registers a new location.
+1. Node starts and reads cluster name, node id, configured services, endpoints, and labels.
+2. Node uses static bootstrap configuration to find a seed or directory endpoint.
+3. Node registers with the node directory.
+4. Directory assigns or records a node epoch and lease.
+5. Node heartbeats until it drains or dies.
+6. During draining, node stops accepting new ownership but may finish existing work.
+7. Expired node leases make the node unavailable for discovery.
+8. Expired route leases make affected routes unavailable until another node registers a new location.
 
 Shutdown should use explicit draining rather than destructor-style cleanup. A draining node should stop accepting new route ownership, reject or redirect new remote sends, finish only bounded in-flight work, close external connections, flush required state, and then let process shutdown terminate anything still unfinished. The framework should not promise that every pending distributed request naturally completes during shutdown.
+
+### Implemented Cluster Management
+
+Current cluster management support includes:
+
+1. Transport-neutral node directory contracts for registration, heartbeat, readiness, draining, node lookup, service queries, expired-node cleanup, and node epoch allocation.
+2. In-memory node-directory storage for tests/local development and SQL-backed storage for production-oriented deployments.
+3. ULinkRPC node-directory messages, client, and binder in `ULinkGame.Cluster.ULinkRPC`, parallel to the route-directory adapter.
+4. A split-process cluster sample where the directory process hosts both node-directory and route-directory services, and workers use directory-assigned node epochs before publishing routes.
+5. `ulinkgame-tool new --network-profile cluster` templates that emit bootstrap settings, node-local service lists, and explicit node-directory storage mode settings rather than treating static configuration as the authoritative live cluster view.
+6. Diagnostics and dependency probes for node-directory and route-directory operations.
+
+Keep Consul, etcd, Kubernetes API, Redis, or Raft-backed discovery as optional future adapters; do not make any of them a dependency of the core cluster contracts unless a later design explicitly selects one as the first persistent backing store.
 
 ### Deferred Cluster Capabilities
 

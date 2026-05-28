@@ -100,7 +100,16 @@ public sealed class ToolTextTests
 
         Assert.Contains("\"Cluster\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"NodeId\": \"gateway-1\"", appSettings, StringComparison.Ordinal);
-        Assert.Contains("\"InternalEndpoint\": \"tcp://127.0.0.1:21000\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"AdvertisedEndpoints\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"cluster\": \"tcp://127.0.0.1:21000\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Bootstrap\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"NodeDirectoryEndpoints\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"NodeDirectory\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Mode\": \"InMemory\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Services\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Kind\": \"node-directory\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Kind\": \"route-directory\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Kind\": \"gateway\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("ULinkGame.Cluster", project, StringComparison.Ordinal);
         Assert.Contains("ULinkGame.Cluster.ULinkRPC", project, StringComparison.Ordinal);
         Assert.Contains("<RootNamespace>Server</RootNamespace>", project, StringComparison.Ordinal);
@@ -108,15 +117,24 @@ public sealed class ToolTextTests
         Assert.Contains("--health-check", program, StringComparison.Ordinal);
         Assert.Contains("ClusterOptions.FromConfiguration", program, StringComparison.Ordinal);
         Assert.Contains("using Server.Hosting;", program, StringComparison.Ordinal);
-        Assert.Contains("RouteDirectoryEndpoint", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("Services", clusterOptions, StringComparison.Ordinal);
+        Assert.DoesNotContain("NodeEpoch", clusterHealthCheck, StringComparison.Ordinal);
         Assert.Contains("cluster=healthy", clusterHealthCheck, StringComparison.Ordinal);
         Assert.Contains("healthcheck:", compose, StringComparison.Ordinal);
         Assert.Contains("dotnet Server.dll --health-check", compose, StringComparison.Ordinal);
         Assert.Contains("ULINKGAME_CLUSTER_NODE_ID", env, StringComparison.Ordinal);
+        Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER", env, StringComparison.Ordinal);
         Assert.Contains("ULinkRpcClusterDependencyProbe", operations, StringComparison.Ordinal);
-        Assert.DoesNotContain("Gateway.csproj", string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations), StringComparison.Ordinal);
-        Assert.DoesNotContain("Gateway.Generated", string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations), StringComparison.Ordinal);
-        Assert.DoesNotContain("Gateway.Hosting", string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations), StringComparison.Ordinal);
+        var generatedText = string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations);
+        Assert.DoesNotContain("NodeEpoch", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("InternalEndpoint", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("RouteDirectoryEndpoint", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("internal-rpc", generatedText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("public-ws", generatedText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Gateway.csproj", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gateway.Generated", generatedText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gateway.Hosting", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("password", compose, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", compose, StringComparison.OrdinalIgnoreCase);
     }

@@ -4,9 +4,11 @@
 
 It starts:
 
-- a route-directory process exposing `IRouteDirectory` through `ULinkRpcRouteDirectoryBinder`
+- a directory process exposing `INodeDirectory` through `ULinkRpcNodeDirectoryBinder` and `IRouteDirectory` through `ULinkRpcRouteDirectoryBinder`
 - a worker process exposing `IClusterMessageHandler` through `ULinkRpcClusterMessageBinder`
-- a driver process that registers a local route, sends local and remote cluster messages, clears a stale worker epoch, restarts the worker with a new epoch, and sends again
+- a driver process that registers a local route, sends local and remote cluster messages, clears a stale worker epoch, restarts the worker so the node directory assigns a new epoch, and sends again
+
+The worker registers with the node directory before publishing routes. The assigned `NodeEpoch` is then used for route ownership so a restarted worker cannot inherit stale routes from its previous process.
 
 Run:
 

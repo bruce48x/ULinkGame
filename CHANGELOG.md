@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added node-directory contracts, in-memory and SQL-backed storage, ULinkRPC node-directory adapter, and node-local service configuration scaffolding for cluster deployments.
+
 ## 2026-05-27
 
 ### Released

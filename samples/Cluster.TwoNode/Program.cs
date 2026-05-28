@@ -26,13 +26,16 @@ static async Task<int> RunDirectoryAsync(SampleOptions options)
         return Usage();
     }
 
-    var directory = new InMemoryRouteDirectory();
+    var nodeDirectory = new InMemoryNodeDirectory();
+    var routeDirectory = new InMemoryRouteDirectory();
     var serializer = new JsonSampleSerializer();
     var builder = RpcServerHostBuilder.Create()
         .UseSerializer(serializer)
         .UseAcceptor(new TcpConnectionAcceptor(options.Port.Value));
-    ULinkRpcRouteDirectoryBinder.Bind(builder.ServiceRegistry, directory);
+    ULinkRpcNodeDirectoryBinder.Bind(builder.ServiceRegistry, nodeDirectory);
+    ULinkRpcRouteDirectoryBinder.Bind(builder.ServiceRegistry, routeDirectory);
 
+    Console.WriteLine($"node-directory-ready tcp://127.0.0.1:{options.Port.Value}");
     Console.WriteLine($"directory-ready tcp://127.0.0.1:{options.Port.Value}");
     await builder.RunAsync(CancellationToken.None);
     return 0;
@@ -41,8 +44,7 @@ static async Task<int> RunDirectoryAsync(SampleOptions options)
 static async Task<int> RunWorkerAsync(SampleOptions options)
 {
     if (options.Port is null ||
-        options.DirectoryEndpoint is null ||
-        options.NodeEpoch is null)
+        options.DirectoryEndpoint is null)
     {
         return Usage();
     }
@@ -63,22 +65,38 @@ static async Task<int> RunWorkerAsync(SampleOptions options)
     var directoryClient = await clientFactory.GetClientAsync(
         DirectoryLocation(options.DirectoryEndpoint),
         CancellationToken.None);
-    var directory = new ULinkRpcRouteDirectory(directoryClient);
+    var nodeDirectory = new ULinkRpcNodeDirectory(directoryClient);
+    var routeDirectory = new ULinkRpcRouteDirectory(directoryClient);
+    var registration = await nodeDirectory.RegisterAsync(
+        WorkerRegistration(options.Port.Value),
+        DateTimeOffset.UtcNow,
+        CancellationToken.None);
+    if (registration.Status != NodeRegistrationStatus.Registered ||
+        registration.Record is null)
+    {
+        Console.Error.WriteLine($"worker-node-register={registration.Status}");
+        return 2;
+    }
+
+    var assignedNodeEpoch = registration.Record.NodeEpoch;
+    var generation = assignedNodeEpoch;
     var route = new RouteLocation(
         WorkerRoute(),
         "worker",
         new NodeEndpoint($"tcp://127.0.0.1:{options.Port.Value}"),
         DateTimeOffset.UtcNow.AddMinutes(5),
-        nodeEpoch: options.NodeEpoch.Value,
-        generation: options.NodeEpoch.Value);
-    var status = await directory.RegisterAsync(route);
+        nodeEpoch: assignedNodeEpoch,
+        generation: generation,
+        metadata: WorkerRouteMetadata());
+    var status = await routeDirectory.RegisterAsync(route);
     if (status != RouteRegistrationStatus.Registered)
     {
         Console.Error.WriteLine($"worker-register={status}");
-        return 2;
+        return 3;
     }
 
-    Console.WriteLine($"worker-ready epoch={options.NodeEpoch.Value} tcp://127.0.0.1:{options.Port.Value}");
+    Console.WriteLine($"node-registered node=worker epoch={assignedNodeEpoch}");
+    Console.WriteLine($"worker-ready epoch={assignedNodeEpoch} tcp://127.0.0.1:{options.Port.Value}");
     await serverTask;
     return 0;
 }
@@ -93,14 +111,16 @@ static async Task<int> RunDriverAsync()
     using var directoryProcess = StartChild("--mode", "directory", "--port", directoryPort.ToString());
     try
     {
+        var nodeDirectoryReady = await WaitForLineAsync(directoryProcess, "node-directory-ready", TimeSpan.FromSeconds(10));
+        Console.WriteLine(nodeDirectoryReady);
         await WaitForLineAsync(directoryProcess, "directory-ready", TimeSpan.FromSeconds(10));
 
         using var worker = StartChild(
             "--mode", "worker",
             "--port", workerPort.ToString(),
-            "--directory", directoryEndpoint,
-            "--epoch", "1");
-        await WaitForLineAsync(worker, "worker-ready", TimeSpan.FromSeconds(10));
+            "--directory", directoryEndpoint);
+        var workerRegistered = await WaitForLineAsync(worker, "node-registered", TimeSpan.FromSeconds(10));
+        Console.WriteLine(workerRegistered);
 
         await using var clientFactory = new ULinkRpcClusterClientFactory(
             new TcpULinkRpcClusterTransportFactory(),
@@ -125,7 +145,8 @@ static async Task<int> RunDriverAsync()
                 new NodeEndpoint($"tcp://127.0.0.1:{workerPort}"),
                 now.AddMinutes(5),
                 nodeEpoch: 1,
-                generation: 0));
+                generation: 0,
+                metadata: WorkerRouteMetadata()));
 
         var router = new ClusterRouter(
             "driver",
@@ -154,9 +175,10 @@ static async Task<int> RunDriverAsync()
         using var restartedWorker = StartChild(
             "--mode", "worker",
             "--port", restartedWorkerPort.ToString(),
-            "--directory", directoryEndpoint,
-            "--epoch", "2");
-        await WaitForLineAsync(restartedWorker, "worker-ready", TimeSpan.FromSeconds(10));
+            "--directory", directoryEndpoint);
+        var restartedRegistered = await WaitForLineAsync(restartedWorker, "node-registered", TimeSpan.FromSeconds(10));
+        var restartedEpoch = ParseWorkerEpoch(restartedRegistered);
+        Console.WriteLine($"node-restarted node=worker epoch={restartedEpoch}");
         var afterRestart = await router.SendAsync(NewActorMessage("after-restart", DateTimeOffset.UtcNow.AddMinutes(1)));
 
         StopChild(restartedWorker);
@@ -197,7 +219,7 @@ static async Task<int> RunDriverAsync()
 
 static int Usage()
 {
-    Console.Error.WriteLine("Usage: --mode driver | --mode directory --port <port> | --mode worker --port <port> --directory <endpoint> --epoch <epoch>");
+    Console.Error.WriteLine("Usage: --mode driver | --mode directory --port <port> | --mode worker --port <port> --directory <endpoint> [--epoch <compatibility-epoch>]");
     return 64;
 }
 
@@ -222,7 +244,7 @@ static Process StartChild(params string[] arguments)
     return process;
 }
 
-static async Task WaitForLineAsync(Process process, string expectedPrefix, TimeSpan timeout)
+static async Task<string> WaitForLineAsync(Process process, string expectedPrefix, TimeSpan timeout)
 {
     using var timeoutCts = new CancellationTokenSource(timeout);
     while (!timeoutCts.IsCancellationRequested)
@@ -237,11 +259,26 @@ static async Task WaitForLineAsync(Process process, string expectedPrefix, TimeS
 
         if (line.StartsWith(expectedPrefix, StringComparison.Ordinal))
         {
-            return;
+            return line;
         }
     }
 
     throw new TimeoutException($"Timed out waiting for '{expectedPrefix}'.");
+}
+
+static long ParseWorkerEpoch(string line)
+{
+    const string marker = " epoch=";
+    var start = line.IndexOf(marker, StringComparison.Ordinal);
+    if (start < 0)
+    {
+        throw new InvalidOperationException($"Worker registration did not include an epoch: {line}");
+    }
+
+    start += marker.Length;
+    var end = line.IndexOf(' ', start);
+    var value = end < 0 ? line[start..] : line[start..end];
+    return long.Parse(value);
 }
 
 static void StopChild(Process process)
@@ -283,6 +320,38 @@ static RouteLocation DirectoryLocation(string endpoint)
 static RouteKey WorkerRoute()
 {
     return ClusterActorRouteKeys.ForActor("worker/demo");
+}
+
+static NodeRegistration WorkerRegistration(int port)
+{
+    return new NodeRegistration(
+        "local",
+        "worker",
+        new Dictionary<string, NodeEndpoint>
+        {
+            ["cluster"] = new NodeEndpoint($"tcp://127.0.0.1:{port}")
+        },
+        new[]
+        {
+            new NodeServiceDescriptor(
+                "room",
+                "worker-room",
+                new Dictionary<string, string>
+                {
+                    ["sample"] = "cluster-two-node"
+                })
+        },
+        DateTimeOffset.UtcNow.AddMinutes(5),
+        NodeState.Ready);
+}
+
+static Dictionary<string, string> WorkerRouteMetadata()
+{
+    return new Dictionary<string, string>
+    {
+        ["service.kind"] = "room",
+        ["service.name"] = "worker-room"
+    };
 }
 
 static ClusterMessage NewMessage(

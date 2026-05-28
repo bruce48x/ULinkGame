@@ -59,3 +59,68 @@ To include database dependencies:
 ulinkgame-tool new --name MyGame --persistence postgres
 ulinkgame-tool new --name MyGame --persistence mysql
 ```
+
+## Cluster Configuration
+
+The cluster scaffold uses a node-local service configuration model. A node is one .NET server process; services such as gateway, lobby, match, room, chat, node-directory, and route-directory are configured inside that node.
+
+The generated development profile uses an all-in-one node:
+
+```json
+{
+  "Cluster": {
+    "NodeId": "dev-1",
+    "AdvertisedEndpoints": {
+      "cluster": "tcp://127.0.0.1:21000",
+      "client": "ws://127.0.0.1:20000/ws"
+    },
+    "Bootstrap": {
+      "NodeDirectoryEndpoints": [
+        "tcp://127.0.0.1:21000"
+      ]
+    },
+    "NodeDirectory": {
+      "Enabled": true,
+      "Storage": {
+        "Mode": "InMemory"
+      }
+    },
+    "Services": [
+      { "Kind": "node-directory", "Name": "node-directory" },
+      { "Kind": "route-directory", "Name": "route-directory" },
+      { "Kind": "gateway", "Name": "gateway" },
+      { "Kind": "lobby", "Name": "lobby" },
+      { "Kind": "match", "Name": "match" },
+      { "Kind": "room", "Name": "room" },
+      { "Kind": "chat", "Name": "chat" }
+    ]
+  }
+}
+```
+
+Production-oriented profiles should keep the same shape, split services across nodes as needed, and use persistent node-directory storage:
+
+```json
+{
+  "Cluster": {
+    "NodeId": "control-1",
+    "AdvertisedEndpoints": {
+      "cluster": "tcp://10.0.0.10:21000"
+    },
+    "NodeDirectory": {
+      "Enabled": true,
+      "Storage": {
+        "Mode": "Persistent",
+        "Provider": "postgres",
+        "ConnectionStringName": "ClusterDirectory"
+      }
+    },
+    "Services": [
+      { "Kind": "node-directory", "Name": "node-directory" },
+      { "Kind": "route-directory", "Name": "route-directory" }
+    ]
+  }
+}
+```
+
+Provider names and connection-string keys are configuration guidance; concrete provider references and secret loading remain project-owned deployment choices.

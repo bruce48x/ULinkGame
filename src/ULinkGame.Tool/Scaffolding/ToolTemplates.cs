@@ -150,9 +150,25 @@ internal static class ToolTemplates
                   },
                   "Cluster": {
                     "NodeId": "gateway-1",
-                    "NodeEpoch": 1,
-                    "InternalEndpoint": "tcp://127.0.0.1:21000",
-                    "RouteDirectoryEndpoint": "tcp://127.0.0.1:21001",
+                    "AdvertisedEndpoints": {
+                      "cluster": "tcp://127.0.0.1:21000"
+                    },
+                    "Bootstrap": {
+                      "NodeDirectoryEndpoints": [
+                        "tcp://127.0.0.1:21000"
+                      ]
+                    },
+                    "NodeDirectory": {
+                      "Enabled": true,
+                      "Storage": {
+                        "Mode": "InMemory"
+                      }
+                    },
+                    "Services": [
+                      { "Kind": "node-directory", "Name": "node-directory" },
+                      { "Kind": "route-directory", "Name": "route-directory" },
+                      { "Kind": "gateway", "Name": "gateway" }
+                    ],
                     "RouteLeaseSeconds": 30,
                     "SendTimeoutMilliseconds": 2000
                   }
@@ -255,16 +271,28 @@ internal sealed class {typeName}
 
     public static string RenderClusterOptions()
     {
-        return @"using Microsoft.Extensions.Configuration;
+        return @"using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 
 namespace Server.Hosting;
 
 internal sealed class ClusterOptions
 {
     public string NodeId { get; init; } = ""gateway-1"";
-    public long NodeEpoch { get; init; } = 1;
-    public string InternalEndpoint { get; init; } = ""tcp://127.0.0.1:21000"";
-    public string RouteDirectoryEndpoint { get; init; } = ""tcp://127.0.0.1:21001"";
+    public IReadOnlyDictionary<string, string> AdvertisedEndpoints { get; init; } =
+        new Dictionary<string, string>
+        {
+            [""cluster""] = ""tcp://127.0.0.1:21000""
+        };
+    public ClusterBootstrapOptions Bootstrap { get; init; } = new();
+    public ClusterNodeDirectoryOptions NodeDirectory { get; init; } = new();
+    public IReadOnlyList<ClusterServiceOptions> Services { get; init; } =
+        new[]
+        {
+            new ClusterServiceOptions { Kind = ""node-directory"", Name = ""node-directory"" },
+            new ClusterServiceOptions { Kind = ""route-directory"", Name = ""route-directory"" },
+            new ClusterServiceOptions { Kind = ""gateway"", Name = ""gateway"" }
+        };
     public int RouteLeaseSeconds { get; init; } = 30;
     public int SendTimeoutMilliseconds { get; init; } = 2000;
 
@@ -275,9 +303,10 @@ internal sealed class ClusterOptions
         return new ClusterOptions
         {
             NodeId = ReadString(section, ""NodeId"", defaults.NodeId),
-            NodeEpoch = ReadLong(section, ""NodeEpoch"", defaults.NodeEpoch),
-            InternalEndpoint = ReadString(section, ""InternalEndpoint"", defaults.InternalEndpoint),
-            RouteDirectoryEndpoint = ReadString(section, ""RouteDirectoryEndpoint"", defaults.RouteDirectoryEndpoint),
+            AdvertisedEndpoints = ReadDictionary(section.GetSection(""AdvertisedEndpoints""), defaults.AdvertisedEndpoints),
+            Bootstrap = ClusterBootstrapOptions.FromConfiguration(section.GetSection(""Bootstrap""), defaults.Bootstrap),
+            NodeDirectory = ClusterNodeDirectoryOptions.FromConfiguration(section.GetSection(""NodeDirectory""), defaults.NodeDirectory),
+            Services = ReadServices(section.GetSection(""Services""), defaults.Services),
             RouteLeaseSeconds = ReadInt(section, ""RouteLeaseSeconds"", defaults.RouteLeaseSeconds),
             SendTimeoutMilliseconds = ReadInt(section, ""SendTimeoutMilliseconds"", defaults.SendTimeoutMilliseconds)
         };
@@ -294,10 +323,130 @@ internal sealed class ClusterOptions
         return int.TryParse(section[name], out var value) && value > 0 ? value : fallback;
     }
 
-    private static long ReadLong(IConfiguration section, string name, long fallback)
+    private static IReadOnlyDictionary<string, string> ReadDictionary(
+        IConfigurationSection section,
+        IReadOnlyDictionary<string, string> fallback)
     {
-        return long.TryParse(section[name], out var value) && value >= 0 ? value : fallback;
+        var values = new Dictionary<string, string>();
+        foreach (var child in section.GetChildren())
+        {
+            if (!string.IsNullOrWhiteSpace(child.Key) &&
+                !string.IsNullOrWhiteSpace(child.Value))
+            {
+                values[child.Key] = child.Value!;
+            }
+        }
+
+        return values.Count == 0 ? fallback : values;
     }
+
+    private static IReadOnlyList<ClusterServiceOptions> ReadServices(
+        IConfigurationSection section,
+        IReadOnlyList<ClusterServiceOptions> fallback)
+    {
+        var values = new List<ClusterServiceOptions>();
+        foreach (var child in section.GetChildren())
+        {
+            var kind = child[""Kind""];
+            if (string.IsNullOrWhiteSpace(kind))
+            {
+                continue;
+            }
+
+            values.Add(new ClusterServiceOptions
+            {
+                Kind = kind,
+                Name = ReadString(child, ""Name"", kind)
+            });
+        }
+
+        return values.Count == 0 ? fallback : values;
+    }
+}
+
+internal sealed class ClusterBootstrapOptions
+{
+    public IReadOnlyList<string> NodeDirectoryEndpoints { get; init; } =
+        new[] { ""tcp://127.0.0.1:21000"" };
+
+    public static ClusterBootstrapOptions FromConfiguration(
+        IConfigurationSection section,
+        ClusterBootstrapOptions defaults)
+    {
+        return new ClusterBootstrapOptions
+        {
+            NodeDirectoryEndpoints = ReadList(section.GetSection(""NodeDirectoryEndpoints""), defaults.NodeDirectoryEndpoints)
+        };
+    }
+
+    private static IReadOnlyList<string> ReadList(
+        IConfigurationSection section,
+        IReadOnlyList<string> fallback)
+    {
+        var values = new List<string>();
+        foreach (var child in section.GetChildren())
+        {
+            if (!string.IsNullOrWhiteSpace(child.Value))
+            {
+                values.Add(child.Value!);
+            }
+        }
+
+        return values.Count == 0 ? fallback : values;
+    }
+}
+
+internal sealed class ClusterNodeDirectoryOptions
+{
+    public bool Enabled { get; init; } = true;
+    public ClusterNodeDirectoryStorageOptions Storage { get; init; } = new();
+
+    public static ClusterNodeDirectoryOptions FromConfiguration(
+        IConfigurationSection section,
+        ClusterNodeDirectoryOptions defaults)
+    {
+        return new ClusterNodeDirectoryOptions
+        {
+            Enabled = ReadBool(section, ""Enabled"", defaults.Enabled),
+            Storage = ClusterNodeDirectoryStorageOptions.FromConfiguration(section.GetSection(""Storage""), defaults.Storage)
+        };
+    }
+
+    private static bool ReadBool(IConfiguration section, string name, bool fallback)
+    {
+        return bool.TryParse(section[name], out var value) ? value : fallback;
+    }
+}
+
+internal sealed class ClusterNodeDirectoryStorageOptions
+{
+    public string Mode { get; init; } = ""InMemory"";
+    public string Provider { get; init; } = """";
+    public string ConnectionStringName { get; init; } = """";
+
+    public static ClusterNodeDirectoryStorageOptions FromConfiguration(
+        IConfigurationSection section,
+        ClusterNodeDirectoryStorageOptions defaults)
+    {
+        return new ClusterNodeDirectoryStorageOptions
+        {
+            Mode = ReadString(section, ""Mode"", defaults.Mode),
+            Provider = ReadString(section, ""Provider"", defaults.Provider),
+            ConnectionStringName = ReadString(section, ""ConnectionStringName"", defaults.ConnectionStringName)
+        };
+    }
+
+    private static string ReadString(IConfiguration section, string name, string fallback)
+    {
+        var value = section[name];
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+}
+
+internal sealed class ClusterServiceOptions
+{
+    public string Kind { get; init; } = """";
+    public string Name { get; init; } = """";
 }";
     }
 
@@ -315,33 +464,30 @@ internal static class ClusterHealthCheck
             return 1;
         }
 
-        if (options.NodeEpoch < 0)
+        if (options.AdvertisedEndpoints.Count == 0)
         {
-            Console.Error.WriteLine(""Cluster health check failed: NodeEpoch cannot be negative."");
+            Console.Error.WriteLine(""Cluster health check failed: at least one advertised endpoint is required."");
             return 1;
         }
 
-        if (!IsTcpEndpoint(options.InternalEndpoint))
+        if (options.Services.Count == 0)
         {
-            Console.Error.WriteLine(""Cluster health check failed: InternalEndpoint must be a tcp:// endpoint."");
+            Console.Error.WriteLine(""Cluster health check failed: at least one service is required."");
             return 1;
         }
 
-        if (!IsTcpEndpoint(options.RouteDirectoryEndpoint))
+        foreach (var endpoint in options.AdvertisedEndpoints)
         {
-            Console.Error.WriteLine(""Cluster health check failed: RouteDirectoryEndpoint must be a tcp:// endpoint."");
-            return 1;
+            if (string.IsNullOrWhiteSpace(endpoint.Key) ||
+                string.IsNullOrWhiteSpace(endpoint.Value))
+            {
+                Console.Error.WriteLine(""Cluster health check failed: advertised endpoint keys and values are required."");
+                return 1;
+            }
         }
 
         Console.WriteLine(""cluster=healthy"");
         return 0;
-    }
-
-    private static bool IsTcpEndpoint(string endpoint)
-    {
-        return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
-            string.Equals(uri.Scheme, ""tcp"", StringComparison.OrdinalIgnoreCase) &&
-            uri.Port > 0;
     }
 }";
     }
@@ -537,9 +683,16 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
               Endpoint__Port: "20000"
               Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
               Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-gateway-1}"
-              Cluster__NodeEpoch: "${ULINKGAME_CLUSTER_NODE_EPOCH:-1}"
-              Cluster__InternalEndpoint: "${ULINKGAME_CLUSTER_INTERNAL_ENDPOINT:-tcp://gateway:21000}"
-              Cluster__RouteDirectoryEndpoint: "${ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT:-tcp://gateway:21001}"
+              Cluster__AdvertisedEndpoints__cluster: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER:-tcp://gateway:21000}"
+              Cluster__Bootstrap__NodeDirectoryEndpoints__0: "${ULINKGAME_CLUSTER_BOOTSTRAP_NODE_DIRECTORY_ENDPOINT_0:-tcp://gateway:21000}"
+              Cluster__NodeDirectory__Enabled: "${ULINKGAME_CLUSTER_NODE_DIRECTORY_ENABLED:-true}"
+              Cluster__NodeDirectory__Storage__Mode: "${ULINKGAME_CLUSTER_NODE_DIRECTORY_STORAGE_MODE:-InMemory}"
+              Cluster__Services__0__Kind: "node-directory"
+              Cluster__Services__0__Name: "node-directory"
+              Cluster__Services__1__Kind: "route-directory"
+              Cluster__Services__1__Name: "route-directory"
+              Cluster__Services__2__Kind: "gateway"
+              Cluster__Services__2__Name: "gateway"
               Cluster__RouteLeaseSeconds: "${ULINKGAME_CLUSTER_ROUTE_LEASE_SECONDS:-30}"
               Cluster__SendTimeoutMilliseconds: "${ULINKGAME_CLUSTER_SEND_TIMEOUT_MILLISECONDS:-2000}"
             ports:
@@ -559,9 +712,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         # This file intentionally contains no production secrets.
         # Put node authentication and TLS material in your deployment platform secret store.
         ULINKGAME_CLUSTER_NODE_ID=gateway-1
-        ULINKGAME_CLUSTER_NODE_EPOCH=1
-        ULINKGAME_CLUSTER_INTERNAL_ENDPOINT=tcp://gateway:21000
-        ULINKGAME_CLUSTER_ROUTE_DIRECTORY_ENDPOINT=tcp://gateway:21001
+        ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER=tcp://gateway:21000
+        ULINKGAME_CLUSTER_BOOTSTRAP_NODE_DIRECTORY_ENDPOINT_0=tcp://gateway:21000
+        ULINKGAME_CLUSTER_NODE_DIRECTORY_ENABLED=true
+        ULINKGAME_CLUSTER_NODE_DIRECTORY_STORAGE_MODE=InMemory
         ULINKGAME_CLUSTER_ROUTE_LEASE_SECONDS=30
         ULINKGAME_CLUSTER_SEND_TIMEOUT_MILLISECONDS=2000
         """;
@@ -579,9 +733,12 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         Generated cluster settings can be overridden with environment variables:
 
         - `Cluster__NodeId`
-        - `Cluster__NodeEpoch`
-        - `Cluster__InternalEndpoint`
-        - `Cluster__RouteDirectoryEndpoint`
+        - `Cluster__AdvertisedEndpoints__cluster`
+        - `Cluster__Bootstrap__NodeDirectoryEndpoints__0`
+        - `Cluster__NodeDirectory__Enabled`
+        - `Cluster__NodeDirectory__Storage__Mode`
+        - `Cluster__Services__0__Kind`
+        - `Cluster__Services__0__Name`
         - `Cluster__RouteLeaseSeconds`
         - `Cluster__SendTimeoutMilliseconds`
 
@@ -591,7 +748,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         dotnet Server.dll --health-check
         ```
 
-        The generated health check validates local cluster configuration. Remote route-directory and node-messenger dependency checks should be wired by the project host using `ULinkRpcClusterDependencyProbe` once the project chooses its concrete topology and secret policy.
+        The generated health check validates that local cluster configuration has a node id, at least one advertised endpoint, and at least one configured service. Remote node-directory, route-directory, and node-messenger dependency checks should be wired by the project host using `ULinkRpcClusterDependencyProbe` once the project chooses its concrete topology and secret policy.
         """;
     }
 

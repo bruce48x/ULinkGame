@@ -36,6 +36,9 @@ public sealed class ClusterTwoNodeSampleTests
         var stderr = await stderrTask;
 
         Assert.True(process.ExitCode == 0, $"stdout:{Environment.NewLine}{stdout}{Environment.NewLine}stderr:{Environment.NewLine}{stderr}");
+        Assert.Contains("node-directory-ready", stdout, StringComparison.Ordinal);
+        Assert.Contains("node-registered node=worker epoch=1", stdout, StringComparison.Ordinal);
+        Assert.Contains("node-restarted node=worker epoch=2", stdout, StringComparison.Ordinal);
         Assert.Contains("remote=Accepted", stdout, StringComparison.Ordinal);
         Assert.Contains("missing=RouteNotFound", stdout, StringComparison.Ordinal);
         Assert.Contains("expired=Expired", stdout, StringComparison.Ordinal);
