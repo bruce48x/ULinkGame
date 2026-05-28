@@ -16,19 +16,28 @@ public static class HotfixDispatch
 
     public static HotfixMethodKey CreateKey<TState, TResult>(string methodName, params Type[] parameterTypes)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
-        ArgumentNullException.ThrowIfNull(parameterTypes);
+        return CreateKey(typeof(TState), methodName, typeof(TResult), parameterTypes);
+    }
 
-        if (parameterTypes.Any(static type => type is null))
+    public static void Invoke<TState>(
+        string methodName,
+        TState state,
+        Type[] parameterTypes,
+        object?[] arguments)
+    {
+        var invocation = PrepareInvocation<TState>(methodName, state, typeof(void), parameterTypes, arguments);
+
+        if (invocation.Method.ReturnType != typeof(void))
         {
-            throw new ArgumentException("Parameter types cannot contain null.", nameof(parameterTypes));
+            throw new InvalidOperationException(
+                $"Hotfix method '{invocation.Key}' returns '{invocation.Method.ReturnType.FullName ?? invocation.Method.ReturnType.Name}' and cannot be invoked through the void dispatch overload.");
         }
 
-        return new HotfixMethodKey(
-            typeof(TState).FullName ?? typeof(TState).Name,
-            methodName,
-            typeof(TResult).FullName ?? typeof(TResult).Name,
-            parameterTypes.Select(static type => type.FullName ?? type.Name).ToArray());
+        var result = invocation.Method.Invoke(null, invocation.Arguments);
+        if (result is not null)
+        {
+            throw new InvalidOperationException($"Hotfix method '{invocation.Key}' returned a result from the void dispatch overload.");
+        }
     }
 
     public static TResult Invoke<TState, TResult>(
@@ -37,8 +46,31 @@ public static class HotfixDispatch
         Type[] parameterTypes,
         object?[] arguments)
     {
+        var invocation = PrepareInvocation<TState>(methodName, state, typeof(TResult), parameterTypes, arguments);
+        var result = invocation.Method.Invoke(null, invocation.Arguments);
+        if (result is TResult typedResult)
+        {
+            return typedResult;
+        }
+
+        if (result is null && default(TResult) is null)
+        {
+            return default!;
+        }
+
+        throw new InvalidOperationException($"Hotfix method '{invocation.Key}' returned an invalid result.");
+    }
+
+    private static PreparedInvocation PrepareInvocation<TState>(
+        string methodName,
+        TState state,
+        Type returnType,
+        Type[] parameterTypes,
+        object?[] arguments)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(returnType);
         ArgumentNullException.ThrowIfNull(parameterTypes);
         ArgumentNullException.ThrowIfNull(arguments);
 
@@ -55,23 +87,40 @@ public static class HotfixDispatch
         }
 
         var table = Current;
-        var key = CreateKey<TState, TResult>(methodName, parameterTypes);
+        var key = CreateKey(typeof(TState), methodName, returnType, parameterTypes);
         var method = table.Resolve(key);
         var invokeArguments = new object?[arguments.Length + 1];
         invokeArguments[0] = state;
         Array.Copy(arguments, 0, invokeArguments, 1, arguments.Length);
 
-        var result = method.Invoke(null, invokeArguments);
-        if (result is TResult typedResult)
-        {
-            return typedResult;
-        }
-
-        if (result is null && default(TResult) is null)
-        {
-            return default!;
-        }
-
-        throw new InvalidOperationException($"Hotfix method '{key}' returned an invalid result.");
+        return new PreparedInvocation(key, method, invokeArguments);
     }
+
+    private static HotfixMethodKey CreateKey(
+        Type stateType,
+        string methodName,
+        Type returnType,
+        Type[] parameterTypes)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(methodName);
+        ArgumentNullException.ThrowIfNull(stateType);
+        ArgumentNullException.ThrowIfNull(returnType);
+        ArgumentNullException.ThrowIfNull(parameterTypes);
+
+        if (parameterTypes.Any(static type => type is null))
+        {
+            throw new ArgumentException("Parameter types cannot contain null.", nameof(parameterTypes));
+        }
+
+        return new HotfixMethodKey(
+            stateType.FullName ?? stateType.Name,
+            methodName,
+            returnType.FullName ?? returnType.Name,
+            parameterTypes.Select(static type => type.FullName ?? type.Name).ToArray());
+    }
+
+    private sealed record PreparedInvocation(
+        HotfixMethodKey Key,
+        System.Reflection.MethodInfo Method,
+        object?[] Arguments);
 }

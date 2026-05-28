@@ -22,6 +22,22 @@ public sealed class HotfixDispatchTests
 
         Assert.Equal(12, result);
     }
+
+    [Fact]
+    public void Invoke_calls_loaded_void_static_extension_method()
+    {
+        var scan = HotfixSystemScanner.Scan(typeof(DispatchTestStateSystem).Assembly);
+        HotfixDispatch.Replace(new HotfixDispatchTable(1, scan.Methods));
+        var state = new DispatchTestState { Value = 5 };
+
+        HotfixDispatch.Invoke(
+            "AddExp",
+            state,
+            [typeof(int)],
+            [7]);
+
+        Assert.Equal(12, state.Value);
+    }
 }
 
 public sealed class DispatchTestState
@@ -35,5 +51,10 @@ public static class DispatchTestStateSystem
     public static int Add(this DispatchTestState self, int amount)
     {
         return self.Value + amount;
+    }
+
+    public static void AddExp(this DispatchTestState self, int amount)
+    {
+        self.Value += amount;
     }
 }
