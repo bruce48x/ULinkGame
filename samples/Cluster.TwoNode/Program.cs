@@ -35,9 +35,17 @@ static async Task<int> RunDirectoryAsync(SampleOptions options)
     ULinkRpcNodeDirectoryBinder.Bind(builder.ServiceRegistry, nodeDirectory);
     ULinkRpcRouteDirectoryBinder.Bind(builder.ServiceRegistry, routeDirectory);
 
+    var serverTask = builder.RunAsync(CancellationToken.None).AsTask();
+    await WaitForTcpEndpointAsync(
+        IPAddress.Loopback,
+        options.Port.Value,
+        serverTask,
+        TimeSpan.FromSeconds(10),
+        CancellationToken.None);
+
     Console.WriteLine($"node-directory-ready tcp://127.0.0.1:{options.Port.Value}");
     Console.WriteLine($"directory-ready tcp://127.0.0.1:{options.Port.Value}");
-    await builder.RunAsync(CancellationToken.None);
+    await serverTask;
     return 0;
 }
 
