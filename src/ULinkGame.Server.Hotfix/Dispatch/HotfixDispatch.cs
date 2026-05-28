@@ -19,6 +19,24 @@ public static class HotfixDispatch
         return CreateKey(typeof(TState), methodName, typeof(TResult), parameterTypes);
     }
 
+    public static TResult Invoke<TState, TResult>(string methodName, TState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        var table = Current;
+        var key = CreateKey<TState, TResult>(methodName);
+        return table.Resolve<TState, TResult>(key)(state);
+    }
+
+    public static TResult Invoke<TState, TArg, TResult>(string methodName, TState state, TArg arg)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        var table = Current;
+        var key = CreateKey<TState, TResult>(methodName, typeof(TArg));
+        return table.Resolve<TState, TArg, TResult>(key)(state, arg);
+    }
+
     public static void Invoke<TState>(
         string methodName,
         TState state,
