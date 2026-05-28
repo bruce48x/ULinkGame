@@ -26,12 +26,12 @@ namespace ULinkGame.Server.Hotfix.Generators
 
         private static bool IsStateCandidate(SyntaxNode node, CancellationToken cancellationToken)
         {
-            return node is ClassDeclarationSyntax declaration && declaration.AttributeLists.Count > 0;
+            return node is TypeDeclarationSyntax declaration && declaration.AttributeLists.Count > 0;
         }
 
         private static HotfixStateInfo? GetState(GeneratorSyntaxContext context, CancellationToken cancellationToken)
         {
-            var declaration = (ClassDeclarationSyntax)context.Node;
+            var declaration = (TypeDeclarationSyntax)context.Node;
             var symbol = context.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken);
             if (symbol == null)
             {
@@ -66,8 +66,24 @@ namespace ULinkGame.Server.Hotfix.Generators
                 return;
             }
 
+            var nonPartialContainer = state.ContainingTypes.FirstOrDefault(type => !IsPartial(type.Declaration));
+            if (nonPartialContainer != null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    HotfixGeneratorDiagnostics.ContainingTypeMustBePartial,
+                    nonPartialContainer.Declaration.Identifier.GetLocation(),
+                    nonPartialContainer.Symbol.ToDisplayString(),
+                    state.Symbol.ToDisplayString()));
+                return;
+            }
+
             var hintName = CreateHintName(state.Symbol);
             context.AddSource(hintName, SourceText.From(GenerateStateSource(state), Encoding.UTF8));
+        }
+
+        private static bool IsPartial(TypeDeclarationSyntax declaration)
+        {
+            return declaration.Modifiers.Any(modifier => modifier.IsKind(SyntaxKind.PartialKeyword));
         }
 
         private static string GenerateStateSource(HotfixStateInfo state)
@@ -78,7 +94,7 @@ namespace ULinkGame.Server.Hotfix.Generators
 
             var fields = state.Symbol.GetMembers()
                 .OfType<IFieldSymbol>()
-                .Where(field => field.DeclaredAccessibility == Accessibility.Private)
+                .Where(IsFriendAccessorField)
                 .OrderBy(field => field.Locations.Length == 0 ? 0 : field.Locations[0].SourceSpan.Start)
                 .ToArray();
 
@@ -93,7 +109,7 @@ namespace ULinkGame.Server.Hotfix.Generators
                 builder.AppendLine("{");
             }
 
-            AppendStateType(builder, state.Symbol, fields, namespaceName != null ? 1 : 0);
+            AppendContainingTypes(builder, state, fields, namespaceName != null ? 1 : 0);
 
             if (namespaceName != null)
             {
@@ -103,17 +119,47 @@ namespace ULinkGame.Server.Hotfix.Generators
             return builder.ToString();
         }
 
-        private static void AppendStateType(StringBuilder builder, INamedTypeSymbol stateType, IFieldSymbol[] fields, int indentLevel)
+        private static bool IsFriendAccessorField(IFieldSymbol field)
+        {
+            return field.DeclaredAccessibility == Accessibility.Private &&
+                !field.IsImplicitlyDeclared &&
+                field.AssociatedSymbol == null &&
+                !field.IsStatic &&
+                !field.IsConst;
+        }
+
+        private static void AppendContainingTypes(StringBuilder builder, HotfixStateInfo state, IFieldSymbol[] fields, int indentLevel)
+        {
+            foreach (var containingType in state.ContainingTypes)
+            {
+                AppendTypeHeader(builder, containingType.Declaration, indentLevel);
+                builder.Append(new string(' ', indentLevel * 4)).AppendLine("{");
+                indentLevel++;
+            }
+
+            AppendStateType(builder, state.Declaration, fields, indentLevel);
+
+            for (var index = state.ContainingTypes.Length - 1; index >= 0; index--)
+            {
+                indentLevel--;
+                builder.Append(new string(' ', indentLevel * 4)).AppendLine("}");
+            }
+        }
+
+        private static void AppendStateType(StringBuilder builder, TypeDeclarationSyntax declaration, IFieldSymbol[] fields, int indentLevel)
         {
             var indent = new string(' ', indentLevel * 4);
             var usedAccessorNames = new HashSet<string>();
+            var normalizedNameCounts = fields
+                .GroupBy(field => NormalizeFieldName(field.Name))
+                .ToDictionary(group => group.Key, group => group.Count());
 
-            builder.Append(indent).Append("partial class ").Append(stateType.Name).AppendLine();
+            AppendTypeHeader(builder, declaration, indentLevel);
             builder.Append(indent).AppendLine("{");
 
             foreach (var field in fields)
             {
-                var accessorName = CreateUniqueAccessorName(field.Name, usedAccessorNames);
+                var accessorName = CreateUniqueAccessorName(field.Name, normalizedNameCounts, usedAccessorNames);
 
                 builder.Append(indent).AppendLine("    [EditorBrowsable(EditorBrowsableState.Never)]");
                 builder.Append(indent).Append("    public ")
@@ -130,10 +176,38 @@ namespace ULinkGame.Server.Hotfix.Generators
             builder.Append(indent).AppendLine("}");
         }
 
-        private static string CreateUniqueAccessorName(string fieldName, HashSet<string> usedAccessorNames)
+        private static void AppendTypeHeader(StringBuilder builder, TypeDeclarationSyntax declaration, int indentLevel)
         {
-            var normalizedName = fieldName.TrimStart('_');
-            if (normalizedName.Length == 0)
+            builder.Append(new string(' ', indentLevel * 4))
+                .Append(GetTypeModifiers(declaration))
+                .Append(' ')
+                .Append(declaration.Keyword.ValueText)
+                .Append(' ')
+                .Append(declaration.Identifier.ValueText)
+                .Append(declaration.TypeParameterList != null ? declaration.TypeParameterList.ToString() : string.Empty)
+                .AppendLine();
+
+            foreach (var constraint in declaration.ConstraintClauses)
+            {
+                builder.Append(new string(' ', (indentLevel + 1) * 4))
+                    .AppendLine(constraint.ToString());
+            }
+        }
+
+        private static string GetTypeModifiers(TypeDeclarationSyntax declaration)
+        {
+            return string.Join(" ", declaration.Modifiers.Select(modifier => modifier.ValueText));
+        }
+
+        private static string CreateUniqueAccessorName(
+            string fieldName,
+            Dictionary<string, int> normalizedNameCounts,
+            HashSet<string> usedAccessorNames)
+        {
+            var normalizedName = NormalizeFieldName(fieldName);
+            if (fieldName.StartsWith("_", System.StringComparison.Ordinal) &&
+                normalizedNameCounts.TryGetValue(normalizedName, out var count) &&
+                count > 1)
             {
                 normalizedName = fieldName;
             }
@@ -144,7 +218,7 @@ namespace ULinkGame.Server.Hotfix.Generators
                 return candidate;
             }
 
-            candidate = "__hotfix_" + SanitizeIdentifierPart(fieldName);
+            candidate = "__hotfix_" + SanitizeIdentifierPart(fieldName.TrimStart('@'));
             if (usedAccessorNames.Add(candidate))
             {
                 return candidate;
@@ -157,6 +231,12 @@ namespace ULinkGame.Server.Hotfix.Generators
             }
 
             return candidate + "_" + suffix;
+        }
+
+        private static string NormalizeFieldName(string fieldName)
+        {
+            var normalizedName = fieldName.TrimStart('_');
+            return normalizedName.Length == 0 ? fieldName : normalizedName;
         }
 
         private static string SanitizeIdentifierPart(string value)
@@ -196,7 +276,49 @@ namespace ULinkGame.Server.Hotfix.Generators
 
         private sealed class HotfixStateInfo
         {
-            public HotfixStateInfo(INamedTypeSymbol symbol, ClassDeclarationSyntax declaration)
+            public HotfixStateInfo(INamedTypeSymbol symbol, TypeDeclarationSyntax declaration)
+            {
+                Symbol = symbol;
+                Declaration = declaration;
+                ContainingTypes = CreateContainingTypes(symbol, declaration);
+            }
+
+            public INamedTypeSymbol Symbol { get; }
+
+            public TypeDeclarationSyntax Declaration { get; }
+
+            public ContainingTypeInfo[] ContainingTypes { get; }
+
+            private static ContainingTypeInfo[] CreateContainingTypes(INamedTypeSymbol symbol, TypeDeclarationSyntax declaration)
+            {
+                var containingDeclarations = new List<TypeDeclarationSyntax>();
+                for (var current = declaration.Parent; current != null; current = current.Parent)
+                {
+                    if (current is TypeDeclarationSyntax containingDeclaration)
+                    {
+                        containingDeclarations.Add(containingDeclaration);
+                    }
+                }
+
+                containingDeclarations.Reverse();
+
+                var containingSymbols = new List<INamedTypeSymbol>();
+                for (var current = symbol.ContainingType; current != null; current = current.ContainingType)
+                {
+                    containingSymbols.Add(current);
+                }
+
+                containingSymbols.Reverse();
+
+                return containingDeclarations
+                    .Zip(containingSymbols, (typeDeclaration, typeSymbol) => new ContainingTypeInfo(typeSymbol, typeDeclaration))
+                    .ToArray();
+            }
+        }
+
+        private sealed class ContainingTypeInfo
+        {
+            public ContainingTypeInfo(INamedTypeSymbol symbol, TypeDeclarationSyntax declaration)
             {
                 Symbol = symbol;
                 Declaration = declaration;
@@ -204,7 +326,7 @@ namespace ULinkGame.Server.Hotfix.Generators
 
             public INamedTypeSymbol Symbol { get; }
 
-            public ClassDeclarationSyntax Declaration { get; }
+            public TypeDeclarationSyntax Declaration { get; }
         }
     }
 }
