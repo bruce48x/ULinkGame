@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Shared.Interfaces;
 using UnityEngine;
+#if NET10_0_OR_GREATER
+using ULinkGame.Server.Hotfix.Abstractions;
+#endif
 
 namespace Shared.Gameplay
 {
@@ -79,7 +82,10 @@ namespace Shared.Gameplay
         public MatchEnd? MatchEnd { get; }
     }
 
-    public sealed class ArenaSimulation
+#if NET10_0_OR_GREATER
+    [HotfixState]
+#endif
+    public sealed partial class ArenaSimulation
     {
         private static readonly Vector2 Zero = new(0f, 0f);
 
@@ -957,37 +963,5 @@ namespace Shared.Gameplay
             };
         }
 
-        private sealed class ArenaFood
-        {
-            public PickupType Type { get; set; }
-            public Vector2 Position { get; set; }
-        }
-
-        private sealed class ArenaPlayer
-        {
-            public ArenaPlayer(string playerId, int spawnIndex, float mass, bool isBot, int botNumber)
-            {
-                PlayerId = playerId;
-                SpawnIndex = spawnIndex;
-                Position = Zero;
-                Mass = NormalizeMass(mass);
-                Alive = true;
-                IsBot = isBot;
-                BotNumber = botNumber;
-            }
-
-            public string PlayerId { get; }
-            public int SpawnIndex { get; }
-            public bool IsBot { get; }
-            public int BotNumber { get; }
-            public Vector2 Position { get; set; }
-            public Vector2 Velocity { get; set; }
-            public Vector2 Input { get; set; }
-            public bool Alive { get; set; }
-            public float RespawnRemaining { get; set; }
-            public int LastInputTick { get; set; }
-            public float Mass { get; set; }
-            public float Radius { get; set; }
-        }
     }
 }
