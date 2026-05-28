@@ -1,0 +1,78 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using ULinkGame.Server.Hotfix.Abstractions;
+using ULinkGame.Server.Hotfix.Dispatch;
+
+namespace ULinkGame.Server.Hotfix.Scanning;
+
+public static class HotfixSystemScanner
+{
+    public static HotfixSystemScanResult Scan(params Assembly[] assemblies)
+    {
+        ArgumentNullException.ThrowIfNull(assemblies);
+
+        var methods = new List<HotfixMethodBinding>();
+        var diagnostics = new List<string>();
+        var keys = new HashSet<HotfixMethodKey>();
+
+        foreach (var assembly in assemblies)
+        {
+            foreach (var type in assembly.GetTypes())
+            {
+                var system = type.GetCustomAttribute<HotfixSystemOfAttribute>();
+                if (system is null)
+                {
+                    continue;
+                }
+
+                if (!type.IsAbstract || !type.IsSealed)
+                {
+                    diagnostics.Add($"Hotfix system '{type.FullName}' must be a static class.");
+                    continue;
+                }
+
+                ScanSystemType(type, system.StateType, methods, diagnostics, keys);
+            }
+        }
+
+        return new HotfixSystemScanResult(methods, diagnostics);
+    }
+
+    private static void ScanSystemType(
+        Type systemType,
+        Type stateType,
+        List<HotfixMethodBinding> methods,
+        List<string> diagnostics,
+        HashSet<HotfixMethodKey> keys)
+    {
+        foreach (var method in systemType.GetMethods(BindingFlags.Public | BindingFlags.Static))
+        {
+            if (!method.IsDefined(typeof(ExtensionAttribute), inherit: false))
+            {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            if (parameters.Length == 0 || parameters[0].ParameterType != stateType)
+            {
+                diagnostics.Add($"Hotfix method '{systemType.FullName}.{method.Name}' must start with 'this {stateType.FullName} self'.");
+                continue;
+            }
+
+            var argumentTypes = parameters.Skip(1).Select(static parameter => parameter.ParameterType).ToArray();
+            var key = new HotfixMethodKey(
+                stateType.FullName ?? stateType.Name,
+                method.Name,
+                method.ReturnType.FullName ?? method.ReturnType.Name,
+                argumentTypes.Select(static type => type.FullName ?? type.Name).ToArray());
+
+            if (!keys.Add(key))
+            {
+                diagnostics.Add($"Duplicate hotfix method key '{key}'.");
+                continue;
+            }
+
+            methods.Add(new HotfixMethodBinding(key, method, stateType, method.ReturnType, argumentTypes));
+        }
+    }
+}
