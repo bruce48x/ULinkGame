@@ -8,6 +8,14 @@ namespace ULinkGame.Cluster.Tests;
 public sealed class ClusterDiagnosticsTests
 {
     [Fact]
+    public void NodeDirectoryMetricNamesAreStable()
+    {
+        Assert.Equal("ulinkgame.cluster.node_directory.registration", ClusterDiagnostics.NodeDirectoryRegistrationMetricName);
+        Assert.Equal("ulinkgame.cluster.node_directory.heartbeat", ClusterDiagnostics.NodeDirectoryHeartbeatMetricName);
+        Assert.Equal("ulinkgame.cluster.node_directory.expired", ClusterDiagnostics.NodeDirectoryExpiredMetricName);
+    }
+
+    [Fact]
     public async Task RouterMetricsUseLowCardinalityTags()
     {
         using var collector = new MetricCollector();

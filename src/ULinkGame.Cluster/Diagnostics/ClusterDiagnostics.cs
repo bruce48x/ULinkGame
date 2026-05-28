@@ -7,6 +7,9 @@ namespace ULinkGame.Cluster
     {
         public const string MeterName = "ULinkGame.Cluster";
         public const string ActivitySourceName = "ULinkGame.Cluster";
+        public const string NodeDirectoryRegistrationMetricName = "ulinkgame.cluster.node_directory.registration";
+        public const string NodeDirectoryHeartbeatMetricName = "ulinkgame.cluster.node_directory.heartbeat";
+        public const string NodeDirectoryExpiredMetricName = "ulinkgame.cluster.node_directory.expired";
 
         public static readonly Meter Meter = new Meter(MeterName, "0.1.1");
         public static readonly ActivitySource ActivitySource = new ActivitySource(ActivitySourceName, "0.1.1");

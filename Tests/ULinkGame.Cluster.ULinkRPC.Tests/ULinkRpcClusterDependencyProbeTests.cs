@@ -8,6 +8,55 @@ namespace ULinkGame.Cluster.ULinkRPC.Tests;
 public sealed class ULinkRpcClusterDependencyProbeTests
 {
     [Fact]
+    public async Task ProbeReportsNodeDirectoryDependency()
+    {
+        var nodeDirectory = new InMemoryNodeDirectory();
+        var probe = ULinkRpcClusterDependencyProbe.ForNodeDirectory(
+            nodeDirectory,
+            "local",
+            "node-a",
+            TimeSpan.FromSeconds(1));
+
+        var health = await probe.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("node-directory", health.Name);
+        Assert.Equal(ULinkRpcClusterDependencyStatus.Healthy, health.Status);
+        Assert.Null(health.Error);
+    }
+
+    [Fact]
+    public async Task CheckNodeDirectoryReturnsTimeoutWithoutHanging()
+    {
+        var probe = ULinkRpcClusterDependencyProbe.ForNodeDirectory(
+            new HangingNodeDirectory(),
+            "local",
+            "node-a",
+            TimeSpan.FromMilliseconds(1));
+
+        var health = await probe.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("node-directory", health.Name);
+        Assert.Equal(ULinkRpcClusterDependencyStatus.Timeout, health.Status);
+        Assert.NotNull(health.Error);
+    }
+
+    [Fact]
+    public async Task CheckNodeDirectoryReturnsUnhealthyWhenDirectoryThrows()
+    {
+        var probe = ULinkRpcClusterDependencyProbe.ForNodeDirectory(
+            new ThrowingNodeDirectory(new InvalidOperationException("node directory failed")),
+            "local",
+            "node-a",
+            TimeSpan.FromSeconds(1));
+
+        var health = await probe.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("node-directory", health.Name);
+        Assert.Equal(ULinkRpcClusterDependencyStatus.Unhealthy, health.Status);
+        Assert.Contains("node directory failed", health.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CheckRouteDirectoryReturnsHealthyWhenResolveCompletes()
     {
         var probe = new ULinkRpcClusterDependencyProbe(
@@ -133,6 +182,130 @@ public sealed class ULinkRpcClusterDependencyProbeTests
             RpcPushMethod<TArg> method,
             Action<TArg> handler)
         {
+        }
+    }
+
+    private sealed class HangingNodeDirectory : INodeDirectory
+    {
+        public ValueTask<NodeRegistrationResult> RegisterAsync(
+            NodeRegistration registration,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<NodeHeartbeatStatus> HeartbeatAsync(
+            string clusterName,
+            NodeId node,
+            long nodeEpoch,
+            DateTimeOffset leaseExpiresAt,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<NodeStateUpdateStatus> UpdateStateAsync(
+            string clusterName,
+            NodeId node,
+            long nodeEpoch,
+            NodeState state,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public async ValueTask<NodeRecord?> ResolveAsync(
+            string clusterName,
+            NodeId node,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("unreachable");
+        }
+
+        public ValueTask<IReadOnlyList<NodeRecord>> QueryAsync(
+            NodeDirectoryQuery query,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> ExpireAsync(
+            string clusterName,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ThrowingNodeDirectory : INodeDirectory
+    {
+        private readonly Exception _exception;
+
+        public ThrowingNodeDirectory(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public ValueTask<NodeRegistrationResult> RegisterAsync(
+            NodeRegistration registration,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<NodeHeartbeatStatus> HeartbeatAsync(
+            string clusterName,
+            NodeId node,
+            long nodeEpoch,
+            DateTimeOffset leaseExpiresAt,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<NodeStateUpdateStatus> UpdateStateAsync(
+            string clusterName,
+            NodeId node,
+            long nodeEpoch,
+            NodeState state,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<NodeRecord?> ResolveAsync(
+            string clusterName,
+            NodeId node,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw _exception;
+        }
+
+        public ValueTask<IReadOnlyList<NodeRecord>> QueryAsync(
+            NodeDirectoryQuery query,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> ExpireAsync(
+            string clusterName,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 }
