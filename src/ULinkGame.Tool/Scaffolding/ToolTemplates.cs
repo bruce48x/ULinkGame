@@ -136,6 +136,7 @@ internal static class ToolTemplates
     {
         var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
         var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var clientEndpoint = RenderAdvertisedClientEndpoint(options.Transport, "127.0.0.1", 20000, controlPlanePath);
         if (!ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
             if (ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile))
@@ -151,7 +152,8 @@ internal static class ToolTemplates
                   "Cluster": {
                     "NodeId": "gateway-1",
                     "AdvertisedEndpoints": {
-                      "cluster": "tcp://127.0.0.1:21000"
+                      "cluster": "tcp://127.0.0.1:21000",
+                      "client": "{{TemplateText.SanitizeStringLiteral(clientEndpoint)}}"
                     },
                     "Bootstrap": {
                       "NodeDirectoryEndpoints": [
@@ -282,7 +284,8 @@ internal sealed class ClusterOptions
     public IReadOnlyDictionary<string, string> AdvertisedEndpoints { get; init; } =
         new Dictionary<string, string>
         {
-            [""cluster""] = ""tcp://127.0.0.1:21000""
+            [""cluster""] = ""tcp://127.0.0.1:21000"",
+            [""client""] = ""tcp://127.0.0.1:20000""
         };
     public ClusterBootstrapOptions Bootstrap { get; init; } = new();
     public ClusterNodeDirectoryOptions NodeDirectory { get; init; } = new();
@@ -669,6 +672,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     public static string RenderClusterCompose(NewCommandOptions options)
     {
         var endpointPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var advertisedClientEndpoint = RenderAdvertisedClientEndpoint(options.Transport, "gateway", 20000, endpointPath);
         var healthCommand = "dotnet Server.dll --health-check";
 
         return $$"""
@@ -684,6 +688,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
               Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
               Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-gateway-1}"
               Cluster__AdvertisedEndpoints__cluster: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER:-tcp://gateway:21000}"
+              Cluster__AdvertisedEndpoints__client: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT:-{{TemplateText.SanitizeStringLiteral(advertisedClientEndpoint)}}}"
               Cluster__Bootstrap__NodeDirectoryEndpoints__0: "${ULINKGAME_CLUSTER_BOOTSTRAP_NODE_DIRECTORY_ENDPOINT_0:-tcp://gateway:21000}"
               Cluster__NodeDirectory__Enabled: "${ULINKGAME_CLUSTER_NODE_DIRECTORY_ENABLED:-true}"
               Cluster__NodeDirectory__Storage__Mode: "${ULINKGAME_CLUSTER_NODE_DIRECTORY_STORAGE_MODE:-InMemory}"
@@ -713,6 +718,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         # Put node authentication and TLS material in your deployment platform secret store.
         ULINKGAME_CLUSTER_NODE_ID=gateway-1
         ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER=tcp://gateway:21000
+        ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT=tcp://gateway:20000
         ULINKGAME_CLUSTER_BOOTSTRAP_NODE_DIRECTORY_ENDPOINT_0=tcp://gateway:21000
         ULINKGAME_CLUSTER_NODE_DIRECTORY_ENABLED=true
         ULINKGAME_CLUSTER_NODE_DIRECTORY_STORAGE_MODE=InMemory
@@ -734,6 +740,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
 
         - `Cluster__NodeId`
         - `Cluster__AdvertisedEndpoints__cluster`
+        - `Cluster__AdvertisedEndpoints__client`
         - `Cluster__Bootstrap__NodeDirectoryEndpoints__0`
         - `Cluster__NodeDirectory__Enabled`
         - `Cluster__NodeDirectory__Storage__Mode`
@@ -819,6 +826,23 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
                     builder.Limits.MaxPendingAcceptedConnections));
                 """
         };
+    }
+
+    private static string RenderAdvertisedClientEndpoint(
+        string transport,
+        string host,
+        int port,
+        string path)
+    {
+        var scheme = transport switch
+        {
+            "websocket" => "ws",
+            "tcp" => "tcp",
+            _ => "kcp"
+        };
+        return string.IsNullOrWhiteSpace(path)
+            ? $"{scheme}://{host}:{port}"
+            : $"{scheme}://{host}:{port}{path}";
     }
 }
 

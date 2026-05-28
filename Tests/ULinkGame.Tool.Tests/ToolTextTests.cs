@@ -102,6 +102,7 @@ public sealed class ToolTextTests
         Assert.Contains("\"NodeId\": \"gateway-1\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"AdvertisedEndpoints\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"cluster\": \"tcp://127.0.0.1:21000\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"client\": \"tcp://127.0.0.1:20000\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Bootstrap\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"NodeDirectoryEndpoints\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"NodeDirectory\"", appSettings, StringComparison.Ordinal);
@@ -118,6 +119,8 @@ public sealed class ToolTextTests
         Assert.Contains("ClusterOptions.FromConfiguration", program, StringComparison.Ordinal);
         Assert.Contains("using Server.Hosting;", program, StringComparison.Ordinal);
         Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("[\"cluster\"] = \"tcp://127.0.0.1:21000\"", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("[\"client\"] = \"tcp://127.0.0.1:20000\"", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("Services", clusterOptions, StringComparison.Ordinal);
         Assert.DoesNotContain("NodeEpoch", clusterHealthCheck, StringComparison.Ordinal);
         Assert.Contains("cluster=healthy", clusterHealthCheck, StringComparison.Ordinal);
@@ -125,7 +128,11 @@ public sealed class ToolTextTests
         Assert.Contains("dotnet Server.dll --health-check", compose, StringComparison.Ordinal);
         Assert.Contains("ULINKGAME_CLUSTER_NODE_ID", env, StringComparison.Ordinal);
         Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER", env, StringComparison.Ordinal);
+        Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT", env, StringComparison.Ordinal);
+        Assert.Contains("Cluster__AdvertisedEndpoints__client", compose, StringComparison.Ordinal);
+        Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT", compose, StringComparison.Ordinal);
         Assert.Contains("ULinkRpcClusterDependencyProbe", operations, StringComparison.Ordinal);
+        Assert.Contains("Cluster__AdvertisedEndpoints__client", operations, StringComparison.Ordinal);
         var generatedText = string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations);
         Assert.DoesNotContain("NodeEpoch", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("InternalEndpoint", generatedText, StringComparison.Ordinal);
