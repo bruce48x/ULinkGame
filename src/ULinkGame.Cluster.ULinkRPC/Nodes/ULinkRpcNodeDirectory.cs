@@ -36,11 +36,19 @@ namespace ULinkGame.Cluster.ULinkRPC
                 cancellationToken).ConfigureAwait(false);
 
             var status = ToRegistrationStatus(reply.Status);
+            if (status != NodeRegistrationStatus.Registered)
+            {
+                return new NodeRegistrationResult(status, null);
+            }
+
+            if (reply.Record is null)
+            {
+                return new NodeRegistrationResult(NodeRegistrationStatus.InvalidRegistration, null);
+            }
+
             return new NodeRegistrationResult(
-                status,
-                status == NodeRegistrationStatus.Registered && reply.Record is not null
-                    ? ULinkRpcNodeDirectoryRecordConverter.ToNodeRecord(reply.Record)
-                    : null);
+                NodeRegistrationStatus.Registered,
+                ULinkRpcNodeDirectoryRecordConverter.ToNodeRecord(reply.Record));
         }
 
         public async ValueTask<NodeHeartbeatStatus> HeartbeatAsync(

@@ -97,6 +97,55 @@ public sealed class ULinkRpcNodeDirectoryTests
     }
 
     [Fact]
+    public async Task ClientTreatsRegisteredReplyWithoutRecordAsInvalidRegistration()
+    {
+        var client = new RecordingRpcClient();
+        var directory = new ULinkRpcNodeDirectory(client);
+        var now = DateTimeOffset.UtcNow;
+
+        client.Enqueue(new ULinkRpcNodeRegisterReply
+        {
+            Status = (int)NodeRegistrationStatus.Registered,
+            Record = null
+        });
+
+        var registered = await directory.RegisterAsync(TestRegistration("local", "node-a", now), now, TestContext.Current.CancellationToken);
+
+        Assert.Equal(NodeRegistrationStatus.InvalidRegistration, registered.Status);
+        Assert.Null(registered.Record);
+    }
+
+    [Fact]
+    public async Task ClientRejectsRecordReplyWithInvalidNodeState()
+    {
+        var client = new RecordingRpcClient();
+        var directory = new ULinkRpcNodeDirectory(client);
+        var now = DateTimeOffset.UtcNow;
+        var record = ULinkRpcNodeDirectoryRecordConverter.ToDto(TestRecord(TestRegistration("local", "node-a", now), 1, now));
+        record.State = 99;
+        client.Enqueue(new ULinkRpcNodeResolveReply
+        {
+            Record = record
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            directory.ResolveAsync("local", "node-a", now, TestContext.Current.CancellationToken).AsTask());
+    }
+
+    [Fact]
+    public void ConverterRejectsQueryWithInvalidNodeState()
+    {
+        var query = new ULinkRpcNodeDirectoryQueryDto
+        {
+            ClusterName = "local",
+            State = 99
+        };
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ULinkRpcNodeDirectoryRecordConverter.ToNodeDirectoryQuery(query));
+    }
+
+    [Fact]
     public async Task BinderRegistersNodeHandlersAndUsesDirectorySemantics()
     {
         var registry = new RpcServiceRegistry();
@@ -193,6 +242,58 @@ public sealed class ULinkRpcNodeDirectoryTests
         Assert.NotNull(query.Records);
         Assert.Single(query.Records);
         Assert.Equal("room-1", query.Records[0].Node);
+    }
+
+    [Fact]
+    public async Task BinderRejectsInvalidInboundNodeState()
+    {
+        var registry = new RpcServiceRegistry();
+        ULinkRpcNodeDirectoryBinder.Bind(registry, new InMemoryNodeDirectory());
+        var serializer = new JsonTestSerializer();
+        await using var session = new RpcSession(new FakeTransport(), serializer);
+        var now = DateTimeOffset.UtcNow;
+        var registration = ULinkRpcNodeDirectoryRecordConverter.ToDto(TestRegistration("local", "node-a", now));
+        registration.State = 99;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeAsync<ULinkRpcNodeRegisterRequest, ULinkRpcNodeRegisterReply>(
+                registry,
+                session,
+                ULinkRpcClusterProtocol.RegisterNodeMethodId,
+                new ULinkRpcNodeRegisterRequest
+                {
+                    Registration = registration,
+                    Now = now
+                }));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeAsync<ULinkRpcNodeUpdateStateRequest, ULinkRpcNodeUpdateStateReply>(
+                registry,
+                session,
+                ULinkRpcClusterProtocol.UpdateNodeStateMethodId,
+                new ULinkRpcNodeUpdateStateRequest
+                {
+                    ClusterName = "local",
+                    Node = "node-a",
+                    NodeEpoch = 1,
+                    State = 99,
+                    Now = now
+                }));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeAsync<ULinkRpcNodeQueryRequest, ULinkRpcNodeQueryReply>(
+                registry,
+                session,
+                ULinkRpcClusterProtocol.QueryNodesMethodId,
+                new ULinkRpcNodeQueryRequest
+                {
+                    Query = new ULinkRpcNodeDirectoryQueryDto
+                    {
+                        ClusterName = "local",
+                        State = 99
+                    },
+                    Now = now
+                }));
     }
 
     private static async Task<TReply> InvokeAsync<TRequest, TReply>(

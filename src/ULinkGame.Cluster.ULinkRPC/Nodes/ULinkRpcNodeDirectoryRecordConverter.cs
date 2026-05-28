@@ -207,6 +207,11 @@ namespace ULinkGame.Cluster.ULinkRPC
 
         private static NodeState ToNodeState(int value)
         {
+            if (!Enum.IsDefined(typeof(NodeState), value))
+            {
+                throw new InvalidOperationException("Node state value is invalid.");
+            }
+
             return (NodeState)value;
         }
     }
