@@ -57,7 +57,12 @@ static async Task<int> RunWorkerAsync(SampleOptions options)
     ULinkRpcClusterMessageBinder.Bind(builder.ServiceRegistry, handler);
 
     var serverTask = builder.RunAsync(CancellationToken.None).AsTask();
-    await Task.Delay(100);
+    await WaitForTcpEndpointAsync(
+        IPAddress.Loopback,
+        options.Port.Value,
+        serverTask,
+        TimeSpan.FromSeconds(10),
+        CancellationToken.None);
 
     await using var clientFactory = new ULinkRpcClusterClientFactory(
         new TcpULinkRpcClusterTransportFactory(),
@@ -108,14 +113,21 @@ static async Task<int> RunDriverAsync()
     var restartedWorkerPort = GetFreePort();
     var directoryEndpoint = $"tcp://127.0.0.1:{directoryPort}";
     var serializer = new JsonSampleSerializer();
-    using var directoryProcess = StartChild("--mode", "directory", "--port", directoryPort.ToString());
+    var childProcesses = new List<Process>();
     try
     {
+        var directoryProcess = StartTrackedChild(
+            childProcesses,
+            "--mode",
+            "directory",
+            "--port",
+            directoryPort.ToString());
         var nodeDirectoryReady = await WaitForLineAsync(directoryProcess, "node-directory-ready", TimeSpan.FromSeconds(10));
         Console.WriteLine(nodeDirectoryReady);
         await WaitForLineAsync(directoryProcess, "directory-ready", TimeSpan.FromSeconds(10));
 
-        using var worker = StartChild(
+        var worker = StartTrackedChild(
+            childProcesses,
             "--mode", "worker",
             "--port", workerPort.ToString(),
             "--directory", directoryEndpoint);
@@ -172,7 +184,8 @@ static async Task<int> RunDriverAsync()
         var clearedOldEpoch = await directory.ClearByNodeEpochAsync("worker", 1);
         var oldRoute = await directory.ResolveAsync(WorkerRoute(), DateTimeOffset.UtcNow);
 
-        using var restartedWorker = StartChild(
+        var restartedWorker = StartTrackedChild(
+            childProcesses,
             "--mode", "worker",
             "--port", restartedWorkerPort.ToString(),
             "--directory", directoryEndpoint);
@@ -213,7 +226,7 @@ static async Task<int> RunDriverAsync()
     }
     finally
     {
-        StopChild(directoryProcess);
+        StopChildren(childProcesses);
     }
 }
 
@@ -244,6 +257,13 @@ static Process StartChild(params string[] arguments)
     return process;
 }
 
+static Process StartTrackedChild(List<Process> childProcesses, params string[] arguments)
+{
+    var process = StartChild(arguments);
+    childProcesses.Add(process);
+    return process;
+}
+
 static async Task<string> WaitForLineAsync(Process process, string expectedPrefix, TimeSpan timeout)
 {
     using var timeoutCts = new CancellationTokenSource(timeout);
@@ -264,6 +284,43 @@ static async Task<string> WaitForLineAsync(Process process, string expectedPrefi
     }
 
     throw new TimeoutException($"Timed out waiting for '{expectedPrefix}'.");
+}
+
+static async Task WaitForTcpEndpointAsync(
+    IPAddress address,
+    int port,
+    Task serverTask,
+    TimeSpan timeout,
+    CancellationToken cancellationToken)
+{
+    var deadline = DateTimeOffset.UtcNow + timeout;
+    while (DateTimeOffset.UtcNow < deadline)
+    {
+        if (serverTask.IsCompleted)
+        {
+            await serverTask;
+            throw new InvalidOperationException("Server task completed before the TCP endpoint became ready.");
+        }
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(address, port, cancellationToken);
+            return;
+        }
+        catch (SocketException)
+        {
+        }
+
+        await Task.Delay(25, cancellationToken);
+    }
+
+    if (serverTask.IsFaulted)
+    {
+        await serverTask;
+    }
+
+    throw new TimeoutException($"Timed out waiting for tcp://{address}:{port}.");
 }
 
 static long ParseWorkerEpoch(string line)
@@ -290,6 +347,22 @@ static void StopChild(Process process)
 
     process.Kill(entireProcessTree: true);
     process.WaitForExit(5000);
+}
+
+static void StopChildren(List<Process> childProcesses)
+{
+    for (var i = childProcesses.Count - 1; i >= 0; i--)
+    {
+        var process = childProcesses[i];
+        try
+        {
+            StopChild(process);
+        }
+        finally
+        {
+            process.Dispose();
+        }
+    }
 }
 
 static int GetFreePort()
