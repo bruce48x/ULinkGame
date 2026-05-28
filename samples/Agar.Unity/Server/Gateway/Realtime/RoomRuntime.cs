@@ -26,6 +26,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _loopTask;
     private bool _matchCommitted;
+    private bool _hotfixFallbackLogged;
 
     public RoomRuntime(
         RoomSnapshot room,
@@ -130,7 +131,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
 
                 lock (_gate)
                 {
-                    result = _simulation.Tick((float)TickInterval.TotalSeconds);
+                    result = TickSimulation((float)TickInterval.TotalSeconds);
                 }
 
                 if (result.MatchEnd is null && ShouldForceRoundEnd(result.WorldState))
@@ -176,6 +177,19 @@ internal sealed class RoomRuntime : IAsyncDisposable
         };
     }
 
+    private ArenaStepResult TickSimulation(float deltaTime)
+    {
+        try
+        {
+            return _simulation.TickWithHotfix(deltaTime);
+        }
+        catch (MissingMethodException ex)
+        {
+            LogHotfixFallback(ex, "tick");
+            return _simulation.Tick(deltaTime);
+        }
+    }
+
     private void PublishWorldState(ArenaStepResult result)
     {
         var registrations = _sessionDirectory.GetByRoom(_roomId);
@@ -217,12 +231,9 @@ internal sealed class RoomRuntime : IAsyncDisposable
 
     private async Task PersistMatchEndAsync(ArenaStepResult result)
     {
-        var rankedPlayers = result.WorldState.Players
-            .OrderByDescending(static player => player.Mass)
-            .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
-            .ToArray();
+        var settlement = SettleMatch(result.WorldState);
 
-        var winnerPlayerId = result.MatchEnd?.WinnerPlayerId ?? "";
+        var winnerPlayerId = settlement.WinnerPlayerId;
         await _rooms
             .CompleteAsync(new RoomMatchCompletion
             {
@@ -230,13 +241,13 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 SettlementId = $"settlement-{_roomId}-{result.MatchEnd?.Tick ?? result.WorldState.Tick}",
                 FinishedAtUtc = DateTime.UtcNow,
                 WinnerUserId = winnerPlayerId,
-                Reason = "Round timer elapsed.",
-                Results = rankedPlayers.Select((player, index) => new RoomSettlementEntry
+                Reason = settlement.Reason,
+                Results = settlement.Entries.Select(entry => new RoomSettlementEntry
                 {
-                    UserId = player.PlayerId,
-                    Rank = index + 1,
-                    Mass = NormalizeRankingMass(player.Mass),
-                    IsWinner = string.Equals(player.PlayerId, winnerPlayerId, StringComparison.Ordinal)
+                    UserId = entry.PlayerId,
+                    Rank = entry.Rank,
+                    Mass = entry.Mass,
+                    IsWinner = entry.IsWinner
                 }).ToList()
             })
             .ConfigureAwait(false);
@@ -256,31 +267,86 @@ internal sealed class RoomRuntime : IAsyncDisposable
                 .ConfigureAwait(false);
         }
 
-        if (!string.IsNullOrWhiteSpace(winnerPlayerId) && !VictoryPointAwards.IsBotPlayer(winnerPlayerId))
+        var winnerEntry = settlement.Entries.FirstOrDefault(static entry => entry.IsWinner);
+        if (winnerEntry is not null && !winnerEntry.IsBot)
         {
-            await _users.AddWinAsync(winnerPlayerId).ConfigureAwait(false);
+            await _users.AddWinAsync(winnerEntry.PlayerId).ConfigureAwait(false);
         }
 
-        foreach (var player in rankedPlayers.Where(static player => !VictoryPointAwards.IsBotPlayer(player.PlayerId)))
+        foreach (var entry in settlement.Entries.Where(static entry => !entry.IsBot && entry.VictoryPoints > 0))
         {
-            var rank = Array.IndexOf(rankedPlayers, player) + 1;
-            var victoryPoints = VictoryPointAwards.GetPointsForRank(rank);
-            if (victoryPoints <= 0)
-            {
-                continue;
-            }
-
-            await _users.AddVictoryPointsAsync(player.PlayerId, victoryPoints).ConfigureAwait(false);
-            var profile = await _users.GetProfileAsync(player.PlayerId).ConfigureAwait(false);
+            await _users.AddVictoryPointsAsync(entry.PlayerId, entry.VictoryPoints).ConfigureAwait(false);
+            var profile = await _users.GetProfileAsync(entry.PlayerId).ConfigureAwait(false);
             await _leaderboard
-                .RecordVictoryPointsAsync(player.PlayerId, profile.VictoryPoints, profile.WinCount)
+                .RecordVictoryPointsAsync(entry.PlayerId, profile.VictoryPoints, profile.WinCount)
                 .ConfigureAwait(false);
             _logger.LogInformation("Awarded {VictoryPoints} victory points to {PlayerId} for rank {Rank} in room {RoomId}.",
-                victoryPoints,
-                player.PlayerId,
-                rank,
+                entry.VictoryPoints,
+                entry.PlayerId,
+                entry.Rank,
                 _roomId);
         }
+    }
+
+    private MatchSettlementResult SettleMatch(WorldState worldState)
+    {
+        try
+        {
+            return _simulation.SettleMatch(worldState);
+        }
+        catch (MissingMethodException ex)
+        {
+            LogHotfixFallback(ex, "settlement");
+            return CreateStableSettlement(worldState);
+        }
+    }
+
+    private MatchSettlementResult CreateStableSettlement(WorldState worldState)
+    {
+        var rankedPlayers = worldState.Players
+            .OrderByDescending(static player => player.Mass)
+            .ThenBy(static player => player.PlayerId, StringComparer.Ordinal)
+            .ToArray();
+
+        var winnerPlayerId = rankedPlayers.FirstOrDefault()?.PlayerId ?? "";
+        var settlement = new MatchSettlementResult
+        {
+            WinnerPlayerId = winnerPlayerId,
+            Reason = "Round timer elapsed."
+        };
+
+        for (var index = 0; index < rankedPlayers.Length; index++)
+        {
+            var player = rankedPlayers[index];
+            var rank = index + 1;
+            var isBot = VictoryPointAwards.IsBotPlayer(player.PlayerId);
+            settlement.Entries.Add(new MatchSettlementEntry
+            {
+                PlayerId = player.PlayerId,
+                Rank = rank,
+                Mass = NormalizeRankingMass(player.Mass),
+                IsWinner = string.Equals(player.PlayerId, winnerPlayerId, StringComparison.Ordinal),
+                IsBot = isBot,
+                VictoryPoints = isBot ? 0 : VictoryPointAwards.GetPointsForRank(rank)
+            });
+        }
+
+        return settlement;
+    }
+
+    private void LogHotfixFallback(Exception exception, string operation)
+    {
+        if (_hotfixFallbackLogged)
+        {
+            return;
+        }
+
+        _hotfixFallbackLogged = true;
+        _logger.LogWarning(
+            exception,
+            "Room {RoomId} is using stable {HotfixOperation} rules because hotfix dispatch is not loaded.",
+            _roomId,
+            operation);
     }
 
     private void SafeInvoke(IPlayerCallback callback, Action<IPlayerCallback> action)

@@ -41,6 +41,40 @@ public sealed class AgarHotfixTests
         Assert.Equal(10, settlement.Entries.Single(entry => entry.PlayerId == "p1").VictoryPoints);
     }
 
+    [Fact]
+    public async Task Hotfix_reload_keeps_existing_arena_state()
+    {
+        var hotfixAssemblyPath = FindHotfixAssemblyPath();
+        var source = new CurrentDirectoryHotfixAssemblySource(
+            Path.GetDirectoryName(hotfixAssemblyPath)!,
+            Path.GetFileName(hotfixAssemblyPath));
+        var manager = new HotfixManager(source, [typeof(ArenaSimulation).Assembly.GetName().Name!]);
+
+        var firstReload = await manager.ReloadAsync(TestContext.Current.CancellationToken);
+        Assert.True(firstReload.Succeeded, BuildReloadDiagnostics(firstReload));
+
+        var simulation = new ArenaSimulation(new ArenaSimulationOptions
+        {
+            EnableBots = false,
+            FoodTargetCount = 0
+        });
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "p1", Mass = 50 });
+        simulation.UpsertPlayer(new ArenaPlayerRegistration { PlayerId = "p2", Mass = 25 });
+
+        var secondReload = await manager.ReloadAsync(TestContext.Current.CancellationToken);
+        Assert.True(secondReload.Succeeded, BuildReloadDiagnostics(secondReload));
+
+        Assert.True(simulation.TryGetPlayerSnapshot("p1", out var snapshot));
+        Assert.Equal("p1", snapshot.PlayerId);
+        Assert.Equal(50, snapshot.Mass);
+
+        var settlement = simulation.SettleMatch(simulation.CreateWorldState());
+
+        Assert.Equal("p1", settlement.WinnerPlayerId);
+        Assert.Equal(10, settlement.Entries.Single(entry => entry.PlayerId == "p1").VictoryPoints);
+        Assert.Equal(7, settlement.Entries.Single(entry => entry.PlayerId == "p2").VictoryPoints);
+    }
+
     private static string FindHotfixAssemblyPath()
     {
         const string assemblyFileName = "Agar.Sample.Hotfix.dll";
