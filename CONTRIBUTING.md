@@ -158,6 +158,7 @@ The packages currently published by this workflow are:
 - `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
 - `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
 - `ULinkGame.Cluster`, versioned in `src/ULinkGame.Cluster/ULinkGame.Cluster.csproj`
+- `ULinkGame.Cluster.Sql`, versioned in `src/ULinkGame.Cluster.Sql/ULinkGame.Cluster.Sql.csproj`
 - `ULinkGame.Cluster.ULinkRPC`, versioned in `src/ULinkGame.Cluster.ULinkRPC/ULinkGame.Cluster.ULinkRPC.csproj`
 - `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
 
@@ -179,6 +180,7 @@ dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release 
 dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Cluster/ULinkGame.Cluster.csproj -c Release -o artifacts/nuget
+dotnet pack src/ULinkGame.Cluster.Sql/ULinkGame.Cluster.Sql.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Cluster.ULinkRPC/ULinkGame.Cluster.ULinkRPC.csproj -c Release -o artifacts/nuget
 dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
 ```

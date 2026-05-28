@@ -118,7 +118,7 @@ namespace ULinkGame.Cluster
                     return new ValueTask<NodeRecord?>((NodeRecord?)null);
                 }
 
-                if (record.IsExpired(now))
+                if (record.State == NodeState.Dead || record.IsExpired(now))
                 {
                     return new ValueTask<NodeRecord?>((NodeRecord?)null);
                 }
@@ -193,7 +193,7 @@ namespace ULinkGame.Cluster
                 return NodeAccessStatus.EpochMismatch;
             }
 
-            if (record.IsExpired(now))
+            if (record.State == NodeState.Dead || record.IsExpired(now))
             {
                 return NodeAccessStatus.Expired;
             }
@@ -211,7 +211,7 @@ namespace ULinkGame.Cluster
                 return false;
             }
 
-            if (!query.IncludeExpired && record.IsExpired(now))
+            if (!query.IncludeExpired && (record.State == NodeState.Dead || record.IsExpired(now)))
             {
                 return false;
             }
