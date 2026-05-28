@@ -75,11 +75,11 @@ public sealed class HotfixManager : IHotfixManager
                 null,
                 null);
 
+            HotfixDispatch.Replace(table);
             var oldContext = Interlocked.Exchange(ref _loadContext, pendingContext);
             pendingContext = null;
             Volatile.Write(ref _current, snapshot);
             UnloadQuietly(oldContext);
-            HotfixDispatch.Replace(table);
 
             return new HotfixReloadResult(HotfixReloadStatus.Succeeded, snapshot, resolved.Version, resolved.AssemblyPath, Array.Empty<string>());
         }

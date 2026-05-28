@@ -20,6 +20,7 @@ public sealed class HotfixManagerTests
 
         Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics));
         Assert.Equal(1, result.Current.DispatchTableVersion);
+        Assert.Equal(result.Current.DispatchTableVersion, HotfixDispatch.Current.Version);
         Assert.Contains(result.Current.Methods, key => key.MethodName == "Add");
     }
 
