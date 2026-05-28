@@ -711,14 +711,17 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         """;
     }
 
-    public static string RenderClusterEnvExample()
+    public static string RenderClusterEnvExample(NewCommandOptions options)
     {
-        return """
+        var endpointPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var advertisedClientEndpoint = RenderAdvertisedClientEndpoint(options.Transport, "gateway", 20000, endpointPath);
+
+        return $$"""
         # This file intentionally contains no production secrets.
         # Put node authentication and TLS material in your deployment platform secret store.
         ULINKGAME_CLUSTER_NODE_ID=gateway-1
         ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER=tcp://gateway:21000
-        ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT=tcp://gateway:20000
+        ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT={{advertisedClientEndpoint}}
         ULINKGAME_CLUSTER_BOOTSTRAP_NODE_DIRECTORY_ENDPOINT_0=tcp://gateway:21000
         ULINKGAME_CLUSTER_NODE_DIRECTORY_ENABLED=true
         ULINKGAME_CLUSTER_NODE_DIRECTORY_STORAGE_MODE=InMemory

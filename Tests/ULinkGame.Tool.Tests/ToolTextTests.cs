@@ -95,7 +95,7 @@ public sealed class ToolTextTests
         var clusterOptions = ToolTemplates.RenderClusterOptions();
         var clusterHealthCheck = ToolTemplates.RenderClusterHealthCheck();
         var compose = ToolTemplates.RenderClusterCompose(options);
-        var env = ToolTemplates.RenderClusterEnvExample();
+        var env = ToolTemplates.RenderClusterEnvExample(options);
         var operations = ToolTemplates.RenderClusterOperationsGuide();
 
         Assert.Contains("\"Cluster\"", appSettings, StringComparison.Ordinal);
@@ -144,5 +144,28 @@ public sealed class ToolTextTests
         Assert.DoesNotContain("Gateway.Hosting", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("password", compose, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", compose, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ClusterEnvExampleUsesSelectedTransportForAdvertisedClientEndpoint()
+    {
+        var websocketOptions = new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: "unity",
+            Transport: "websocket",
+            NetworkProfile: "cluster",
+            Serializer: "json",
+            Persistence: "none",
+            NuGetForUnitySource: "embedded",
+            DeployProfile: "compose");
+        var defaultOptions = CliParser.ParseNewOptions([]);
+
+        var websocketEnv = ToolTemplates.RenderClusterEnvExample(websocketOptions);
+        var defaultEnv = ToolTemplates.RenderClusterEnvExample(defaultOptions);
+
+        Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT=ws://gateway:20000/ws", websocketEnv, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT=tcp://gateway:20000", websocketEnv, StringComparison.Ordinal);
+        Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT=kcp://gateway:20000", defaultEnv, StringComparison.Ordinal);
     }
 }
