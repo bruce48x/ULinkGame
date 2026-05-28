@@ -107,13 +107,13 @@ namespace ULinkGame.Cluster.Sql
                 "AND node_epoch = @node_epoch " +
                 "AND state <> @dead_state " +
                 "AND lease_expires_at > @now";
-            AddParameter(command, "@lease_expires_at", ToUnixMilliseconds(leaseExpiresAt));
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
+            AddParameter(command, "@lease_expires_at", ToUtcTicks(leaseExpiresAt));
+            AddParameter(command, "@updated_at", ToUtcTicks(now));
             AddParameter(command, "@cluster_name", clusterName);
             AddParameter(command, "@node_id", node.Value);
             AddParameter(command, "@node_epoch", nodeEpoch);
             AddParameter(command, "@dead_state", (int)NodeState.Dead);
-            AddParameter(command, "@now", ToUnixMilliseconds(now));
+            AddParameter(command, "@now", ToUtcTicks(now));
             var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             if (affected == 1)
             {
@@ -154,12 +154,12 @@ namespace ULinkGame.Cluster.Sql
                 "AND state <> @dead_state " +
                 "AND lease_expires_at > @now";
             AddParameter(command, "@state", (int)state);
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
+            AddParameter(command, "@updated_at", ToUtcTicks(now));
             AddParameter(command, "@cluster_name", clusterName);
             AddParameter(command, "@node_id", node.Value);
             AddParameter(command, "@node_epoch", nodeEpoch);
             AddParameter(command, "@dead_state", (int)NodeState.Dead);
-            AddParameter(command, "@now", ToUnixMilliseconds(now));
+            AddParameter(command, "@now", ToUtcTicks(now));
             var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             if (affected == 1)
             {
@@ -246,9 +246,9 @@ namespace ULinkGame.Cluster.Sql
                 "AND state <> @dead_state " +
                 "AND lease_expires_at <= @now";
             AddParameter(command, "@dead_state", (int)NodeState.Dead);
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
+            AddParameter(command, "@updated_at", ToUtcTicks(now));
             AddParameter(command, "@cluster_name", clusterName);
-            AddParameter(command, "@now", ToUnixMilliseconds(now));
+            AddParameter(command, "@now", ToUtcTicks(now));
             return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -401,8 +401,8 @@ namespace ULinkGame.Cluster.Sql
             AddParameter(command, "@endpoints_json", SerializeEndpoints(record.Endpoints));
             AddParameter(command, "@services_json", SerializeServices(record.Services));
             AddParameter(command, "@labels_json", SerializeStringDictionary(record.Labels));
-            AddParameter(command, "@lease_expires_at", ToUnixMilliseconds(record.LeaseExpiresAt));
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(record.UpdatedAt));
+            AddParameter(command, "@lease_expires_at", ToUtcTicks(record.LeaseExpiresAt));
+            AddParameter(command, "@updated_at", ToUtcTicks(record.UpdatedAt));
         }
 
         private static void AddParameter(DbCommand command, string name, object value)
@@ -423,8 +423,8 @@ namespace ULinkGame.Cluster.Sql
                 DeserializeServices(reader.GetString(5)),
                 DeserializeStringDictionary(reader.GetString(6)),
                 (NodeState)reader.GetInt32(3),
-                FromUnixMilliseconds(reader.GetInt64(7)),
-                FromUnixMilliseconds(reader.GetInt64(8)));
+                FromUtcTicks(reader.GetInt64(7)),
+                FromUtcTicks(reader.GetInt64(8)));
         }
 
         private static bool MatchesQuery(NodeRecord record, NodeDirectoryQuery query, DateTimeOffset now)
@@ -541,14 +541,14 @@ namespace ULinkGame.Cluster.Sql
             return copy;
         }
 
-        private static long ToUnixMilliseconds(DateTimeOffset value)
+        private static long ToUtcTicks(DateTimeOffset value)
         {
-            return value.ToUnixTimeMilliseconds();
+            return value.UtcTicks;
         }
 
-        private static DateTimeOffset FromUnixMilliseconds(long value)
+        private static DateTimeOffset FromUtcTicks(long value)
         {
-            return DateTimeOffset.FromUnixTimeMilliseconds(value);
+            return new DateTimeOffset(value, TimeSpan.Zero);
         }
 
         private static async ValueTask RollbackQuietlyAsync(DbTransaction transaction)

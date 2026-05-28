@@ -190,6 +190,42 @@ public sealed class SqlNodeDirectoryTests
     }
 
     [Fact]
+    public async Task ResolvePreservesTimestampTicksAndExpiresAtExactTick()
+    {
+        await using var database = await OpenSharedDatabaseAsync();
+        await SqlNodeDirectorySchema.EnsureCreatedAsync(
+            database.KeeperConnection,
+            SqlNodeDirectoryDialect.Sqlite,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var directory = CreateDirectory(database.ConnectionString);
+        var now = new DateTimeOffset(2026, 5, 28, 12, 0, 0, TimeSpan.Zero).AddTicks(1234);
+        var leaseExpiresAt = now.AddSeconds(30).AddTicks(5678);
+
+        var registered = await directory.RegisterAsync(
+            TestRegistration("local", "node-a", now, leaseExpiresAt: leaseExpiresAt),
+            now,
+            TestContext.Current.CancellationToken);
+        var resolvedBeforeExpiry = await directory.ResolveAsync(
+            "local",
+            "node-a",
+            leaseExpiresAt.AddTicks(-1),
+            TestContext.Current.CancellationToken);
+        var resolvedAtExpiry = await directory.ResolveAsync(
+            "local",
+            "node-a",
+            leaseExpiresAt,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(0, now.Ticks % TimeSpan.TicksPerMillisecond);
+        Assert.NotEqual(0, leaseExpiresAt.Ticks % TimeSpan.TicksPerMillisecond);
+        Assert.NotNull(resolvedBeforeExpiry);
+        Assert.Null(resolvedAtExpiry);
+        Assert.Equal(leaseExpiresAt.UtcTicks, resolvedBeforeExpiry!.LeaseExpiresAt.UtcTicks);
+        Assert.Equal(now.UtcTicks, resolvedBeforeExpiry.UpdatedAt.UtcTicks);
+        Assert.Equal(now.UtcTicks, registered.Record!.UpdatedAt.UtcTicks);
+    }
+
+    [Fact]
     public async Task ConcurrentRegistrationsReturnUniqueEpochs()
     {
         await using var database = await OpenSharedDatabaseAsync();
@@ -253,7 +289,7 @@ public sealed class SqlNodeDirectoryTests
         Assert.Equal(NodeHeartbeatStatus.EpochMismatch, status);
         Assert.NotNull(resolved);
         Assert.Equal(2, resolved!.NodeEpoch);
-        Assert.Equal(originalLease.ToUnixTimeMilliseconds(), resolved.LeaseExpiresAt.ToUnixTimeMilliseconds());
+        Assert.Equal(originalLease.UtcTicks, resolved.LeaseExpiresAt.UtcTicks);
     }
 
     [Fact]
@@ -394,7 +430,8 @@ public sealed class SqlNodeDirectoryTests
         string clusterName,
         string nodeId,
         DateTimeOffset now,
-        string serviceKind = "gateway")
+        string serviceKind = "gateway",
+        DateTimeOffset? leaseExpiresAt = null)
     {
         return new NodeRegistration(
             clusterName,
@@ -417,7 +454,7 @@ public sealed class SqlNodeDirectoryTests
                         ["role"] = serviceKind
                     })
             },
-            now.AddSeconds(30),
+            leaseExpiresAt ?? now.AddSeconds(30),
             NodeState.Ready,
             new Dictionary<string, string>
             {
