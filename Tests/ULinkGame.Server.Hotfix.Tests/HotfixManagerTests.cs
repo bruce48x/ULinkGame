@@ -269,6 +269,8 @@ public sealed class HotfixManagerTests
 
     private sealed class CompiledHotfixFixture : IDisposable
     {
+        private static readonly TimeSpan BuildTimeout = TimeSpan.FromSeconds(60);
+
         private CompiledHotfixFixture(
             string rootDirectory,
             string stableAssemblyPath,
@@ -437,12 +439,56 @@ public sealed class HotfixManagerTests
                 UseShellExecute = false
             }) ?? throw new InvalidOperationException("Could not start dotnet build.");
 
-            var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
+            var outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+            var errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
+            var waitTask = process.WaitForExitAsync(cancellationToken);
+            var timeoutTask = Task.Delay(BuildTimeout, CancellationToken.None);
+
+            var completedTask = await Task.WhenAny(waitTask, timeoutTask).ConfigureAwait(false);
+            if (completedTask == timeoutTask)
+            {
+                KillProcessTree(process);
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                var timeoutOutput = await outputTask.ConfigureAwait(false);
+                var timeoutError = await errorTask.ConfigureAwait(false);
+                throw new TimeoutException(
+                    $"dotnet build timed out after {BuildTimeout.TotalSeconds:N0} seconds for '{projectPath}'."
+                    + $"{Environment.NewLine}{timeoutOutput}{Environment.NewLine}{timeoutError}");
+            }
+
+            try
+            {
+                await waitTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                KillProcessTree(process);
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
+
+            var output = await outputTask.ConfigureAwait(false);
+            var error = await errorTask.ConfigureAwait(false);
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException($"dotnet build failed for '{projectPath}'.{Environment.NewLine}{output}{Environment.NewLine}{error}");
+            }
+        }
+
+        private static void KillProcessTree(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
             }
         }
     }
