@@ -13,6 +13,8 @@ namespace ULinkGame.Cluster.Sql
 {
     public sealed class SqlNodeDirectory : INodeDirectory
     {
+        private const int RegisterMaxAttempts = 8;
+
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -35,37 +37,52 @@ namespace ULinkGame.Cluster.Sql
                 throw new ArgumentNullException(nameof(registration));
             }
 
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-            await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-            var existingEpoch = await SelectEpochAsync(
-                connection,
-                transaction,
-                registration.ClusterName,
-                registration.NodeId,
-                cancellationToken).ConfigureAwait(false);
-            var epoch = existingEpoch.HasValue ? existingEpoch.Value + 1 : 1;
-            var record = new NodeRecord(
-                registration.ClusterName,
-                registration.NodeId,
-                epoch,
-                registration.Endpoints,
-                registration.Services,
-                registration.Labels,
-                registration.State,
-                registration.LeaseExpiresAt,
-                now);
-
-            if (existingEpoch.HasValue)
+            for (var attempt = 1; attempt <= RegisterMaxAttempts; attempt++)
             {
-                await UpdateRecordAsync(connection, transaction, record, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                await InsertRecordAsync(connection, transaction, record, cancellationToken).ConfigureAwait(false);
+                await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                await using var transaction = await connection.BeginTransactionAsync(
+                    IsolationLevel.Serializable,
+                    cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    var existingEpoch = await SelectEpochAsync(
+                        connection,
+                        transaction,
+                        registration.ClusterName,
+                        registration.NodeId,
+                        cancellationToken).ConfigureAwait(false);
+                    var epoch = existingEpoch.HasValue ? existingEpoch.Value + 1 : 1;
+                    var record = new NodeRecord(
+                        registration.ClusterName,
+                        registration.NodeId,
+                        epoch,
+                        registration.Endpoints,
+                        registration.Services,
+                        registration.Labels,
+                        registration.State,
+                        registration.LeaseExpiresAt,
+                        now);
+
+                    if (existingEpoch.HasValue)
+                    {
+                        await UpdateRecordAsync(connection, transaction, record, cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await InsertRecordAsync(connection, transaction, record, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                    return new NodeRegistrationResult(NodeRegistrationStatus.Registered, record);
+                }
+                catch (DbException) when (attempt < RegisterMaxAttempts)
+                {
+                    await RollbackQuietlyAsync(transaction).ConfigureAwait(false);
+                    await DelayBeforeRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
+                }
             }
 
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return new NodeRegistrationResult(NodeRegistrationStatus.Registered, record);
+            throw new InvalidOperationException("SQL node registration retry loop exited unexpectedly.");
         }
 
         public async ValueTask<NodeHeartbeatStatus> HeartbeatAsync(
@@ -81,7 +98,28 @@ namespace ULinkGame.Cluster.Sql
                 throw new ArgumentOutOfRangeException(nameof(nodeEpoch), "Node epoch cannot be negative.");
             }
 
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "UPDATE " + _options.TableName + " " +
+                "SET lease_expires_at = @lease_expires_at, updated_at = @updated_at " +
+                "WHERE cluster_name = @cluster_name AND node_id = @node_id " +
+                "AND node_epoch = @node_epoch " +
+                "AND state <> @dead_state " +
+                "AND lease_expires_at > @now";
+            AddParameter(command, "@lease_expires_at", ToUnixMilliseconds(leaseExpiresAt));
+            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
+            AddParameter(command, "@cluster_name", clusterName);
+            AddParameter(command, "@node_id", node.Value);
+            AddParameter(command, "@node_epoch", nodeEpoch);
+            AddParameter(command, "@dead_state", (int)NodeState.Dead);
+            AddParameter(command, "@now", ToUnixMilliseconds(now));
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if (affected == 1)
+            {
+                return NodeHeartbeatStatus.Refreshed;
+            }
+
             var status = await GetCurrentStatusAsync(
                 connection,
                 null,
@@ -90,22 +128,7 @@ namespace ULinkGame.Cluster.Sql
                 nodeEpoch,
                 now,
                 cancellationToken).ConfigureAwait(false);
-            if (status != NodeAccessStatus.Current)
-            {
-                return ToHeartbeatStatus(status);
-            }
-
-            using var command = connection.CreateCommand();
-            command.CommandText =
-                "UPDATE " + _options.TableName + " " +
-                "SET lease_expires_at = @lease_expires_at, updated_at = @updated_at " +
-                "WHERE cluster_name = @cluster_name AND node_id = @node_id";
-            AddParameter(command, "@lease_expires_at", ToUnixMilliseconds(leaseExpiresAt));
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
-            AddParameter(command, "@cluster_name", clusterName);
-            AddParameter(command, "@node_id", node.Value);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return NodeHeartbeatStatus.Refreshed;
+            return ToHeartbeatStatus(status);
         }
 
         public async ValueTask<NodeStateUpdateStatus> UpdateStateAsync(
@@ -121,7 +144,28 @@ namespace ULinkGame.Cluster.Sql
                 throw new ArgumentOutOfRangeException(nameof(nodeEpoch), "Node epoch cannot be negative.");
             }
 
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "UPDATE " + _options.TableName + " " +
+                "SET state = @state, updated_at = @updated_at " +
+                "WHERE cluster_name = @cluster_name AND node_id = @node_id " +
+                "AND node_epoch = @node_epoch " +
+                "AND state <> @dead_state " +
+                "AND lease_expires_at > @now";
+            AddParameter(command, "@state", (int)state);
+            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
+            AddParameter(command, "@cluster_name", clusterName);
+            AddParameter(command, "@node_id", node.Value);
+            AddParameter(command, "@node_epoch", nodeEpoch);
+            AddParameter(command, "@dead_state", (int)NodeState.Dead);
+            AddParameter(command, "@now", ToUnixMilliseconds(now));
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if (affected == 1)
+            {
+                return NodeStateUpdateStatus.Updated;
+            }
+
             var status = await GetCurrentStatusAsync(
                 connection,
                 null,
@@ -130,22 +174,7 @@ namespace ULinkGame.Cluster.Sql
                 nodeEpoch,
                 now,
                 cancellationToken).ConfigureAwait(false);
-            if (status != NodeAccessStatus.Current)
-            {
-                return ToStateUpdateStatus(status);
-            }
-
-            using var command = connection.CreateCommand();
-            command.CommandText =
-                "UPDATE " + _options.TableName + " " +
-                "SET state = @state, updated_at = @updated_at " +
-                "WHERE cluster_name = @cluster_name AND node_id = @node_id";
-            AddParameter(command, "@state", (int)state);
-            AddParameter(command, "@updated_at", ToUnixMilliseconds(now));
-            AddParameter(command, "@cluster_name", clusterName);
-            AddParameter(command, "@node_id", node.Value);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return NodeStateUpdateStatus.Updated;
+            return ToStateUpdateStatus(status);
         }
 
         public async ValueTask<NodeRecord?> ResolveAsync(
@@ -154,7 +183,7 @@ namespace ULinkGame.Cluster.Sql
             DateTimeOffset now,
             CancellationToken cancellationToken = default)
         {
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             var record = await SelectRecordAsync(
                 connection,
                 null,
@@ -180,7 +209,7 @@ namespace ULinkGame.Cluster.Sql
                 throw new ArgumentNullException(nameof(query));
             }
 
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             using var command = connection.CreateCommand();
             command.CommandText =
                 "SELECT cluster_name, node_id, node_epoch, state, endpoints_json, services_json, labels_json, lease_expires_at, updated_at " +
@@ -208,7 +237,7 @@ namespace ULinkGame.Cluster.Sql
             DateTimeOffset now,
             CancellationToken cancellationToken = default)
         {
-            var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             using var command = connection.CreateCommand();
             command.CommandText =
                 "UPDATE " + _options.TableName + " " +
@@ -237,7 +266,21 @@ namespace ULinkGame.Cluster.Sql
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
 
+            await ConfigureConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+
             return connection;
+        }
+
+        private async ValueTask ConfigureConnectionAsync(DbConnection connection, CancellationToken cancellationToken)
+        {
+            if (_options.Dialect != SqlNodeDirectoryDialect.Sqlite)
+            {
+                return;
+            }
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA busy_timeout = 5000";
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private async ValueTask<long?> SelectEpochAsync(
@@ -308,7 +351,7 @@ namespace ULinkGame.Cluster.Sql
                 return NodeAccessStatus.EpochMismatch;
             }
 
-            if (record.IsExpired(now))
+            if (record.State == NodeState.Dead || record.IsExpired(now))
             {
                 return NodeAccessStatus.Expired;
             }
@@ -506,6 +549,25 @@ namespace ULinkGame.Cluster.Sql
         private static DateTimeOffset FromUnixMilliseconds(long value)
         {
             return DateTimeOffset.FromUnixTimeMilliseconds(value);
+        }
+
+        private static async ValueTask RollbackQuietlyAsync(DbTransaction transaction)
+        {
+            try
+            {
+                await transaction.RollbackAsync().ConfigureAwait(false);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (DbException)
+            {
+            }
+        }
+
+        private static Task DelayBeforeRetryAsync(int attempt, CancellationToken cancellationToken)
+        {
+            return Task.Delay(TimeSpan.FromMilliseconds(Math.Min(50, attempt * 5)), cancellationToken);
         }
 
         private static NodeHeartbeatStatus ToHeartbeatStatus(NodeAccessStatus status)
