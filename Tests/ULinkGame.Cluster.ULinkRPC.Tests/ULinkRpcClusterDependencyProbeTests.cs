@@ -41,6 +41,22 @@ public sealed class ULinkRpcClusterDependencyProbeTests
     }
 
     [Fact]
+    public async Task CheckNodeDirectoryPropagatesCallerCancellation()
+    {
+        var probe = ULinkRpcClusterDependencyProbe.ForNodeDirectory(
+            new HangingNodeDirectory(),
+            "local",
+            "node-a",
+            TimeSpan.FromSeconds(1));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        var exception = await Record.ExceptionAsync(async () =>
+            await probe.CheckAsync(canceled.Token));
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
+    }
+
+    [Fact]
     public async Task CheckNodeDirectoryReturnsUnhealthyWhenDirectoryThrows()
     {
         var probe = ULinkRpcClusterDependencyProbe.ForNodeDirectory(
@@ -85,6 +101,20 @@ public sealed class ULinkRpcClusterDependencyProbeTests
 
         Assert.Equal(ULinkRpcClusterDependencyStatus.Timeout, health.Status);
         Assert.NotNull(health.Error);
+    }
+
+    [Fact]
+    public async Task CheckRouteDirectoryPropagatesCallerCancellation()
+    {
+        var probe = new ULinkRpcClusterDependencyProbe(
+            new StaticClientFactory(new HangingClient()),
+            TimeSpan.FromSeconds(1));
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        var exception = await Record.ExceptionAsync(async () =>
+            await probe.CheckRouteDirectoryAsync(NewDirectoryLocation(), canceled.Token));
+        Assert.IsAssignableFrom<OperationCanceledException>(exception);
     }
 
     [Fact]

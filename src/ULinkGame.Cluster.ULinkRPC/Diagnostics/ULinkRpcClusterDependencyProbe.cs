@@ -76,6 +76,10 @@ namespace ULinkGame.Cluster.ULinkRPC
                     "node-directory",
                     ULinkRpcClusterDependencyStatus.Healthy);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 return new ULinkRpcClusterDependencyHealth(
@@ -114,6 +118,10 @@ namespace ULinkGame.Cluster.ULinkRPC
                 return new ULinkRpcClusterDependencyHealth(
                     "route-directory",
                     ULinkRpcClusterDependencyStatus.Healthy);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
