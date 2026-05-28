@@ -15,8 +15,9 @@ public static class HotfixServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(source);
         var sharedNames = (sharedAssemblyNames ?? Array.Empty<string>()).ToArray();
         services.RemoveAll<IHotfixAssemblySource>();
+        services.RemoveAll<IHotfixManager>();
         services.AddSingleton(source);
-        services.TryAddSingleton<IHotfixManager>(provider =>
+        services.AddSingleton<IHotfixManager>(provider =>
             new HotfixManager(provider.GetRequiredService<IHotfixAssemblySource>(), sharedNames));
         return services;
     }

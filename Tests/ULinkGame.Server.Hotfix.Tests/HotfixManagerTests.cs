@@ -82,6 +82,24 @@ public sealed class HotfixManagerTests
     }
 
     [Fact]
+    public async Task Reload_canceled_after_source_resolution_does_not_publish()
+    {
+        using var cts = new CancellationTokenSource();
+        var source = new SwitchableAssemblySource(typeof(ManagerTestStateSystem).Assembly.Location);
+        var manager = new HotfixManager(source);
+        var first = await manager.ReloadAsync(TestContext.Current.CancellationToken);
+        var key = first.Current.Methods.Single(key => key.MethodName == "Add");
+        var previousMethod = HotfixDispatch.Current.Resolve(key);
+        source.Path = typeof(ManagerTestStateSystem).Assembly.Location;
+        source.AfterResolve = () => cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await manager.ReloadAsync(cts.Token));
+
+        Assert.Equal(first.Current.DispatchTableVersion, manager.Current.DispatchTableVersion);
+        Assert.Same(previousMethod, HotfixDispatch.Current.Resolve(key));
+    }
+
+    [Fact]
     public async Task ReloadAsync_serializes_concurrent_reloads()
     {
         var source = new BlockingAssemblySource(typeof(ManagerTestStateSystem).Assembly.Location);
@@ -138,6 +156,24 @@ public sealed class HotfixManagerTests
         Assert.Same(newSource, provider.GetRequiredService<IHotfixAssemblySource>());
     }
 
+    [Fact]
+    public async Task AddULinkGameHotfix_second_call_rebuilds_manager_with_latest_source_and_shared_policy()
+    {
+        using var compiled = await CompiledHotfixFixture.CreateAsync(TestContext.Current.CancellationToken);
+        var stableAssembly = Assembly.LoadFrom(compiled.StableAssemblyPath);
+        var services = new ServiceCollection();
+        services.AddULinkGameHotfix(new FixedAssemblySource(@"Z:\missing\Missing.Hotfix.dll"), ["MissingStableContracts"]);
+        services.AddULinkGameHotfix(new FixedAssemblySource(compiled.HotfixAssemblyPath), [stableAssembly.GetName().Name!]);
+
+        using var provider = services.BuildServiceProvider();
+        var manager = provider.GetRequiredService<IHotfixManager>();
+        var result = await manager.ReloadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = HotfixDispatch.Current.Resolve(result.Current.Methods.Single());
+        Assert.Same(stableAssembly, method.GetParameters()[0].ParameterType.Assembly);
+    }
+
     private sealed class FixedAssemblySource : IHotfixAssemblySource
     {
         private readonly string _path;
@@ -166,13 +202,17 @@ public sealed class HotfixManagerTests
 
         public string Path { get; set; }
 
+        public Action? AfterResolve { get; set; }
+
         public ValueTask<HotfixAssemblySourceResult> ResolveAsync(CancellationToken cancellationToken = default)
         {
-            return ValueTask.FromResult(new HotfixAssemblySourceResult(
+            var result = new HotfixAssemblySourceResult(
                 "switchable",
                 "test",
                 Path,
-                System.IO.Path.GetDirectoryName(Path) ?? Environment.CurrentDirectory));
+                System.IO.Path.GetDirectoryName(Path) ?? Environment.CurrentDirectory);
+            AfterResolve?.Invoke();
+            return ValueTask.FromResult(result);
         }
     }
 
@@ -254,6 +294,10 @@ public sealed class HotfixManagerTests
             var stableProject = Path.Combine(root, "StableContracts", "StableContracts.csproj");
             var hotfixProject = Path.Combine(root, "HotfixLogic", "HotfixLogic.csproj");
             var invalidProject = Path.Combine(root, "InvalidHotfixLogic", "InvalidHotfixLogic.csproj");
+            var suffix = Guid.NewGuid().ToString("N");
+            var stableAssemblyName = $"StableContracts_{suffix}";
+            var hotfixAssemblyName = $"HotfixLogic_{suffix}";
+            var invalidAssemblyName = $"InvalidHotfixLogic_{suffix}";
             var abstractionsProject = FindRepositoryFile(Path.Combine("src", "ULinkGame.Server.Hotfix.Abstractions", "ULinkGame.Server.Hotfix.Abstractions.csproj"));
 
             Directory.CreateDirectory(Path.GetDirectoryName(stableProject)!);
@@ -262,10 +306,11 @@ public sealed class HotfixManagerTests
 
             await File.WriteAllTextAsync(
                 stableProject,
-                """
+                $$"""
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
+                    <AssemblyName>{{stableAssemblyName}}</AssemblyName>
                     <ImplicitUsings>enable</ImplicitUsings>
                     <Nullable>enable</Nullable>
                   </PropertyGroup>
@@ -288,6 +333,7 @@ public sealed class HotfixManagerTests
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
+                    <AssemblyName>{{hotfixAssemblyName}}</AssemblyName>
                     <ImplicitUsings>enable</ImplicitUsings>
                     <Nullable>enable</Nullable>
                   </PropertyGroup>
@@ -298,7 +344,7 @@ public sealed class HotfixManagerTests
                 </Project>
                 """;
             await File.WriteAllTextAsync(hotfixProject, hotfixProjectContent, cancellationToken);
-            await File.WriteAllTextAsync(invalidProject, hotfixProjectContent, cancellationToken);
+            await File.WriteAllTextAsync(invalidProject, hotfixProjectContent.Replace(hotfixAssemblyName, invalidAssemblyName, StringComparison.Ordinal), cancellationToken);
             await File.WriteAllTextAsync(
                 Path.Combine(Path.GetDirectoryName(hotfixProject)!, "ArenaSimulationSystem.cs"),
                 """
@@ -343,9 +389,9 @@ public sealed class HotfixManagerTests
 
             return new CompiledHotfixFixture(
                 root,
-                Path.Combine(Path.GetDirectoryName(stableProject)!, "bin", "Debug", "net10.0", "StableContracts.dll"),
-                Path.Combine(Path.GetDirectoryName(hotfixProject)!, "bin", "Debug", "net10.0", "HotfixLogic.dll"),
-                Path.Combine(Path.GetDirectoryName(invalidProject)!, "bin", "Debug", "net10.0", "InvalidHotfixLogic.dll"));
+                Path.Combine(Path.GetDirectoryName(stableProject)!, "bin", "Debug", "net10.0", $"{stableAssemblyName}.dll"),
+                Path.Combine(Path.GetDirectoryName(hotfixProject)!, "bin", "Debug", "net10.0", $"{hotfixAssemblyName}.dll"),
+                Path.Combine(Path.GetDirectoryName(invalidProject)!, "bin", "Debug", "net10.0", $"{invalidAssemblyName}.dll"));
         }
 
         public void Dispose()

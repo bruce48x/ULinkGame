@@ -45,6 +45,8 @@ public sealed class HotfixManager : IHotfixManager
         try
         {
             resolved = await _source.ResolveAsync(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!File.Exists(resolved.AssemblyPath))
             {
                 throw new FileNotFoundException("Hotfix assembly was not found.", resolved.AssemblyPath);
@@ -58,14 +60,10 @@ public sealed class HotfixManager : IHotfixManager
                 throw new InvalidOperationException(string.Join(Environment.NewLine, scan.Diagnostics));
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             var tableVersion = Interlocked.Increment(ref _nextVersion);
             var table = new HotfixDispatchTable(tableVersion, scan.Methods);
-            HotfixDispatch.Replace(table);
-
-            var oldContext = Interlocked.Exchange(ref _loadContext, pendingContext);
-            pendingContext = null;
-            oldContext?.Unload();
-
             var snapshot = new HotfixSnapshot(
                 resolved.Version,
                 resolved.SourceKind,
@@ -76,7 +74,12 @@ public sealed class HotfixManager : IHotfixManager
                 HotfixReloadStatus.Succeeded,
                 null,
                 null);
+
+            var oldContext = Interlocked.Exchange(ref _loadContext, pendingContext);
+            pendingContext = null;
             Volatile.Write(ref _current, snapshot);
+            UnloadQuietly(oldContext);
+            HotfixDispatch.Replace(table);
 
             return new HotfixReloadResult(HotfixReloadStatus.Succeeded, snapshot, resolved.Version, resolved.AssemblyPath, Array.Empty<string>());
         }
@@ -109,6 +112,17 @@ public sealed class HotfixManager : IHotfixManager
                 [ex.Message],
                 ex.Message,
                 ex.GetType().FullName);
+        }
+    }
+
+    private static void UnloadQuietly(HotfixAssemblyLoadContext? loadContext)
+    {
+        try
+        {
+            loadContext?.Unload();
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 }

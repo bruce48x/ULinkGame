@@ -11,7 +11,7 @@ public static class HotfixDispatch
     public static void Replace(HotfixDispatchTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
-        Volatile.Write(ref current, table);
+        Interlocked.Exchange(ref current, table);
     }
 
     public static HotfixMethodKey CreateKey<TState, TResult>(string methodName, params Type[] parameterTypes)
