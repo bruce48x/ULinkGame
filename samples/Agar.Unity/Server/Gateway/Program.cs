@@ -42,7 +42,8 @@ builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
 builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
 builder.Services.AddHostedService<MatchmakingHostedService>();
 builder.Services.AddHostedService<DisconnectedSessionCleanupHostedService>();
-var hotfixDirectory = builder.Configuration["Hotfix:Directory"] ?? "../Hotfix/bin/Debug/net10.0";
+var hotfixDirectory = ResolveHotfixDirectory(
+    builder.Configuration["Hotfix:Directory"] ?? "../../../../Hotfix/bin/Debug/net10.0");
 var hotfixAssembly = builder.Configuration["Hotfix:Assembly"] ?? "Agar.Sample.Hotfix.dll";
 builder.Services.AddULinkGameHotfix(
     new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, hotfixAssembly),
@@ -79,3 +80,13 @@ using (var scope = host.Services.CreateScope())
 }
 
 await host.RunAsync();
+
+static string ResolveHotfixDirectory(string configuredDirectory)
+{
+    if (Path.IsPathFullyQualified(configuredDirectory))
+    {
+        return configuredDirectory;
+    }
+
+    return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredDirectory));
+}
