@@ -25,7 +25,13 @@ public sealed class ToolTextTests
         Assert.Contains("命令:", text.HelpText, StringComparison.Ordinal);
         Assert.Equal("ULinkGame 项目已就绪。下一步:", text.NewProjectReadyHeader);
         Assert.Contains("修改 Shared 合约后", text.RebuildContractsStep, StringComparison.Ordinal);
-        Assert.Contains("正在自动安装", text.InstallingStarter("ULinkRPC.Starter", "0.3.1"), StringComparison.Ordinal);
+        Assert.Contains("正在自动安装", text.InstallingStarter("ULinkRPC.Starter", ToolPackageVersions.ULinkRpcStarter), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PinsCurrentStarterPackageVersion()
+    {
+        Assert.Equal("0.3.4", ToolPackageVersions.ULinkRpcStarter);
     }
 
     [Fact]

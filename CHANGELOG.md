@@ -7,11 +7,15 @@
 - `ULinkGame.Cluster` `0.1.3`
 - `ULinkGame.Cluster.Sql` `0.1.0`
 - `ULinkGame.Cluster.ULinkRPC` `0.1.2`
-- `ULinkGame.Tool` `0.2.8`
+- `ULinkGame.Tool` `0.2.9`
 
 ### Added
 
 - Added node-directory contracts, in-memory and SQL-backed storage, ULinkRPC node-directory adapter, and node-local service configuration scaffolding for cluster deployments.
+
+### Changed
+
+- Updated `ULinkGame.Tool` to consume `ULinkRPC.Starter` `0.3.4`.
 
 ## 2026-05-27
 
