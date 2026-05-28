@@ -19,6 +19,8 @@ src/**/*.meta
 /.nuget/
 /_verify/
 /.buildtmp/
+/.superpowers/
+/.worktrees/
 
 # NuGetForUnity restored packages
 /Client/Assets/Packages/
