@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.DependencyInjection;
 using ULinkGame.Server.Hotfix.Abstractions;
 using ULinkGame.Server.Hotfix.Dispatch;
@@ -269,8 +270,6 @@ public sealed class HotfixManagerTests
 
     private sealed class CompiledHotfixFixture : IDisposable
     {
-        private static readonly TimeSpan BuildTimeout = TimeSpan.FromSeconds(60);
-
         private CompiledHotfixFixture(
             string rootDirectory,
             string stableAssemblyPath,
@@ -294,34 +293,21 @@ public sealed class HotfixManagerTests
         public static async Task<CompiledHotfixFixture> CreateAsync(CancellationToken cancellationToken)
         {
             var root = Path.Combine(Path.GetTempPath(), "ULinkGameHotfixTests", Guid.NewGuid().ToString("N"));
-            var stableProject = Path.Combine(root, "StableContracts", "StableContracts.csproj");
-            var hotfixProject = Path.Combine(root, "HotfixLogic", "HotfixLogic.csproj");
-            var invalidProject = Path.Combine(root, "InvalidHotfixLogic", "InvalidHotfixLogic.csproj");
             var suffix = Guid.NewGuid().ToString("N");
             var stableAssemblyName = $"StableContracts_{suffix}";
             var hotfixAssemblyName = $"HotfixLogic_{suffix}";
             var invalidAssemblyName = $"InvalidHotfixLogic_{suffix}";
-            var abstractionsProject = FindRepositoryFile(Path.Combine("src", "ULinkGame.Server.Hotfix.Abstractions", "ULinkGame.Server.Hotfix.Abstractions.csproj"));
+            var stableAssemblyPath = Path.Combine(root, "stable", $"{stableAssemblyName}.dll");
+            var hotfixAssemblyPath = Path.Combine(root, "hotfix", $"{hotfixAssemblyName}.dll");
+            var invalidAssemblyPath = Path.Combine(root, "invalid", $"{invalidAssemblyName}.dll");
 
-            Directory.CreateDirectory(Path.GetDirectoryName(stableProject)!);
-            Directory.CreateDirectory(Path.GetDirectoryName(hotfixProject)!);
-            Directory.CreateDirectory(Path.GetDirectoryName(invalidProject)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(stableAssemblyPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(hotfixAssemblyPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(invalidAssemblyPath)!);
 
-            await File.WriteAllTextAsync(
-                stableProject,
-                $$"""
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                    <AssemblyName>{{stableAssemblyName}}</AssemblyName>
-                    <ImplicitUsings>enable</ImplicitUsings>
-                    <Nullable>enable</Nullable>
-                  </PropertyGroup>
-                </Project>
-                """,
-                cancellationToken);
-            await File.WriteAllTextAsync(
-                Path.Combine(Path.GetDirectoryName(stableProject)!, "ArenaSimulation.cs"),
+            await EmitAssemblyAsync(
+                stableAssemblyName,
+                stableAssemblyPath,
                 """
                 namespace StableContracts;
 
@@ -329,28 +315,16 @@ public sealed class HotfixManagerTests
                 {
                 }
                 """,
+                [],
                 cancellationToken);
 
-            var hotfixProjectContent =
+            var stableReference = MetadataReference.CreateFromFile(stableAssemblyPath);
+            var abstractionsReference = MetadataReference.CreateFromFile(typeof(HotfixSystemOfAttribute).Assembly.Location);
+
+            await EmitAssemblyAsync(
+                hotfixAssemblyName,
+                hotfixAssemblyPath,
                 $$"""
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                    <AssemblyName>{{hotfixAssemblyName}}</AssemblyName>
-                    <ImplicitUsings>enable</ImplicitUsings>
-                    <Nullable>enable</Nullable>
-                  </PropertyGroup>
-                  <ItemGroup>
-                    <ProjectReference Include="{{stableProject}}" />
-                    <ProjectReference Include="{{abstractionsProject}}" />
-                  </ItemGroup>
-                </Project>
-                """;
-            await File.WriteAllTextAsync(hotfixProject, hotfixProjectContent, cancellationToken);
-            await File.WriteAllTextAsync(invalidProject, hotfixProjectContent.Replace(hotfixAssemblyName, invalidAssemblyName, StringComparison.Ordinal), cancellationToken);
-            await File.WriteAllTextAsync(
-                Path.Combine(Path.GetDirectoryName(hotfixProject)!, "ArenaSimulationSystem.cs"),
-                """
                 using StableContracts;
                 using ULinkGame.Server.Hotfix.Abstractions;
 
@@ -365,10 +339,13 @@ public sealed class HotfixManagerTests
                     }
                 }
                 """,
+                [stableReference, abstractionsReference],
                 cancellationToken);
-            await File.WriteAllTextAsync(
-                Path.Combine(Path.GetDirectoryName(invalidProject)!, "ArenaSimulationSystem.cs"),
-                """
+
+            await EmitAssemblyAsync(
+                invalidAssemblyName,
+                invalidAssemblyPath,
+                $$"""
                 using StableContracts;
                 using ULinkGame.Server.Hotfix.Abstractions;
 
@@ -384,17 +361,14 @@ public sealed class HotfixManagerTests
                     }
                 }
                 """,
+                [stableReference, abstractionsReference],
                 cancellationToken);
-
-            await RunDotnetBuildAsync(stableProject, cancellationToken);
-            await RunDotnetBuildAsync(hotfixProject, cancellationToken);
-            await RunDotnetBuildAsync(invalidProject, cancellationToken);
 
             return new CompiledHotfixFixture(
                 root,
-                Path.Combine(Path.GetDirectoryName(stableProject)!, "bin", "Debug", "net10.0", $"{stableAssemblyName}.dll"),
-                Path.Combine(Path.GetDirectoryName(hotfixProject)!, "bin", "Debug", "net10.0", $"{hotfixAssemblyName}.dll"),
-                Path.Combine(Path.GetDirectoryName(invalidProject)!, "bin", "Debug", "net10.0", $"{invalidAssemblyName}.dll"));
+                stableAssemblyPath,
+                hotfixAssemblyPath,
+                invalidAssemblyPath);
         }
 
         public void Dispose()
@@ -411,85 +385,49 @@ public sealed class HotfixManagerTests
             }
         }
 
-        private static string FindRepositoryFile(string relativePath)
+        private static async Task EmitAssemblyAsync(
+            string assemblyName,
+            string assemblyPath,
+            string source,
+            IReadOnlyList<MetadataReference> additionalReferences,
+            CancellationToken cancellationToken)
         {
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            while (directory is not null)
-            {
-                var candidate = Path.Combine(directory.FullName, relativePath);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
+            cancellationToken.ThrowIfCancellationRequested();
 
-                directory = directory.Parent;
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, cancellationToken: cancellationToken);
+            var references = GetTrustedPlatformReferences()
+                .Concat(additionalReferences)
+                .GroupBy(static reference => reference.Display, StringComparer.OrdinalIgnoreCase)
+                .Select(static group => group.First())
+                .ToArray();
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                [syntaxTree],
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            await using var stream = File.Create(assemblyPath);
+            var emit = compilation.Emit(stream, cancellationToken: cancellationToken);
+            if (!emit.Success)
+            {
+                var diagnostics = string.Join(Environment.NewLine, emit.Diagnostics);
+                throw new InvalidOperationException($"Could not emit test assembly '{assemblyName}'.{Environment.NewLine}{diagnostics}");
             }
 
-            throw new FileNotFoundException($"Could not find repository file '{relativePath}'.");
+            await stream.FlushAsync(cancellationToken);
         }
 
-        private static async Task RunDotnetBuildAsync(string projectPath, CancellationToken cancellationToken)
+        private static IEnumerable<MetadataReference> GetTrustedPlatformReferences()
         {
-            using var process = Process.Start(new ProcessStartInfo
+            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            if (trustedPlatformAssemblies is null)
             {
-                FileName = "dotnet",
-                ArgumentList = { "build", projectPath },
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false
-            }) ?? throw new InvalidOperationException("Could not start dotnet build.");
-
-            var outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-            var errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
-            var waitTask = process.WaitForExitAsync(cancellationToken);
-            var timeoutTask = Task.Delay(BuildTimeout, CancellationToken.None);
-
-            var completedTask = await Task.WhenAny(waitTask, timeoutTask).ConfigureAwait(false);
-            if (completedTask == timeoutTask)
-            {
-                KillProcessTree(process);
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-                var timeoutOutput = await outputTask.ConfigureAwait(false);
-                var timeoutError = await errorTask.ConfigureAwait(false);
-                throw new TimeoutException(
-                    $"dotnet build timed out after {BuildTimeout.TotalSeconds:N0} seconds for '{projectPath}'."
-                    + $"{Environment.NewLine}{timeoutOutput}{Environment.NewLine}{timeoutError}");
+                throw new InvalidOperationException("TRUSTED_PLATFORM_ASSEMBLIES is not available.");
             }
 
-            try
-            {
-                await waitTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                KillProcessTree(process);
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-                throw;
-            }
-
-            var output = await outputTask.ConfigureAwait(false);
-            var error = await errorTask.ConfigureAwait(false);
-            if (process.ExitCode != 0)
-            {
-                throw new InvalidOperationException($"dotnet build failed for '{projectPath}'.{Environment.NewLine}{output}{Environment.NewLine}{error}");
-            }
-        }
-
-        private static void KillProcessTree(Process process)
-        {
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-            }
+            return trustedPlatformAssemblies
+                .Split(Path.PathSeparator)
+                .Select(static path => MetadataReference.CreateFromFile(path));
         }
     }
 }
