@@ -8,12 +8,16 @@ public static class HotfixServiceCollectionExtensions
 {
     public static IServiceCollection AddULinkGameHotfix(
         this IServiceCollection services,
-        IHotfixAssemblySource source)
+        IHotfixAssemblySource source,
+        IEnumerable<string>? sharedAssemblyNames = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(source);
-        services.TryAddSingleton(source);
-        services.TryAddSingleton<IHotfixManager, HotfixManager>();
+        var sharedNames = (sharedAssemblyNames ?? Array.Empty<string>()).ToArray();
+        services.RemoveAll<IHotfixAssemblySource>();
+        services.AddSingleton(source);
+        services.TryAddSingleton<IHotfixManager>(provider =>
+            new HotfixManager(provider.GetRequiredService<IHotfixAssemblySource>(), sharedNames));
         return services;
     }
 }

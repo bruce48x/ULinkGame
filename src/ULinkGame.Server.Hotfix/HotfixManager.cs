@@ -8,18 +8,37 @@ namespace ULinkGame.Server.Hotfix;
 public sealed class HotfixManager : IHotfixManager
 {
     private readonly IHotfixAssemblySource _source;
+    private readonly IReadOnlyList<string> _sharedAssemblyNames;
+    private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private long _nextVersion;
     private HotfixSnapshot _current = new(null, null, null, null, 0, Array.Empty<HotfixMethodKey>(), null, null, null);
     private HotfixAssemblyLoadContext? _loadContext;
 
-    public HotfixManager(IHotfixAssemblySource source)
+    public HotfixManager(IHotfixAssemblySource source, IEnumerable<string>? sharedAssemblyNames = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
+        _sharedAssemblyNames = (sharedAssemblyNames ?? Array.Empty<string>())
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 
     public HotfixSnapshot Current => Volatile.Read(ref _current);
 
     public async ValueTask<HotfixReloadResult> ReloadAsync(CancellationToken cancellationToken = default)
+    {
+        await _reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await ReloadCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _reloadLock.Release();
+        }
+    }
+
+    private async ValueTask<HotfixReloadResult> ReloadCoreAsync(CancellationToken cancellationToken)
     {
         HotfixAssemblySourceResult? resolved = null;
         HotfixAssemblyLoadContext? pendingContext = null;
@@ -31,7 +50,7 @@ public sealed class HotfixManager : IHotfixManager
                 throw new FileNotFoundException("Hotfix assembly was not found.", resolved.AssemblyPath);
             }
 
-            pendingContext = new HotfixAssemblyLoadContext(resolved.AssemblyPath);
+            pendingContext = new HotfixAssemblyLoadContext(resolved.AssemblyPath, _sharedAssemblyNames);
             var assembly = pendingContext.LoadFromAssemblyPath(resolved.AssemblyPath);
             var scan = HotfixSystemScanner.Scan(assembly);
             if (!scan.Succeeded)
@@ -60,6 +79,11 @@ public sealed class HotfixManager : IHotfixManager
             Volatile.Write(ref _current, snapshot);
 
             return new HotfixReloadResult(HotfixReloadStatus.Succeeded, snapshot, resolved.Version, resolved.AssemblyPath, Array.Empty<string>());
+        }
+        catch (OperationCanceledException)
+        {
+            pendingContext?.Unload();
+            throw;
         }
         catch (Exception ex)
         {

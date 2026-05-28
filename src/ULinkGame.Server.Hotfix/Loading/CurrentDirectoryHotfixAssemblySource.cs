@@ -14,7 +14,8 @@ public sealed class CurrentDirectoryHotfixAssemblySource : IHotfixAssemblySource
     public ValueTask<HotfixAssemblySourceResult> ResolveAsync(CancellationToken cancellationToken = default)
     {
         var fullDirectory = Path.GetFullPath(_directory);
-        var assemblyPath = Path.Combine(fullDirectory, _assemblyFileName);
+        var assemblyFileName = PathValidation.RequireSafeFileName(_assemblyFileName, nameof(_assemblyFileName));
+        var assemblyPath = PathValidation.GetContainedPath(fullDirectory, assemblyFileName, nameof(_assemblyFileName));
         return ValueTask.FromResult(new HotfixAssemblySourceResult("current-directory", null, assemblyPath, fullDirectory));
     }
 }

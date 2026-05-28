@@ -16,15 +16,18 @@ public sealed class VersionPointerHotfixAssemblySource : IHotfixAssemblySource
     public async ValueTask<HotfixAssemblySourceResult> ResolveAsync(CancellationToken cancellationToken = default)
     {
         var root = Path.GetFullPath(_rootDirectory);
-        var pointerPath = Path.Combine(root, _pointerFileName);
+        var pointerFileName = PathValidation.RequireSafeFileName(_pointerFileName, nameof(_pointerFileName));
+        var assemblyFileName = PathValidation.RequireSafeFileName(_assemblyFileName, nameof(_assemblyFileName));
+        var pointerPath = PathValidation.GetContainedPath(root, pointerFileName, nameof(_pointerFileName));
         var version = (await File.ReadAllTextAsync(pointerPath, cancellationToken).ConfigureAwait(false)).Trim();
         if (string.IsNullOrWhiteSpace(version) || version.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             throw new InvalidOperationException($"Hotfix version pointer '{pointerPath}' contains an invalid version.");
         }
 
-        var versionDirectory = Path.Combine(root, "versions", version);
-        var assemblyPath = Path.Combine(versionDirectory, _assemblyFileName);
+        var versionsDirectory = PathValidation.GetContainedPath(root, "versions", "versions");
+        var versionDirectory = PathValidation.GetContainedPath(versionsDirectory, version, "version");
+        var assemblyPath = PathValidation.GetContainedPath(versionDirectory, assemblyFileName, nameof(_assemblyFileName));
         return new HotfixAssemblySourceResult("version-pointer", version, assemblyPath, versionDirectory);
     }
 }
