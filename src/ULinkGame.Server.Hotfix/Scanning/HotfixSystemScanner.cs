@@ -59,6 +59,25 @@ public static class HotfixSystemScanner
                 continue;
             }
 
+            if (method.ContainsGenericParameters)
+            {
+                diagnostics.Add($"Hotfix method '{systemType.FullName}.{method.Name}' must not be generic.");
+                continue;
+            }
+
+            if (method.ReturnType.ContainsGenericParameters
+                || parameters.Any(static parameter => parameter.ParameterType.ContainsGenericParameters))
+            {
+                diagnostics.Add($"Hotfix method '{systemType.FullName}.{method.Name}' must not use open generic return or parameter types.");
+                continue;
+            }
+
+            if (parameters.Any(static parameter => parameter.IsOut || parameter.ParameterType.IsByRef || parameter.ParameterType.IsPointer))
+            {
+                diagnostics.Add($"Hotfix method '{systemType.FullName}.{method.Name}' must not use by-ref, out, or pointer parameter types.");
+                continue;
+            }
+
             var argumentTypes = parameters.Skip(1).Select(static parameter => parameter.ParameterType).ToArray();
             var key = new HotfixMethodKey(
                 stateType.FullName ?? stateType.Name,

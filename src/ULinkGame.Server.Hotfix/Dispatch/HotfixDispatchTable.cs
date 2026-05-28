@@ -9,8 +9,21 @@ public sealed class HotfixDispatchTable
 
     public HotfixDispatchTable(long version, IEnumerable<HotfixMethodBinding> methods)
     {
+        ArgumentNullException.ThrowIfNull(methods);
+
+        var methodList = new List<HotfixMethodBinding>();
+        foreach (var method in methods)
+        {
+            if (method is null)
+            {
+                throw new ArgumentException("Method bindings cannot contain null.", nameof(methods));
+            }
+
+            methodList.Add(method);
+        }
+
         Version = version;
-        this.methods = methods.ToDictionary(static method => method.Key, static method => method.Method);
+        this.methods = methodList.ToDictionary(static method => method.Key, static method => method.Method);
         MethodKeys = this.methods.Keys.OrderBy(static key => key.ToString(), StringComparer.Ordinal).ToArray();
     }
 
