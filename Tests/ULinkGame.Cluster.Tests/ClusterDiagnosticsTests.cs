@@ -58,6 +58,7 @@ public sealed class ClusterDiagnosticsTests
     {
         using var collector = new ActivityCollector();
         var now = DateTimeOffset.UtcNow;
+        var messageKind = "diagnostics-" + Guid.NewGuid().ToString("N");
         var directory = new InMemoryRouteDirectory();
         await directory.RegisterAsync(
             new RouteLocation("room/1", "local", new NodeEndpoint("in-memory://local"), now.AddMinutes(1)),
@@ -70,15 +71,15 @@ public sealed class ClusterDiagnosticsTests
             () => now);
 
         await router.SendAsync(
-            NewMessage(now.AddMinutes(1), correlationId: "corr-1", traceId: "trace-1"),
+            NewMessage(now.AddMinutes(1), messageKind, correlationId: "corr-1", traceId: "trace-1"),
             TestContext.Current.CancellationToken);
 
         var activity = Assert.Single(collector.Snapshot(), activity =>
             activity.OperationName == "send" &&
             Equals(activity.GetTagItem("ulinkgame.cluster.status"), "accepted") &&
-            Equals(activity.GetTagItem("ulinkgame.cluster.message.kind"), "command"));
+            Equals(activity.GetTagItem("ulinkgame.cluster.message.kind"), messageKind));
         Assert.Equal("send", activity.OperationName);
-        Assert.Equal("command", activity.GetTagItem("ulinkgame.cluster.message.kind"));
+        Assert.Equal(messageKind, activity.GetTagItem("ulinkgame.cluster.message.kind"));
         Assert.Equal(true, activity.GetTagItem("ulinkgame.cluster.correlation.present"));
         Assert.Equal(true, activity.GetTagItem("ulinkgame.cluster.trace.present"));
         Assert.Equal("accepted", activity.GetTagItem("ulinkgame.cluster.status"));
@@ -97,12 +98,13 @@ public sealed class ClusterDiagnosticsTests
 
     private static ClusterMessage NewMessage(
         DateTimeOffset expiresAt,
+        string kind = "command",
         string? correlationId = null,
         string? traceId = null)
     {
         return new ClusterMessage(
             "room/1",
-            "command",
+            kind,
             new byte[] { 1 },
             expiresAt,
             "source",
