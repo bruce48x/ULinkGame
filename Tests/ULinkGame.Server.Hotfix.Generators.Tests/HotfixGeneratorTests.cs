@@ -100,6 +100,27 @@ public sealed class HotfixGeneratorTests
     }
 
     [Fact]
+    public void Generator_emits_dispatch_wrapper_declaration_marker()
+    {
+        var source = """
+            using ULinkGame.Server.Hotfix.Abstractions;
+
+            namespace Demo;
+
+            [HotfixState]
+            public partial class PlayerState
+            {
+                private int exp;
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("ULinkGame.Server.Hotfix.Dispatch.HotfixDispatch", result.GeneratedSource);
+    }
+
+    [Fact]
     public void Partial_struct_state_emits_accessor_and_compiles()
     {
         var source = """

@@ -173,6 +173,13 @@ namespace ULinkGame.Server.Hotfix.Generators
                 builder.AppendLine();
             }
 
+            builder.Append(indent).AppendLine("    [EditorBrowsable(EditorBrowsableState.Never)]");
+            builder.Append(indent).AppendLine("    public static string __hotfix_dispatch_marker()");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        return typeof(global::ULinkGame.Server.Hotfix.Dispatch.HotfixDispatch).FullName ?? string.Empty;");
+            builder.Append(indent).AppendLine("    }");
+            builder.AppendLine();
+
             builder.Append(indent).AppendLine("}");
         }
 

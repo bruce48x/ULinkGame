@@ -13,7 +13,8 @@ internal static class GeneratorTestHost
             .Select(static assembly => MetadataReference.CreateFromFile(assembly.Location))
             .Concat(new[]
             {
-                MetadataReference.CreateFromFile(typeof(ULinkGame.Server.Hotfix.Abstractions.HotfixStateAttribute).Assembly.Location)
+                MetadataReference.CreateFromFile(typeof(ULinkGame.Server.Hotfix.Abstractions.HotfixStateAttribute).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ULinkGame.Server.Hotfix.Dispatch.HotfixDispatch).Assembly.Location)
             })
             .Distinct(MetadataReferencePathComparer.Instance)
             .ToArray();

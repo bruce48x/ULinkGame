@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/ULinkGame.Server.Hotfix.Abstractions/ULinkGame.Server.Hotfix.Abstractions.csproj" />
+    <ProjectReference Include="../../src/ULinkGame.Server.Hotfix/ULinkGame.Server.Hotfix.csproj" />
     <ProjectReference Include="../../src/ULinkGame.Server.Hotfix.Generators/ULinkGame.Server.Hotfix.Generators.csproj" />
   </ItemGroup>
 </Project>
