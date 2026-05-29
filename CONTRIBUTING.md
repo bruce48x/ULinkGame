@@ -572,7 +572,7 @@ Reliable push is for low-frequency business or session transitions where missing
 
 Hotfix is an engineering goal, but it should not pollute the core actor or session APIs.
 
-Recommended model:
+The authoritative design model is:
 
 ```txt
 stable runtime state + replaceable business logic
@@ -580,11 +580,32 @@ stable runtime state + replaceable business logic
 
 Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
 
-The first ULinkGame hotfix implementation uses attribute-discovered static system methods, source-generated friend accessors, and explicit stable wrapper methods at hotfix entry points. Actors and stable state objects remain in stable assemblies. Hotfix systems operate on those objects through generated friend accessors and `HotfixDispatch`-backed stable wrappers. Hotfix systems must not own long-lived timers, threads, callbacks, or static event subscriptions.
+Hotfix code is behavior, not ownership. The stable actor or runtime host owns execution, mailbox or loop scheduling, cancellation, I/O, persistence, logging, network push, and other side effects. The stable state object owns long-lived mutable data. The hotfix system owns replaceable rules that operate on the stable state object and return stable DTOs describing the result.
+
+The first ULinkGame hotfix implementation uses attribute-discovered static system methods, source-generated friend accessors, and explicit stable wrapper methods at hotfix entry points. Actors and stable state objects remain in stable assemblies. Hotfix systems operate on those objects through generated friend accessors and `HotfixDispatch`-backed stable wrappers. Hotfix systems must not own long-lived timers, threads, callbacks, static event subscriptions, cached delegates, or other references that would keep an old `AssemblyLoadContext` alive.
+
+Reload replaces the immutable dispatch table only after the new hotfix assembly loads, scans, and validates. Reload failure keeps the previous dispatch table active. A hotfix method already executing keeps the version it resolved; the next dispatch call sees the new table after a successful reload. Stable actors and room loops must not cache hotfix implementation instances across calls.
 
 The first runtime has one process-global dispatch table and should be treated as one hotfix domain per server process. Do not create multiple unrelated hotfix managers in the same process expecting independent active logic tables.
 
 Generated friend accessors are public members on `[HotfixState]` partial types because a separate hotfix assembly must call them. `[FriendOf]` records the intended system relationship for tooling and readability; it is not a CLR-enforced permission boundary. Mark only stable state types whose generated `__hotfix_` accessors are acceptable to expose to project code, and keep sensitive runtime internals out of those hotfix state types.
+
+Hotfix system method rules:
+
+- Methods must be `public static` extension methods.
+- The first parameter must be `this TState self`.
+- `TState` must match the `[HotfixSystemOf(typeof(TState))]` state type.
+- Method name, return type, and parameter types form the dispatch key.
+- Duplicate keys are invalid.
+- By-ref, out, pointer, and open generic signatures are not supported.
+
+Package responsibilities:
+
+- `ULinkGame.Server.Hotfix.Abstractions`: stable attributes and reload result contracts shared by stable projects, hotfix projects, runtime, and generators.
+- `ULinkGame.Server.Hotfix`: runtime loading, source resolution, collectible `AssemblyLoadContext`, scanner, dispatch table, reload manager, and optional file watcher.
+- `ULinkGame.Server.Hotfix.Generators`: source-generated friend accessors for `[HotfixState]` partial types. Full generated call wrappers and call-site caches are deferred; v1 entry points use explicit stable wrapper methods that call `HotfixDispatch`.
+
+For Agar, `RoomRuntime` is stable and owns the tick loop, cancellation, session cleanup, user profile writes, leaderboard writes, logging, and network publishing. `ArenaSimulation` is the stable state object. `ArenaSimulationSystem` and settlement systems are reloadable rule implementations and are not actors.
 
 First versions should avoid hotfixing:
 
