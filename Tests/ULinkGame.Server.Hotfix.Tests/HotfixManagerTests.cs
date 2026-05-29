@@ -62,7 +62,8 @@ public sealed class HotfixManagerTests
         var source = new SwitchableAssemblySource(typeof(ManagerTestStateSystem).Assembly.Location);
         var manager = new HotfixManager(source);
         var first = await manager.ReloadAsync(TestContext.Current.CancellationToken);
-        var key = first.Current.Methods.Single(key => key.MethodName == "Add");
+        var key = first.Current.Methods.Single(key =>
+            key.StateTypeName == typeof(ManagerTestState).FullName && key.MethodName == "Add");
         var previousMethod = HotfixDispatch.Current.Resolve(key);
         source.Path = compiled.InvalidHotfixAssemblyPath;
 
@@ -90,7 +91,8 @@ public sealed class HotfixManagerTests
         var source = new SwitchableAssemblySource(typeof(ManagerTestStateSystem).Assembly.Location);
         var manager = new HotfixManager(source);
         var first = await manager.ReloadAsync(TestContext.Current.CancellationToken);
-        var key = first.Current.Methods.Single(key => key.MethodName == "Add");
+        var key = first.Current.Methods.Single(key =>
+            key.StateTypeName == typeof(ManagerTestState).FullName && key.MethodName == "Add");
         var previousMethod = HotfixDispatch.Current.Resolve(key);
         source.Path = typeof(ManagerTestStateSystem).Assembly.Location;
         source.AfterResolve = () => cts.Cancel();
