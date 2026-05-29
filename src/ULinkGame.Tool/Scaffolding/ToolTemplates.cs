@@ -5,6 +5,7 @@ internal static class ToolTemplates
         return """
         <Solution>
           <Project Path="../Shared/Shared.csproj" />
+          <Project Path="Hotfix/Server.Hotfix.csproj" />
           <Project Path="Server/Server.csproj" />
         </Solution>
         """;
@@ -24,6 +25,8 @@ internal static class ToolTemplates
             using Microsoft.Extensions.Logging;
             using Server.Hosting;
             using ULinkGame.Server;
+            using ULinkGame.Server.Hotfix;
+            using ULinkGame.Server.Hotfix.Loading;
             using ULinkGame.Server.Hosting;
 
             var builder = Host.CreateApplicationBuilder(args);
@@ -48,11 +51,14 @@ internal static class ToolTemplates
                     new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
             builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
             builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
+            {{RenderHotfixServiceRegistration()}}
             builder.Services.AddULinkGameServerGateway();
 
             var host = builder.Build();
+            await LoadInitialHotfixAsync(host);
             await host.RunAsync();
             return 0;
+            {{RenderHotfixHelpers()}}
             """;
         }
 
@@ -65,6 +71,8 @@ internal static class ToolTemplates
         using Microsoft.Extensions.Logging;
         using Server.Hosting;
         using ULinkGame.Server;
+        using ULinkGame.Server.Hotfix;
+        using ULinkGame.Server.Hotfix.Loading;
         using ULinkGame.Server.Hosting;
 
         var builder = Host.CreateApplicationBuilder(args);
@@ -84,11 +92,14 @@ internal static class ToolTemplates
                 "Endpoint",
                 new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
         builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
+        {{RenderHotfixServiceRegistration()}}
         builder.Services.AddULinkGameServerGateway();
 
         var host = builder.Build();
+        await LoadInitialHotfixAsync(host);
         await host.RunAsync();
         return 0;
+        {{RenderHotfixHelpers()}}
         """;
     }
 
@@ -115,10 +126,12 @@ internal static class ToolTemplates
             <ProjectReference Include="..\..\Shared\Shared.csproj" TargetFramework="net10.0">
               <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
             </ProjectReference>
+            <ProjectReference Include="..\Hotfix\Server.Hotfix.csproj" ReferenceOutputAssembly="false" />
           </ItemGroup>
 
           <ItemGroup>
             <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
+            <PackageReference Include="ULinkGame.Server.Hotfix" Version="{{ToolPackageVersions.ULinkGameServerHotfix}}" />
         {{clusterReferences}}
         {{persistenceReferences}}
           </ItemGroup>
@@ -173,7 +186,8 @@ internal static class ToolTemplates
                     ],
                     "RouteLeaseSeconds": 30,
                     "SendTimeoutMilliseconds": 2000
-                  }
+                  },
+                  {{RenderHotfixAppSettingsBlock(9)}}
                 }
                 """;
             }
@@ -185,7 +199,8 @@ internal static class ToolTemplates
                 "Host": "127.0.0.1",
                 "Port": 20000,
                 "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
-              }
+              },
+              {{RenderHotfixAppSettingsBlock(7)}}
             }
             """;
         }
@@ -203,7 +218,149 @@ internal static class ToolTemplates
             "Host": "127.0.0.1",
             "Port": 20001,
             "Path": "{{TemplateText.SanitizeStringLiteral(realtimePath)}}"
-          }
+          },
+          {{RenderHotfixAppSettingsBlock(5)}}
+        }
+        """;
+    }
+
+    public static string RenderHotfixProject()
+    {
+        return $$"""
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup>
+            <TargetFramework>net10.0</TargetFramework>
+            <ImplicitUsings>enable</ImplicitUsings>
+            <Nullable>enable</Nullable>
+            <AssemblyName>Server.Hotfix</AssemblyName>
+            <RootNamespace>Server.Hotfix</RootNamespace>
+            <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+          </PropertyGroup>
+
+          <ItemGroup>
+            <ProjectReference Include="..\..\Shared\Shared.csproj" TargetFramework="net10.0">
+              <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
+            </ProjectReference>
+          </ItemGroup>
+
+          <ItemGroup>
+            <PackageReference Include="ULinkGame.Server.Hotfix.Abstractions" Version="{{ToolPackageVersions.ULinkGameServerHotfixAbstractions}}" />
+          </ItemGroup>
+        </Project>
+        """;
+    }
+
+    public static string RenderSharedProjectHotfixItemGroup()
+    {
+        return $$"""
+        <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+          <PackageReference Include="ULinkGame.Server.Hotfix.Abstractions" Version="{{ToolPackageVersions.ULinkGameServerHotfixAbstractions}}" />
+          <PackageReference Include="ULinkGame.Server.Hotfix" Version="{{ToolPackageVersions.ULinkGameServerHotfix}}" />
+          <PackageReference Include="ULinkGame.Server.Hotfix.Generators" Version="{{ToolPackageVersions.ULinkGameServerHotfixGenerators}}" PrivateAssets="all" />
+        </ItemGroup>
+        """;
+    }
+
+    public static string RenderSharedHotfixAssemblyInfo()
+    {
+        return """
+        using System.Runtime.CompilerServices;
+
+        [assembly: InternalsVisibleTo("Server.Hotfix")]
+        """;
+    }
+
+    public static string RenderSharedGameRules()
+    {
+        return """
+        #nullable enable
+
+        #if NET10_0_OR_GREATER
+        using ULinkGame.Server.Hotfix.Abstractions;
+        using ULinkGame.Server.Hotfix.Dispatch;
+        #endif
+
+        namespace Shared.Gameplay
+        {
+
+            public sealed class GameRuleInput
+            {
+                public string PlayerId { get; set; } = string.Empty;
+                public int Score { get; set; }
+            }
+
+            public sealed class GameRuleResult
+            {
+                public bool Accepted { get; set; }
+                public string Reason { get; set; } = string.Empty;
+            }
+
+        #if NET10_0_OR_GREATER
+            [HotfixState]
+        #endif
+            public sealed partial class GameRulesState
+            {
+                private int _minimumScore = 1;
+
+                public GameRuleResult Evaluate(GameRuleInput input)
+                {
+        #if NET10_0_OR_GREATER
+                    return HotfixDispatch.Invoke<GameRulesState, GameRuleInput, GameRuleResult>(
+                        nameof(Evaluate),
+                        this,
+                        input);
+        #else
+                    return EvaluateStable(input);
+        #endif
+                }
+
+                internal GameRuleResult EvaluateStable(GameRuleInput input)
+                {
+                    if (string.IsNullOrWhiteSpace(input.PlayerId))
+                    {
+                        return new GameRuleResult
+                        {
+                            Accepted = false,
+                            Reason = "Player id is required."
+                        };
+                    }
+
+                    if (input.Score < _minimumScore)
+                    {
+                        return new GameRuleResult
+                        {
+                            Accepted = false,
+                            Reason = "Score is below the current rule threshold."
+                        };
+                    }
+
+                    return new GameRuleResult
+                    {
+                        Accepted = true,
+                        Reason = "Accepted by stable rules."
+                    };
+                }
+            }
+        }
+        """;
+    }
+
+    public static string RenderHotfixGameRulesSystem()
+    {
+        return """
+        using Shared.Gameplay;
+        using ULinkGame.Server.Hotfix.Abstractions;
+
+        namespace Server.Hotfix.Gameplay;
+
+        [FriendOf(typeof(GameRulesState))]
+        [HotfixSystemOf(typeof(GameRulesState))]
+        public static class GameRulesSystem
+        {
+            public static GameRuleResult Evaluate(this GameRulesState self, GameRuleInput input)
+            {
+                return self.EvaluateStable(input);
+            }
         }
         """;
     }
@@ -592,6 +749,73 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
         AllServicesBinder.BindAll(builder.ServiceRegistry);
     }}
 }}";
+    }
+
+    private static string RenderHotfixServiceRegistration()
+    {
+        return """
+        var hotfixDirectory = ResolveHotfixDirectory(
+            builder.Configuration["Hotfix:Directory"] ?? "../../../Hotfix/bin/Debug/net10.0");
+        var hotfixAssembly = builder.Configuration["Hotfix:Assembly"] ?? "Server.Hotfix.dll";
+        builder.Services.AddULinkGameHotfix(
+            new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, hotfixAssembly),
+            sharedAssemblyNames: ["Shared"]);
+        """;
+    }
+
+    private static string RenderHotfixHelpers()
+    {
+        return """
+
+        static async Task LoadInitialHotfixAsync(IHost host)
+        {
+            using var scope = host.Services.CreateScope();
+            var hotfix = scope.ServiceProvider.GetRequiredService<IHotfixManager>();
+            var logger = scope.ServiceProvider
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Server.Hotfix");
+            var result = await hotfix.ReloadAsync();
+            if (result.Succeeded)
+            {
+                logger.LogInformation(
+                    "Initial hotfix load succeeded from {HotfixPath} with {MethodCount} method(s).",
+                    result.Current.SourcePath,
+                    result.Current.Methods.Count);
+                return;
+            }
+
+            logger.LogWarning(
+                "Initial hotfix load failed for {HotfixPath}: {ErrorMessage}",
+                result.RequestedPath,
+                result.ErrorMessage);
+            foreach (var diagnostic in result.Diagnostics)
+            {
+                logger.LogWarning("Hotfix diagnostic: {Diagnostic}", diagnostic);
+            }
+        }
+
+        static string ResolveHotfixDirectory(string configuredDirectory)
+        {
+            if (Path.IsPathFullyQualified(configuredDirectory))
+            {
+                return configuredDirectory;
+            }
+
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredDirectory));
+        }
+        """;
+    }
+
+    private static string RenderHotfixAppSettingsBlock(int indent)
+    {
+        var block = """
+        "Hotfix": {
+          "Source": "current-directory",
+          "Directory": "../../../Hotfix/bin/Debug/net10.0",
+          "Assembly": "Server.Hotfix.dll"
+        }
+        """;
+        return TemplateText.IndentBlock(block, indent / 4);
     }
 
     private static string GetDefaultPath(string transport, string websocketPath)

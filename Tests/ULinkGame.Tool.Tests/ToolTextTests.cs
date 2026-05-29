@@ -153,6 +153,58 @@ public sealed class ToolTextTests
     }
 
     [Fact]
+    public void DefaultScaffoldIncludesServerHotfixInfrastructure()
+    {
+        var options = CliParser.ParseNewOptions([]);
+
+        var solution = ToolTemplates.RenderServerSolution();
+        var project = ToolTemplates.RenderServerProject(options);
+        var sharedProject = ToolTemplates.RenderSharedProjectHotfixItemGroup();
+        var sharedAssemblyInfo = ToolTemplates.RenderSharedHotfixAssemblyInfo();
+        var sharedGameRules = ToolTemplates.RenderSharedGameRules();
+        var hotfixProject = ToolTemplates.RenderHotfixProject();
+        var hotfixGameRules = ToolTemplates.RenderHotfixGameRulesSystem();
+        var appSettings = ToolTemplates.RenderServerAppSettings(options);
+        var program = ToolTemplates.RenderServerProgram(options);
+        var generatedText = string.Concat(
+            solution,
+            project,
+            sharedProject,
+            sharedAssemblyInfo,
+            sharedGameRules,
+            hotfixProject,
+            hotfixGameRules,
+            appSettings,
+            program);
+
+        Assert.Contains(@"<Project Path=""Hotfix/Server.Hotfix.csproj"" />", solution, StringComparison.Ordinal);
+        Assert.Contains(@"<ProjectReference Include=""..\Hotfix\Server.Hotfix.csproj"" ReferenceOutputAssembly=""false"" />", project, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix""", project, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
+        Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
+        Assert.Contains("namespace Shared.Gameplay\r\n{", sharedGameRules.Replace("\n", "\r\n"), StringComparison.Ordinal);
+        Assert.DoesNotContain("namespace Shared.Gameplay;", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains("[HotfixState]", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains("public sealed partial class GameRulesState", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains("HotfixDispatch.Invoke<GameRulesState, GameRuleInput, GameRuleResult>", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains("EvaluateStable", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains(@"ProjectReference Include=""..\..\Shared\Shared.csproj""", hotfixProject, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", hotfixProject, StringComparison.Ordinal);
+        Assert.Contains("[FriendOf(typeof(GameRulesState))]", hotfixGameRules, StringComparison.Ordinal);
+        Assert.Contains("[HotfixSystemOf(typeof(GameRulesState))]", hotfixGameRules, StringComparison.Ordinal);
+        Assert.Contains("public static GameRuleResult Evaluate(this GameRulesState self, GameRuleInput input)", hotfixGameRules, StringComparison.Ordinal);
+        Assert.DoesNotContain("[HotfixState]", hotfixGameRules, StringComparison.Ordinal);
+        Assert.Contains(@"""Hotfix""", appSettings, StringComparison.Ordinal);
+        Assert.Contains(@"""Directory"": ""../../../Hotfix/bin/Debug/net10.0""", appSettings, StringComparison.Ordinal);
+        Assert.Contains(@"""Assembly"": ""Server.Hotfix.dll""", appSettings, StringComparison.Ordinal);
+        Assert.Contains("AddULinkGameHotfix", program, StringComparison.Ordinal);
+        Assert.Contains("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
+        Assert.Contains("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClusterEnvExampleUsesSelectedTransportForAdvertisedClientEndpoint()
     {
         var websocketOptions = new NewCommandOptions(
