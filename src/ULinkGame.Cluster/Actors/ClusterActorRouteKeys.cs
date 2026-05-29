@@ -16,7 +16,12 @@ namespace ULinkGame.Cluster
             return new RouteKey(Prefix + actorId);
         }
 
-        public static bool TryGetActorId(RouteKey route, out string actorId)
+        public static RouteKey ForReply(NodeId nodeId)
+    {
+        return new RouteKey($"actor-reply:{nodeId}");
+    }
+
+    public static bool TryGetActorId(RouteKey route, out string actorId)
         {
             var value = route.Value;
             if (value.StartsWith(Prefix, StringComparison.Ordinal) &&
