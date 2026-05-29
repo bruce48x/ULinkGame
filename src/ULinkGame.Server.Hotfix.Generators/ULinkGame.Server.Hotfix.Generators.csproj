@@ -10,6 +10,7 @@
     <Description>Source generators for ULinkGame server hotfix systems.</Description>
     <PackageTags>ulinkgame;hotfix;source-generator;roslyn</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>

@@ -12,6 +12,8 @@
 ### Added
 
 - Added node-directory contracts, in-memory and SQL-backed storage, ULinkRPC node-directory adapter, and node-local service configuration scaffolding for cluster deployments.
+- Added server hotfix design and initial runtime/generator packages for attribute-discovered hotfix systems.
+- Added Agar sample gameplay-rule hotfix integration for arena tick and settlement behavior.
 
 ### Changed
 

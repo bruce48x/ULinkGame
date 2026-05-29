@@ -580,6 +580,8 @@ stable runtime state + replaceable business logic
 
 Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
 
+The first ULinkGame hotfix implementation uses attribute-discovered static system methods and source-generated wrappers. Actors and stable state objects remain in stable assemblies. Hotfix systems operate on those objects through generated extension wrappers and generated friend accessors. Hotfix systems must not own long-lived timers, threads, callbacks, or static event subscriptions.
+
 First versions should avoid hotfixing:
 
 - actor runtime internals
