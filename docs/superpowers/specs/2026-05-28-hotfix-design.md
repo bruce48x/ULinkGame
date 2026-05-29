@@ -21,8 +21,8 @@ The first version supports:
 - Server-side .NET hotfix through collectible `AssemblyLoadContext`.
 - Stable state objects that remain alive across reload.
 - Hotfix system methods discovered from attributes.
-- Source-generated extension wrappers so callers can use natural syntax such as `arenaSimulation.Tick(deltaTime)`.
 - Source-generated friend accessors for selected private fields on stable state types.
+- Explicit stable wrapper methods at hotfix entry points. Full source-generated extension wrappers are staged after the first runtime integration.
 - Manual reload through `IHotfixManager.ReloadAsync()`.
 - Optional file-watch reload for development and operational convenience.
 - Current-directory and version-pointer hotfix assembly sources.
@@ -36,6 +36,7 @@ The first version does not support:
 - State structure migration.
 - Persistent schema migration.
 - Automatic cross-node reload coordination.
+- Multiple independent hotfix domains inside one server process.
 - Transparent remote actors or generated remote actor clients.
 - A general ET-style message, event, and system framework.
 - Reflection-based private-field access in the gameplay tick hot path.
@@ -99,10 +100,10 @@ This package can depend on `Microsoft.Extensions.Hosting.Abstractions` and the h
 
 Owns source generation and analyzer-style diagnostics:
 
-- extension wrappers for hotfix system methods
-- call-site cache generation
-- friend accessors for selected private fields
-- diagnostics for invalid state types, invalid method signatures, and inaccessible field types
+- friend accessor generation for stable state private fields
+- diagnostics for invalid state types and inaccessible field types
+
+Full extension wrapper generation for hotfix system methods and call-site cache generation remain a staged follow-up. The first integrated sample uses explicit stable wrapper methods that call `HotfixDispatch.Invoke(...)`.
 
 The generator should be packaged as an analyzer/source-generator package and referenced by stable projects that declare hotfix states.
 
@@ -149,14 +150,14 @@ First-version method rules:
 
 ## Source-Generated Wrappers
 
-The generator emits stable extension wrappers so existing code can call natural methods:
+Future generator work should emit stable extension wrappers so existing code can call natural methods:
 
 ```csharp
 var result = arenaSimulation.Tick(deltaTime);
 var settlement = arenaSimulation.SettleMatch(result.WorldState);
 ```
 
-Generated wrapper shape:
+Future generated wrapper shape:
 
 ```csharp
 public static ArenaStepResult Tick(this ArenaSimulation self, float deltaTime)
@@ -168,7 +169,7 @@ public static ArenaStepResult Tick(this ArenaSimulation self, float deltaTime)
 }
 ```
 
-The implementation should not use reflection in the tick path. Runtime scanning can use reflection to build strongly typed delegates, but generated wrappers call cached delegates. The generator should emit a call-site cache keyed by dispatch table version so normal execution avoids repeated method lookup. When reload swaps the table and increments the version, the next call resolves the new delegate and updates the cache.
+The first runtime implementation should not use reflection in the tick path. Runtime scanning can use reflection to build the dispatch table, but stable wrappers call `HotfixDispatch.Invoke(...)`. A later generator should emit a call-site cache keyed by dispatch table version so normal execution avoids repeated method lookup. When reload swaps the table and increments the version, the next call resolves the new delegate and updates the cache.
 
 ## Friend Accessors
 
@@ -197,7 +198,8 @@ Rules:
 
 - Accessors are generated in the same assembly and partial type as the private fields, so access is legal C# rather than reflection.
 - Generated names use a reserved `__hotfix_` prefix and are hidden from normal IntelliSense when possible.
-- Hotfix code may call accessors only when the system declares `[FriendOf(typeof(TState))]`.
+- Hotfix code should call accessors only when the system declares `[FriendOf(typeof(TState))]`.
+- In the first implementation, generated accessors are public members because the hotfix assembly is separate from the stable assembly. `[FriendOf]` is metadata and convention, not an enforced CLR permission boundary.
 - The accessed field type must be visible to the hotfix assembly. Agar's current private nested `ArenaPlayer` and `ArenaFood` types must move to stable hotfix-visible types.
 - Field rename, removal, or type change is not a state-preserving hotfix. It requires stable assembly deployment and a migration or restart strategy.
 
@@ -220,6 +222,8 @@ Flow:
 9. Return a `HotfixReloadResult` with version, source path, status, diagnostics, and previous-version information.
 
 Reload failure keeps the previous dispatch table active. Existing rooms continue to run old logic, and diagnostics record the failed path, exception, and validation errors.
+
+The first implementation uses one process-global dispatch table. Treat a server process as a single hotfix domain unless a later design introduces named dispatch tables.
 
 ## Assembly Sources
 
@@ -315,13 +319,15 @@ lock (_gate)
 var settlement = _simulation.SettleMatch(result.WorldState);
 ```
 
+In the first Agar integration, `TickWithHotfix(...)` and `SettleMatch(...)` are explicit stable methods on `ArenaSimulation`; full generated wrappers are not required for the v1 runtime.
+
 ## Testing
 
 Framework tests should cover:
 
 - successful hotfix assembly load and system scan
 - dispatch table construction from `[HotfixSystemOf]`
-- generated wrapper calling v1 logic
+- explicit stable wrapper calling v1 logic
 - reload to v2 with the same stable state object
 - reload failure retaining v1 logic
 - duplicate method key diagnostics
@@ -332,7 +338,7 @@ Framework tests should cover:
 
 Generator tests should cover:
 
-- wrapper generation for valid system methods
+- wrapper generation for valid system methods, when the staged wrapper generator is added
 - friend accessor generation for private fields
 - diagnostics when a hotfix-visible accessor would expose an inaccessible field type
 - diagnostics for non-partial `[HotfixState]` types

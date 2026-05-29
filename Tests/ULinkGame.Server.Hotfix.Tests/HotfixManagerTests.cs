@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +54,23 @@ public sealed class HotfixManagerTests
         Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics));
         var method = HotfixDispatch.Current.Resolve(result.Current.Methods.Single());
         Assert.Same(stableAssembly, method.GetParameters()[0].ParameterType.Assembly);
+    }
+
+    [Fact]
+    public async Task Reload_releases_previous_collectible_load_context_after_replacement()
+    {
+        using var compiled = await CompiledHotfixFixture.CreateAsync(TestContext.Current.CancellationToken);
+        var stableAssembly = Assembly.LoadFrom(compiled.StableAssemblyPath);
+        var source = new SwitchableAssemblySource(compiled.HotfixAssemblyPath);
+        var manager = new HotfixManager(source, [stableAssembly.GetName().Name!]);
+
+        var previousContext = await LoadFirstVersionAndCaptureContextAsync(manager, TestContext.Current.CancellationToken);
+        source.Path = compiled.SecondHotfixAssemblyPath;
+
+        var second = await manager.ReloadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(second.Succeeded, string.Join(Environment.NewLine, second.Diagnostics));
+        await AssertLoadContextUnloadedAsync(previousContext, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -178,6 +196,40 @@ public sealed class HotfixManagerTests
         Assert.Same(stableAssembly, method.GetParameters()[0].ParameterType.Assembly);
     }
 
+    private static async Task<WeakReference> LoadFirstVersionAndCaptureContextAsync(
+        HotfixManager manager,
+        CancellationToken cancellationToken)
+    {
+        var first = await manager.ReloadAsync(cancellationToken);
+        Assert.True(first.Succeeded, string.Join(Environment.NewLine, first.Diagnostics));
+
+        var method = HotfixDispatch.Current.Resolve(first.Current.Methods.Single());
+        var loadContext = AssemblyLoadContext.GetLoadContext(method.Module.Assembly);
+        Assert.NotNull(loadContext);
+        Assert.True(loadContext.IsCollectible);
+
+        return new WeakReference(loadContext);
+    }
+
+    private static async Task AssertLoadContextUnloadedAsync(WeakReference loadContextReference, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            if (!loadContextReference.IsAlive)
+            {
+                return;
+            }
+
+            await Task.Delay(25, cancellationToken);
+        }
+
+        Assert.False(loadContextReference.IsAlive, "Previous hotfix AssemblyLoadContext should be collectible after a successful replacement reload.");
+    }
+
     private sealed class FixedAssemblySource : IHotfixAssemblySource
     {
         private readonly string _path;
@@ -276,11 +328,13 @@ public sealed class HotfixManagerTests
             string rootDirectory,
             string stableAssemblyPath,
             string hotfixAssemblyPath,
+            string secondHotfixAssemblyPath,
             string invalidHotfixAssemblyPath)
         {
             RootDirectory = rootDirectory;
             StableAssemblyPath = stableAssemblyPath;
             HotfixAssemblyPath = hotfixAssemblyPath;
+            SecondHotfixAssemblyPath = secondHotfixAssemblyPath;
             InvalidHotfixAssemblyPath = invalidHotfixAssemblyPath;
         }
 
@@ -290,6 +344,8 @@ public sealed class HotfixManagerTests
 
         public string HotfixAssemblyPath { get; }
 
+        public string SecondHotfixAssemblyPath { get; }
+
         public string InvalidHotfixAssemblyPath { get; }
 
         public static async Task<CompiledHotfixFixture> CreateAsync(CancellationToken cancellationToken)
@@ -298,13 +354,16 @@ public sealed class HotfixManagerTests
             var suffix = Guid.NewGuid().ToString("N");
             var stableAssemblyName = $"StableContracts_{suffix}";
             var hotfixAssemblyName = $"HotfixLogic_{suffix}";
+            var secondHotfixAssemblyName = $"HotfixLogicV2_{suffix}";
             var invalidAssemblyName = $"InvalidHotfixLogic_{suffix}";
             var stableAssemblyPath = Path.Combine(root, "stable", $"{stableAssemblyName}.dll");
             var hotfixAssemblyPath = Path.Combine(root, "hotfix", $"{hotfixAssemblyName}.dll");
+            var secondHotfixAssemblyPath = Path.Combine(root, "hotfix-v2", $"{secondHotfixAssemblyName}.dll");
             var invalidAssemblyPath = Path.Combine(root, "invalid", $"{invalidAssemblyName}.dll");
 
             Directory.CreateDirectory(Path.GetDirectoryName(stableAssemblyPath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(hotfixAssemblyPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(secondHotfixAssemblyPath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(invalidAssemblyPath)!);
 
             await EmitAssemblyAsync(
@@ -345,6 +404,27 @@ public sealed class HotfixManagerTests
                 cancellationToken);
 
             await EmitAssemblyAsync(
+                secondHotfixAssemblyName,
+                secondHotfixAssemblyPath,
+                $$"""
+                using StableContracts;
+                using ULinkGame.Server.Hotfix.Abstractions;
+
+                namespace HotfixLogicV2;
+
+                [HotfixSystemOf(typeof(ArenaSimulation))]
+                public static class ArenaSimulationSystem
+                {
+                    public static int Tick(this ArenaSimulation self, int delta)
+                    {
+                        return delta + 1;
+                    }
+                }
+                """,
+                [stableReference, abstractionsReference],
+                cancellationToken);
+
+            await EmitAssemblyAsync(
                 invalidAssemblyName,
                 invalidAssemblyPath,
                 $$"""
@@ -370,6 +450,7 @@ public sealed class HotfixManagerTests
                 root,
                 stableAssemblyPath,
                 hotfixAssemblyPath,
+                secondHotfixAssemblyPath,
                 invalidAssemblyPath);
         }
 

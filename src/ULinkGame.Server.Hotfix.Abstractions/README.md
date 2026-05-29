@@ -11,4 +11,6 @@ This package is intentionally small so stable model projects, hotfix projects, r
 - `[FriendOf]` declares that a hotfix system is intended to use generated friend accessors for a stable state type.
 - `HotfixMethodKey`, `HotfixSnapshot`, and `HotfixReloadResult` describe loaded method identity and reload outcomes.
 
+`[FriendOf]` is metadata for the hotfix model and tooling. It is not an access-control mechanism; generated accessors are normal public members on the stable type in the first implementation.
+
 Keep actor identity, serialized state, persistence schema, RPC contracts, and transport contracts outside the hotfix assembly.

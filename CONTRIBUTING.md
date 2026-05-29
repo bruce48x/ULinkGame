@@ -580,7 +580,11 @@ stable runtime state + replaceable business logic
 
 Long-lived mutable state should live in stable runtime-owned types or in explicit serialized state. Replaceable business logic can live in a hotfix assembly and operate on that stable state. Large structural changes, protocol changes, and persistence schema changes should use deployment or migration workflows, not pretend to be safe hotfixes.
 
-The first ULinkGame hotfix implementation uses attribute-discovered static system methods and source-generated wrappers. Actors and stable state objects remain in stable assemblies. Hotfix systems operate on those objects through generated extension wrappers and generated friend accessors. Hotfix systems must not own long-lived timers, threads, callbacks, or static event subscriptions.
+The first ULinkGame hotfix implementation uses attribute-discovered static system methods, source-generated friend accessors, and explicit stable wrapper methods at hotfix entry points. Actors and stable state objects remain in stable assemblies. Hotfix systems operate on those objects through generated friend accessors and `HotfixDispatch`-backed stable wrappers. Hotfix systems must not own long-lived timers, threads, callbacks, or static event subscriptions.
+
+The first runtime has one process-global dispatch table and should be treated as one hotfix domain per server process. Do not create multiple unrelated hotfix managers in the same process expecting independent active logic tables.
+
+Generated friend accessors are public members on `[HotfixState]` partial types because a separate hotfix assembly must call them. `[FriendOf]` records the intended system relationship for tooling and readability; it is not a CLR-enforced permission boundary. Mark only stable state types whose generated `__hotfix_` accessors are acceptable to expose to project code, and keep sensitive runtime internals out of those hotfix state types.
 
 First versions should avoid hotfixing:
 

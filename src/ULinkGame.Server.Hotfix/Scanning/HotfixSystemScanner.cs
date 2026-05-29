@@ -17,7 +17,23 @@ public static class HotfixSystemScanner
 
         foreach (var assembly in assemblies)
         {
-            foreach (var type in assembly.GetTypes())
+            Type[] assemblyTypes;
+            try
+            {
+                assemblyTypes = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException exception)
+            {
+                diagnostics.Add($"Could not load all types from hotfix assembly '{assembly.FullName}': {exception.Message}");
+                foreach (var loaderException in exception.LoaderExceptions.Where(static item => item is not null))
+                {
+                    diagnostics.Add(loaderException!.Message);
+                }
+
+                continue;
+            }
+
+            foreach (var type in assemblyTypes)
             {
                 var system = type.GetCustomAttribute<HotfixSystemOfAttribute>();
                 if (system is null)

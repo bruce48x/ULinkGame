@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="../../Shared/Shared.csproj" />
     <ProjectReference Include="../../Server/Hotfix/Agar.Sample.Hotfix.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../Server/HotfixV2/Agar.Sample.Hotfix.V2.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../Server/State.Contracts/State.Contracts.csproj" />
     <ProjectReference Include="../../../../src/ULinkGame.Server.Hotfix.Abstractions/ULinkGame.Server.Hotfix.Abstractions.csproj" />
     <ProjectReference Include="../../../../src/ULinkGame.Server.Hotfix/ULinkGame.Server.Hotfix.csproj" />
