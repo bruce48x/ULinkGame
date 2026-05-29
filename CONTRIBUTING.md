@@ -164,6 +164,21 @@ The packages currently published by this workflow are:
 
 Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
 
+NuGet publishing is handled by GitHub Actions, not by a local manual push. Do not rely on a local `NUGET_API_KEY` for the normal release path.
+
+#### Version Bumping
+
+Each package version is defined in its `.csproj` through the `<Version>` property.
+
+**Critical rule: any change to source files under a package directory in `src/` that must ship to users must bump that package's `<Version>` before pushing.** The publish workflow pushes with `--skip-duplicate`; if a changed package keeps an already-published version, the CI run can still succeed while nuget.org silently skips that package. Downstream consumers then keep receiving the stale package.
+
+- Bump the `<Version>` in every modified `src/*/*.csproj` package when source, templates, packed content, analyzers, or tool behavior in that package changes.
+- Bump even for small bug fixes. The version is the only release signal nuget.org accepts for new package contents.
+- Do not bump package versions for test-only or docs-only changes unless those changes alter files packed into a package or otherwise need to ship in a NuGet artifact.
+- If a package version is consumed by `ULinkGame.Tool` scaffolding or samples, update the generated template constants, package-version readers, sample package references, or changelog entries in the same change so newly scaffolded projects consume the intended package version.
+
+If you forget the version bump, the fix is to bump the package version in a follow-up commit and push again. The earlier CI run may look green, but the package contents did not reach nuget.org.
+
 To release a new package version:
 
 1. Update the `<Version>` in the owning `.csproj`.
