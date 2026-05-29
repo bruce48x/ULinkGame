@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ulinkgame-tool</ToolCommandName>
     <PackageId>ULinkGame.Tool</PackageId>
-    <Version>0.2.9</Version>
+    <Version>0.2.10</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and source-generator based RPC workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;source-generator</PackageTags>
   </PropertyGroup>
@@ -42,6 +42,21 @@
       Query="/Project/PropertyGroup/Version/text()">
       <Output TaskParameter="Result" PropertyName="ULinkGameClusterULinkRpcPackageVersion" />
     </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Server.Hotfix\ULinkGame.Server.Hotfix.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameServerHotfixPackageVersion" />
+    </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Server.Hotfix.Abstractions\ULinkGame.Server.Hotfix.Abstractions.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameServerHotfixAbstractionsPackageVersion" />
+    </XmlPeek>
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Server.Hotfix.Generators\ULinkGame.Server.Hotfix.Generators.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameServerHotfixGeneratorsPackageVersion" />
+    </XmlPeek>
 
     <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(GeneratedToolPackageVersionsFile)'))" />
 
@@ -53,6 +68,9 @@
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServer = &quot;$(ULinkGameServerPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameCluster = &quot;$(ULinkGameClusterPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClusterULinkRpc = &quot;$(ULinkGameClusterULinkRpcPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServerHotfix = &quot;$(ULinkGameServerHotfixPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServerHotfixAbstractions = &quot;$(ULinkGameServerHotfixAbstractionsPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServerHotfixGenerators = &quot;$(ULinkGameServerHotfixGeneratorsPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="}" />
     </ItemGroup>
 

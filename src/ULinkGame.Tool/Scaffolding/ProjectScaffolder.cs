@@ -4,9 +4,13 @@ internal sealed class ProjectScaffolder
     {
         EnsureStarterServerProjectDirectory(projectRoot);
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteSharedHotfixReferencesAsync(projectRoot).ConfigureAwait(false);
+        await WriteSharedHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteServerProgramAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerProjectAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteHotfixProjectAsync(projectRoot).ConfigureAwait(false);
+        await WriteHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
         await WriteServerAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteOperationsScaffoldingAsync(projectRoot, options).ConfigureAwait(false);
@@ -47,6 +51,17 @@ internal sealed class ProjectScaffolder
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
 
+    private static Task WriteSharedHotfixBoundaryFilesAsync(string projectRoot)
+    {
+        return Task.WhenAll(
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Shared", "Properties", "AssemblyInfo.cs"),
+                ToolTemplates.RenderSharedHotfixAssemblyInfo()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Shared", "Gameplay", "GameRules.cs"),
+                ToolTemplates.RenderSharedGameRules()));
+    }
+
     private static async Task WriteUnityClientPackageReferenceAsync(string projectRoot)
     {
         var path = Path.Combine(projectRoot, "Client", "Assets", "packages.config");
@@ -78,6 +93,37 @@ internal sealed class ProjectScaffolder
     private static Task WriteServerSolutionAsync(string projectRoot)
     {
         return WriteAsync(Path.Combine(projectRoot, "Server", "Server.slnx"), ToolTemplates.RenderServerSolution());
+    }
+
+    private static async Task WriteSharedHotfixReferencesAsync(string projectRoot)
+    {
+        var path = Path.Combine(projectRoot, "Shared", "Shared.csproj");
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var document = System.Xml.Linq.XDocument.Load(path);
+        var project = document.Root ?? throw new InvalidOperationException($"Invalid project file: {path}");
+
+        EnsureConditionalPackageReference(
+            project,
+            "'$(TargetFramework)' == 'net10.0'",
+            "ULinkGame.Server.Hotfix.Abstractions",
+            ToolPackageVersions.ULinkGameServerHotfixAbstractions);
+        EnsureConditionalPackageReference(
+            project,
+            "'$(TargetFramework)' == 'net10.0'",
+            "ULinkGame.Server.Hotfix",
+            ToolPackageVersions.ULinkGameServerHotfix);
+        EnsureConditionalPackageReference(
+            project,
+            "'$(TargetFramework)' == 'net10.0'",
+            "ULinkGame.Server.Hotfix.Generators",
+            ToolPackageVersions.ULinkGameServerHotfixGenerators,
+            ("PrivateAssets", "all"));
+
+        await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
 
     private static void EnsureStarterServerProjectDirectory(string projectRoot)
@@ -116,7 +162,9 @@ internal sealed class ProjectScaffolder
         SetProperty(project, "ULinkRPCServerGeneratedNamespace", ProjectConventions.StarterServerGeneratedNamespace);
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
+        EnsureProjectReferenceWithoutOutput(project, @"..\Hotfix\Server.Hotfix.csproj");
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
+        EnsurePackageReference(project, "ULinkGame.Server.Hotfix", ToolPackageVersions.ULinkGameServerHotfix);
         EnsureClusterPackageReferences(project, options);
         EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: true);
         EnsureNoneUpdate(project, "appsettings.json", "PreserveNewest");
@@ -127,6 +175,18 @@ internal sealed class ProjectScaffolder
     private static Task WriteServerAppSettingsAsync(string projectRoot, NewCommandOptions options)
     {
         return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "appsettings.json"), ToolTemplates.RenderServerAppSettings(options));
+    }
+
+    private static Task WriteHotfixProjectAsync(string projectRoot)
+    {
+        return WriteAsync(Path.Combine(projectRoot, "Server", "Hotfix", "Server.Hotfix.csproj"), ToolTemplates.RenderHotfixProject());
+    }
+
+    private static Task WriteHotfixBoundaryFilesAsync(string projectRoot)
+    {
+        return WriteIfMissingAsync(
+            Path.Combine(projectRoot, "Server", "Hotfix", "Gameplay", "GameRulesSystem.cs"),
+            ToolTemplates.RenderHotfixGameRulesSystem());
     }
 
     private static Task WriteServerConfiguratorsAsync(string projectRoot, NewCommandOptions options)
@@ -177,6 +237,16 @@ internal sealed class ProjectScaffolder
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
         return File.WriteAllTextAsync(path, content + Environment.NewLine);
+    }
+
+    private static Task WriteIfMissingAsync(string path, string content)
+    {
+        if (File.Exists(path))
+        {
+            return Task.CompletedTask;
+        }
+
+        return WriteAsync(path, content);
     }
 
     private static string ToNativePath(string path)
@@ -230,6 +300,21 @@ internal sealed class ProjectScaffolder
         }
     }
 
+    private static void EnsureProjectReferenceWithoutOutput(System.Xml.Linq.XElement project, string include)
+    {
+        var reference = project
+            .Descendants("ProjectReference")
+            .FirstOrDefault(element => string.Equals(element.Attribute("Include")?.Value, include, StringComparison.OrdinalIgnoreCase));
+
+        if (reference is null)
+        {
+            reference = new System.Xml.Linq.XElement("ProjectReference", new System.Xml.Linq.XAttribute("Include", include));
+            FindOrAddItemGroup(project).Add(reference);
+        }
+
+        reference.SetAttributeValue("ReferenceOutputAssembly", "false");
+    }
+
     private static void EnsurePackageReference(System.Xml.Linq.XElement project, string include, string version)
     {
         var reference = project
@@ -246,6 +331,41 @@ internal sealed class ProjectScaffolder
         }
 
         reference.SetAttributeValue("Version", version);
+    }
+
+    private static void EnsureConditionalPackageReference(
+        System.Xml.Linq.XElement project,
+        string condition,
+        string include,
+        string version,
+        params (string Name, string Value)[] attributes)
+    {
+        var reference = project
+            .Descendants("PackageReference")
+            .FirstOrDefault(element => string.Equals(element.Attribute("Include")?.Value, include, StringComparison.OrdinalIgnoreCase));
+
+        if (reference is null)
+        {
+            var itemGroup = project
+                .Elements("ItemGroup")
+                .FirstOrDefault(group => string.Equals(group.Attribute("Condition")?.Value, condition, StringComparison.Ordinal));
+            if (itemGroup is null)
+            {
+                itemGroup = new System.Xml.Linq.XElement("ItemGroup", new System.Xml.Linq.XAttribute("Condition", condition));
+                project.Add(itemGroup);
+            }
+
+            reference = new System.Xml.Linq.XElement(
+                "PackageReference",
+                new System.Xml.Linq.XAttribute("Include", include));
+            itemGroup.Add(reference);
+        }
+
+        reference.SetAttributeValue("Version", version);
+        foreach (var attribute in attributes)
+        {
+            reference.SetAttributeValue(attribute.Name, attribute.Value);
+        }
     }
 
     private static void EnsurePersistenceProviderReference(System.Xml.Linq.XElement project, string persistence, bool includeDapper)
