@@ -7,6 +7,7 @@ using Gateway.Services;
 using Shared.Gameplay;
 using Shared.Interfaces;
 using Microsoft.Extensions.Logging;
+using ULinkGame.Server.Hotfix.Dispatch;
 
 namespace Gateway.Realtime;
 
@@ -183,7 +184,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
         {
             return _simulation.TickWithHotfix(deltaTime);
         }
-        catch (MissingMethodException ex)
+        catch (HotfixMethodNotLoadedException ex)
         {
             LogHotfixFallback(ex, "tick");
             return _simulation.Tick(deltaTime);
@@ -294,7 +295,7 @@ internal sealed class RoomRuntime : IAsyncDisposable
         {
             return _simulation.SettleMatch(worldState);
         }
-        catch (MissingMethodException ex)
+        catch (HotfixMethodNotLoadedException ex)
         {
             LogHotfixFallback(ex, "settlement");
             return CreateStableSettlement(worldState);

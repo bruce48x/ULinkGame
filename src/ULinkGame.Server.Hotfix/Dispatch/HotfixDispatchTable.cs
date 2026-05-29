@@ -36,7 +36,7 @@ public sealed class HotfixDispatchTable
     {
         return methods.TryGetValue(key, out var method)
             ? method
-            : throw new MissingMethodException($"Hotfix method '{key}' is not loaded.");
+            : throw new HotfixMethodNotLoadedException($"Hotfix method '{key}' is not loaded.");
     }
 
     public Func<TState, TResult> Resolve<TState, TResult>(HotfixMethodKey key)

@@ -51,6 +51,15 @@ public sealed class HotfixDispatchTests
 
         Assert.Equal(12, state.Value);
     }
+
+    [Fact]
+    public void Resolve_throws_specific_exception_when_hotfix_method_is_not_loaded()
+    {
+        var table = new HotfixDispatchTable(1, Array.Empty<HotfixMethodBinding>());
+        var key = HotfixDispatch.CreateKey<DispatchTestState, int>("GetValue");
+
+        Assert.Throws<HotfixMethodNotLoadedException>(() => table.Resolve(key));
+    }
 }
 
 public sealed class DispatchTestState
