@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using ULinkGame.Server.Actors;
+using ULinkGame.Server.Diagnostics;
 using Xunit;
 
 namespace ULinkGame.Server.Tests;
@@ -449,6 +450,56 @@ public sealed class ActorRuntimeTests
 
         Assert.Equal(ActorStopOutcome.TimedOut, outcome);
         Assert.Equal(0, DeactivationActor.Deactivations);
+    }
+
+    [Fact]
+    public async Task Message_recording_interceptor_logs_messages_to_store()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = new ServiceCollection()
+            .AddMessageRecording()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IActorRuntime>();
+        var store = provider.GetRequiredService<IMessageLogStore>();
+        var id = ActorId.From("record/1");
+
+        await runtime.AskAsync<CounterActor, int>(
+            id,
+            static async (actor, ct) =>
+            {
+                await actor.IncrementAsync(ct);
+                return actor.Value;
+            },
+            cancellationToken);
+
+        var log = await store.GetLogAsync(id, cancellationToken);
+        Assert.NotEmpty(log);
+        Assert.Null(log[0].Error);
+    }
+
+    [Fact]
+    public async Task Message_recording_interceptor_logs_errors()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = new ServiceCollection()
+            .AddMessageRecording()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IActorRuntime>();
+        var store = provider.GetRequiredService<IMessageLogStore>();
+        var id = ActorId.From("record-error/1");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await runtime.AskAsync<CounterActor, int>(
+                id,
+                static (actor, _) => throw new InvalidOperationException("test error"),
+                cancellationToken));
+
+        var log = await store.GetLogAsync(id, cancellationToken);
+        Assert.NotEmpty(log);
+        Assert.NotNull(log[0].Error);
+        Assert.Contains("InvalidOperationException", log[0].Error, StringComparison.Ordinal);
     }
 
     private sealed class CounterActor : Actor

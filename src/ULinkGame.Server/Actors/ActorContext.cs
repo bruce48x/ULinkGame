@@ -91,6 +91,11 @@ public sealed class ActorContext
             throw new InvalidOperationException("Actor context is not initialized.");
         }
 
+        public ActorState GetState(ActorId id)
+        {
+            throw new InvalidOperationException("Actor context is not initialized.");
+        }
+
         public ValueTask StopAsync(ActorId id)
         {
             throw new InvalidOperationException("Actor context is not initialized.");

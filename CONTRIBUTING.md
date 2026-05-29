@@ -2,6 +2,15 @@
 
 This document is for people working on the ULinkGame repository itself. User-facing package information belongs in `README.md`.
 
+## Design Documentation
+
+Before contributing, read the design philosophy and architectural boundary documents:
+
+- **[Design Philosophy](docs/design-philosophy.md)** — The design principles (influenced by skynet), analysis of four reference frameworks (skynet, ET, Fantasy, GeekServer), what we absorb and reject, and the development roadmap.
+- **[ULinkActor Boundary](docs/ulinkactor-boundary.md)** — The responsibility split between ULinkActor (process-local actor runtime) and ULinkGame (distributed game server), the facade pattern, and configuration flow.
+
+The core principle: **skynet compatibility is the litmus test.** Features from ET, Fantasy, or GeekServer are adopted only when they do not conflict with skynet's philosophy of explicit boundaries, fail-fast behavior, and bounded resources.
+
 ## Repository Map
 
 ```txt
@@ -383,11 +392,16 @@ Bad candidates:
 
 `ULinkActor` is responsible for:
 
-- actor identity and creation
-- in-process message delivery
-- mailbox serialization and backpressure
-- timers and local scheduling
-- source-generated typed actor helpers
+- actor identity and creation (monotonic, non-reusable `long`-based `ActorId`)
+- in-process message delivery (`Tell`/`Call` with typed responses)
+- mailbox serialization and backpressure (`MailboxFull`, `ActorUnavailable`)
+- timers and local scheduling (monotonic, dispatched through mailbox)
+- execution timeout (interrupt stuck handlers, mailbox continues)
+- actor lifecycle state machine (`Active` → `Draining` → `Dead`)
+- message interceptor hooks (`OnBeforeMessage` / `OnAfterMessage`)
+- deadlock detection (circular call chains throw immediately)
+- source-generated typed actor helpers and analyzers
+- distributed tracing (Activity propagation) and metrics (Meter)
 
 ULinkGame is responsible for:
 
@@ -397,6 +411,9 @@ ULinkGame is responsible for:
 - route location and node-to-node messaging integration
 - explicit cross-node failure results
 - tool templates and operational glue
+- message recording/replay (using ULinkActor interceptor hooks)
+- actor state observation and cluster-aware lifecycle
+- execution timeout configuration exposed through `ActorRuntimeOptions`
 
 ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
 
@@ -409,7 +426,7 @@ ULinkGame-owned actor facade capabilities should follow these rules:
 - Explicit local overload should be a normal result. Try-send APIs should map full or unavailable local actor mailboxes to ULinkGame-owned results, and one-way cluster-to-actor dispatch should translate local overload into `ClusterSendStatus.Backpressure`.
 - Actor stop and drain should be explicit. Stop APIs should remove local actors, optionally wait for mailbox drain, and return ULinkGame-owned outcomes that support room shutdown, matchmaking teardown, session actor cleanup, and node draining without exposing ULinkActor lifecycle enums directly.
 - Mailbox metrics should use ULinkGame-owned snapshots. Operators need capacity, queued count, processed count, rejected count, and completion state to diagnose hot rooms, overloaded queues, and stuck state services, but public APIs should not expose ULinkActor runtime types.
-- Timeout diagnostics should preserve root-cause distinctions such as queue timeout, response timeout, and circular wait. Publish these through logging, metrics, or tracing with low-cardinality fields.
+- Timeout diagnostics should preserve root-cause distinctions (queue timeout, response timeout). Circular wait is no longer a timeout reason — it throws immediately as `InvalidOperationException`. Publish these through logging, metrics, or tracing with low-cardinality fields.
 - Dead-letter and slow-message diagnostics should stay configurable through `ActorRuntimeOptions`, preserving low-cardinality metric and log fields.
 - Timers should be delivered through the actor mailbox. Timer callbacks must not bypass sequential actor execution.
 - Lifecycle hooks should be tied to explicit actor lifecycle operations. Startup should remain compatible with `Actor.OnActivateAsync`, and graceful deactivation should run only on explicit actor stop, not on best-effort process disposal cleanup.

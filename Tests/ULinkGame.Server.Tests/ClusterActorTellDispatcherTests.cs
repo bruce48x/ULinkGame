@@ -173,6 +173,11 @@ public sealed class ClusterActorTellDispatcherTests
             throw new NotSupportedException();
         }
 
+        public ActorState GetState(ActorId id)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask StopAsync(ActorId id)
         {
             throw new NotSupportedException();

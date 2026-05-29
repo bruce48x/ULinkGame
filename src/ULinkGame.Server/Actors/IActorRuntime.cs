@@ -34,6 +34,8 @@ public interface IActorRuntime
 
     bool TryGetMailboxMetrics(ActorId id, out ActorMailboxMetrics metrics);
 
+    ActorState GetState(ActorId id);
+
     ValueTask StopAsync(ActorId id);
 
     ValueTask<ActorStopOutcome> StopAsync(ActorId id, TimeSpan drainTimeout);

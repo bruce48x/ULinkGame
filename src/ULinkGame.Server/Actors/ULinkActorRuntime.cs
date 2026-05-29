@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using ULinkGame.Server.Diagnostics;
 
 namespace ULinkGame.Server.Actors;
 
@@ -20,7 +21,9 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         _actorSystem = new global::ULinkActor.ActorSystem(new global::ULinkActor.ActorSystemOptions
         {
             MailboxCapacity = Math.Max(1, options.MailboxCapacity),
-            SlowMessageThreshold = options.SlowMessageThreshold
+            SlowMessageThreshold = options.SlowMessageThreshold,
+            ExecutionTimeout = options.ExecutionTimeout,
+            MessageInterceptor = options.MessageInterceptor
         });
         _actorSystem.DeadLetterPublished += OnDeadLetterPublished;
         _actorSystem.SlowMessageDetected += OnSlowMessageDetected;
@@ -135,26 +138,39 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         return false;
     }
 
+    public ActorState GetState(ActorId id)
+    {
+        if (_actors.TryGetValue(id, out var cell))
+        {
+            return cell.GetState();
+        }
+
+        return ActorState.Dead;
+    }
+
     public async ValueTask StopAsync(ActorId id)
     {
-        if (!_actors.TryRemove(id, out var cell))
+        if (!_actors.TryGetValue(id, out var cell))
         {
             return;
         }
 
-        _actorIds.TryRemove(cell.RuntimeActorId, out _);
         await cell.StopAsync().ConfigureAwait(false);
+        _actors.TryRemove(id, out _);
+        _actorIds.TryRemove(cell.RuntimeActorId, out _);
     }
 
     public async ValueTask<ActorStopOutcome> StopAsync(ActorId id, TimeSpan drainTimeout)
     {
-        if (!_actors.TryRemove(id, out var cell))
+        if (!_actors.TryGetValue(id, out var cell))
         {
             return ActorStopOutcome.Drained;
         }
 
+        var result = await cell.StopAsync(drainTimeout).ConfigureAwait(false);
+        _actors.TryRemove(id, out _);
         _actorIds.TryRemove(cell.RuntimeActorId, out _);
-        return MapStopOutcome(await cell.StopAsync(drainTimeout).ConfigureAwait(false));
+        return MapStopOutcome(result);
     }
 
     public async ValueTask DisposeAsync()
@@ -245,7 +261,6 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         return reason switch
         {
             global::ULinkActor.ActorCallTimeoutReason.QueueTimeout => ActorCallTimeoutReason.QueueTimeout,
-            global::ULinkActor.ActorCallTimeoutReason.CircularWait => ActorCallTimeoutReason.CircularWait,
             _ => ActorCallTimeoutReason.ResponseTimeout
         };
     }
@@ -276,6 +291,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         private readonly IServiceProvider _services;
         private readonly IActorRuntime _runtime;
         private readonly ActorRuntimeOptions _runtimeOptions;
+        private readonly IMessageLogStore? _messageLogStore;
         private global::ULinkActor.ActorRef<ActorRuntimeEnvelope>? _actorRef;
         private int _stopping;
         private bool _activated;
@@ -294,6 +310,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             _services = services;
             _runtime = runtime;
             _runtimeOptions = runtimeOptions;
+            _messageLogStore = services.GetService<IMessageLogStore>();
         }
 
         public IActor Actor { get; }
@@ -423,6 +440,12 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             return MapMailboxMetrics(actorRef.GetMailboxMetrics());
         }
 
+        public ActorState GetState()
+        {
+            var actorRef = _actorRef;
+            return actorRef is null ? ActorState.Dead : MapActorState(actorRef.GetState());
+        }
+
         public IAsyncDisposable RegisterTimer(ActorRuntimeEnvelope tick, TimeSpan dueTime, TimeSpan? period)
         {
             var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
@@ -484,15 +507,28 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
                 throw new OperationCanceledException(envelope.CancellationToken);
             }
 
+            Exception? error = null;
+
             try
             {
                 CurrentCell.Value = this;
                 await ActivateCoreAsync(Actor, envelope.CancellationToken).ConfigureAwait(false);
                 return await envelope.Callback(Actor, envelope.State, envelope.CancellationToken).ConfigureAwait(false);
             }
+            catch (Exception ex)
+            {
+                error = ex;
+                throw;
+            }
             finally
             {
                 CurrentCell.Value = null;
+
+                if (_messageLogStore is not null)
+                {
+                    var entry = new MessageLogEntry(DateTimeOffset.UtcNow, envelope.State, error?.GetType().FullName);
+                    _ = _messageLogStore.RecordAsync(_id, entry, CancellationToken.None);
+                }
             }
         }
 
@@ -513,7 +549,17 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             _activated = true;
         }
 
-        private static ActorTellResult MapTellResult(global::ULinkActor.ActorSendResult result)
+        private static ActorState MapActorState(global::ULinkActor.ActorState state)
+    {
+        return state switch
+        {
+            global::ULinkActor.ActorState.Draining => ActorState.Draining,
+            global::ULinkActor.ActorState.Dead => ActorState.Dead,
+            _ => ActorState.Active
+        };
+    }
+
+    private static ActorTellResult MapTellResult(global::ULinkActor.ActorSendResult result)
         {
             return result switch
             {
