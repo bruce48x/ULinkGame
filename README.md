@@ -100,11 +100,4 @@ Use `ULinkGame.Tool` when creating or maintaining a ULinkGame project layout.
 
 The repository includes Unity and Godot samples under `samples/`.
 
-For internals and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
 For user-facing articles, see the Hugo blog at [bruce48x.github.io/ULinkGame](https://bruce48x.github.io/ULinkGame/).
-
-For implementation design notes, see:
-
-- [Reliable push design](CONTRIBUTING.md#reliable-business-push-design)
-- [Package decision notes](CONTRIBUTING.md#package-decision)
