@@ -167,10 +167,12 @@ internal sealed class ActorPlayerSessionStateStore(IActorRuntime runtime) : IPla
         return Ask(userId, static actor => actor.GetSnapshotAsync());
     }
 
+    private static ActorId SessionId(string userId) => ActorId.From($"session:{userId}");
+
     private Task<PlayerSessionSnapshot> Ask(string userId, Func<PlayerSessionActor, Task<PlayerSessionSnapshot>> call)
     {
         return runtime.AskAsync<PlayerSessionActor, PlayerSessionSnapshot>(
-            ActorId.From(userId),
+            SessionId(userId),
             (actor, _) => new ValueTask<PlayerSessionSnapshot>(call(actor))).AsTask();
     }
 }
