@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 internal sealed class ToolProcessRunner(ToolText? text = null)
 {
@@ -9,6 +10,25 @@ internal sealed class ToolProcessRunner(ToolText? text = null)
 
     public async Task<int> RunStarterNewAsync(string projectName, string outputDirectory, NewCommandOptions options)
     {
+        var expectedVersion = ToolPackageVersions.ULinkRpcStarter;
+
+        var installedVersion = await GetInstalledStarterVersionAsync().ConfigureAwait(false);
+        if (installedVersion != null && installedVersion != expectedVersion)
+        {
+            Console.Error.WriteLine(text.StarterVersionMismatch(installedVersion, expectedVersion));
+            var updateResult = await InstallOrUpdateStarterAsync(expectedVersion).ConfigureAwait(false);
+            if (updateResult is { Started: true, ExitCode: 0 })
+            {
+                Console.Error.WriteLine(text.StarterUpdated(expectedVersion));
+            }
+            else
+            {
+                Console.Error.WriteLine(text.UnableToUpdateStarter(StarterPackageId));
+                Console.Error.WriteLine(text.InstallStarterBeforeNew);
+                return updateResult.Started ? updateResult.ExitCode : 1;
+            }
+        }
+
         var arguments = new[]
         {
             "new",
@@ -35,12 +55,8 @@ internal sealed class ToolProcessRunner(ToolText? text = null)
             return 0;
         }
 
-        Console.Error.WriteLine(text.InstallingStarter(StarterPackageId, ToolPackageVersions.ULinkRpcStarter));
-        var installInvocation = new ProcessInvocation(
-            "dotnet",
-            ["tool", "install", "--global", StarterPackageId, "--version", ToolPackageVersions.ULinkRpcStarter],
-            true);
-        var installResult = await TryRunProcessAsync(installInvocation).ConfigureAwait(false);
+        Console.Error.WriteLine(text.InstallingStarter(StarterPackageId, expectedVersion));
+        var installResult = await InstallOrUpdateStarterAsync(expectedVersion).ConfigureAwait(false);
         if (!installResult.Started || installResult.ExitCode != 0)
         {
             Console.Error.WriteLine(text.UnableToInstallStarter(StarterPackageId));
@@ -57,6 +73,55 @@ internal sealed class ToolProcessRunner(ToolText? text = null)
         Console.Error.WriteLine(text.UnableToLocateStarter);
         Console.Error.WriteLine(text.InstallStarterBeforeNew);
         return 1;
+    }
+
+    private async Task<string?> GetInstalledStarterVersionAsync()
+    {
+        try
+        {
+            var output = await RunProcessForOutputAsync(
+                "dotnet",
+                ["tool", "list", "--global"],
+                Directory.GetCurrentDirectory()).ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(output))
+                return null;
+
+            var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                if (line.Contains(StarterPackageId, StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = Regex.Match(line, @"\d+\.\d+\.\d+");
+                    if (match.Success)
+                        return match.Value;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+
+    private static async Task<ProcessRunResult> InstallOrUpdateStarterAsync(string version)
+    {
+        var updateInvocation = new ProcessInvocation(
+            "dotnet",
+            ["tool", "update", "--global", StarterPackageId, "--version", version],
+            true);
+
+        var updateResult = await TryRunProcessAsync(updateInvocation).ConfigureAwait(false);
+        if (updateResult.Started && updateResult.ExitCode == 0)
+            return updateResult;
+
+        var installInvocation = new ProcessInvocation(
+            "dotnet",
+            ["tool", "install", "--global", StarterPackageId, "--version", version],
+            true);
+
+        return await TryRunProcessAsync(installInvocation).ConfigureAwait(false);
     }
 
     private static async Task<ProcessRunResult> TryRunProcessAsync(ProcessInvocation invocation)
@@ -96,6 +161,36 @@ internal sealed class ToolProcessRunner(ToolText? text = null)
 
         await process.WaitForExitAsync().ConfigureAwait(false);
         return process.ExitCode;
+    }
+
+    private static async Task<string?> RunProcessForOutputAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo(fileName)
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException($"Failed to start process: {fileName}");
+
+            var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+            await process.WaitForExitAsync().ConfigureAwait(false);
+            return output;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 

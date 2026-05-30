@@ -200,6 +200,27 @@ internal sealed class ToolText
         _ => "Run `dotnet tool install --global ULinkRPC.Starter`, or make sure the .NET global tools directory is on PATH."
     };
 
+    public string StarterVersionMismatch(string installed, string expected) => Language switch
+    {
+        ToolLanguage.SimplifiedChinese => $"检测到 `ulinkrpc-starter` 版本不匹配：已安装 {installed}，需要 {expected}。正在自动更新...",
+        ToolLanguage.TraditionalChinese => $"偵測到 `ulinkrpc-starter` 版本不符：已安裝 {installed}，需要 {expected}。正在自動更新...",
+        _ => $"`ulinkrpc-starter` version mismatch detected: installed {installed}, expected {expected}. Updating..."
+    };
+
+    public string StarterUpdated(string version) => Language switch
+    {
+        ToolLanguage.SimplifiedChinese => $"`ulinkrpc-starter` 已更新至 {version}。",
+        ToolLanguage.TraditionalChinese => $"`ulinkrpc-starter` 已更新至 {version}。",
+        _ => $"`ulinkrpc-starter` has been updated to {version}."
+    };
+
+    public string UnableToUpdateStarter(string packageId) => Language switch
+    {
+        ToolLanguage.SimplifiedChinese => $"无法自动更新 `{packageId}`。",
+        ToolLanguage.TraditionalChinese => $"無法自動更新 `{packageId}`。",
+        _ => $"Unable to update `{packageId}` automatically."
+    };
+
     private string DidYouMeanValue(string suggestion) => Language switch
     {
         ToolLanguage.SimplifiedChinese => $"你是否想输入 '{suggestion}'?",
