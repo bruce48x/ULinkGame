@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ULinkGame.Server</RootNamespace>
     <PackageId>ULinkGame.Server</PackageId>
-    <Version>0.1.8</Version>
+    <Version>0.1.9</Version>
     <Description>Server-side actor runtime, RPC hosting helpers, session lifecycle, and reliable push infrastructure for ULinkGame applications.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;server;actor;rpc;reliable-push</PackageTags>
   </PropertyGroup>
@@ -13,12 +13,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="ULinkRPC.Server" Version="0.11.9" />
+    <PackageReference Include="ULinkActor" Version="0.3.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ULinkGame.Abstractions\ULinkGame.Abstractions.csproj" />
     <ProjectReference Include="..\ULinkGame.Cluster\ULinkGame.Cluster.csproj" />
-    <ProjectReference Include="D:\ULinkActor\src\ULinkActor\ULinkActor.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,20 +1,42 @@
 # Changelog
 
-## Unreleased
+## 2026-05-30
+
+### Released
+
+- `ULinkGame.Server` `0.1.9`
+- `ULinkGame.Tool` `0.2.12`
+
+### Changed
+
+- Replaced hardcoded `ULinkActor` project reference with NuGet package `ULinkActor` `0.3.0` in `ULinkGame.Server`.
+
+## 2026-05-29
+
+### Released
+
+- `ULinkGame.Tool` `0.2.10`
+- `ULinkGame.Tool` `0.2.11`
+
+### Added
+
+- Added server hotfix design and initial runtime/generator packages for attribute-discovered hotfix systems.
+- Added Agar sample gameplay-rule hotfix integration for arena tick and settlement behavior.
+- Added default `ULinkGame.Tool` hotfix scaffolding with stable `Shared` state, a separate `Server.Hotfix` assembly, hotfix package references, runtime loading, and boundary examples.
+
+## 2026-05-28
 
 ### Released
 
 - `ULinkGame.Cluster` `0.1.3`
 - `ULinkGame.Cluster.Sql` `0.1.0`
 - `ULinkGame.Cluster.ULinkRPC` `0.1.2`
-- `ULinkGame.Tool` `0.2.10`
+- `ULinkGame.Tool` `0.2.8`
+- `ULinkGame.Tool` `0.2.9`
 
 ### Added
 
 - Added node-directory contracts, in-memory and SQL-backed storage, ULinkRPC node-directory adapter, and node-local service configuration scaffolding for cluster deployments.
-- Added server hotfix design and initial runtime/generator packages for attribute-discovered hotfix systems.
-- Added Agar sample gameplay-rule hotfix integration for arena tick and settlement behavior.
-- Added default `ULinkGame.Tool` hotfix scaffolding with stable `Shared` state, a separate `Server.Hotfix` assembly, hotfix package references, runtime loading, and boundary examples.
 
 ### Changed
 
