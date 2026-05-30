@@ -248,3 +248,80 @@ public sealed class PlayerLoginService
 ```
 
 Projects can register `IGameSessionTokenValidator` and `IAuthoritativeSessionStateProbe` to decide whether a reconnect is accepted, requires a snapshot refresh, or must start a new session. ULinkGame does not define account models, token formats, room snapshots, or gameplay DTOs.
+
+## Feature/Role Assembly
+
+Compose servers from declarative features and deploy with role-based filtering. Develop with everything in one process, split into multiple processes in production — without code changes.
+
+```csharp
+// Define a role
+public sealed class GatewayRole : INodeRole
+{
+    public string Name => "gateway";
+    public IFeature[] Features => [new ClusterFeature(), new AuthFeature()];
+}
+
+// Configure in Program.cs
+builder.Services.AddFeatures(builder.Configuration, features =>
+{
+    features.FromAssembly(typeof(GatewayRole).Assembly);
+});
+```
+
+```bash
+dotnet run                                     # all roles
+dotnet run --ULinkGame:Features:Roles=gateway   # gateway only
+```
+
+See `docs/feature-role.md` for details.
+
+## Remote Actor Messaging
+
+Send messages to actors on other nodes with explicit remote semantics:
+
+```csharp
+// Request-reply
+var result = await runtime.AskRemoteAsync<TResult>(
+    router, gateway, routeDirectory, localNode,
+    "player/alice", "login",
+    () => Serialize(request),
+    payload => Deserialize<TResult>(payload),
+    TimeSpan.FromSeconds(5));
+
+// Fire-and-forget
+await runtime.TellRemoteAsync(
+    router, localNode, "player/alice", "notify",
+    () => Serialize(notification),
+    TimeSpan.FromSeconds(5));
+```
+
+See `docs/remote-actor-messaging.md` for details.
+
+## Message Recording
+
+Capture every actor message dispatch for offline debugging. One line to enable:
+
+```csharp
+builder.Services.AddMessageRecording();
+
+// Later
+var store = provider.GetRequiredService<IMessageLogStore>();
+var log = await store.GetLogAsync(ActorId.From("player/alice"));
+```
+
+See `docs/message-recording.md` for details.
+
+## Actor Runtime Configuration
+
+```csharp
+builder.Services.AddULinkGameServerActors(options =>
+{
+    options.MailboxCapacity = 4096;
+    options.ExecutionTimeout = TimeSpan.FromSeconds(5);  // new in 0.3.0
+    options.SlowMessageThreshold = TimeSpan.FromSeconds(1);
+    options.CallTimeout = TimeSpan.FromSeconds(30);
+});
+
+// Query actor lifecycle state
+var state = runtime.GetState(actorId);  // Active / Draining / Dead
+```

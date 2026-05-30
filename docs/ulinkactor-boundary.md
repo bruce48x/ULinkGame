@@ -43,17 +43,19 @@ Examples:
 
 A feature belongs in ULinkGame if it answers: **"How do multiple nodes cooperate?"** or **"How does a game server compose its services?"**
 
-Examples:
+Currently implemented:
 - Cluster routing and node directory
 - Session resume and token validation
 - Reliable push outbox/inbox
 - Hotfix assembly loading and dispatch table swap
-- Gate/Watchdog/Agent connection model
-- Cross-server event bus
-- Service discovery and leader election
-- Component-based server assembly
-- Message recording storage and replay
+- Component-based server assembly (`IFeature` / `INodeRole`)
+- Remote actor messaging (`AskRemoteAsync` / `TellRemoteAsync`)
+- Message recording storage and replay (`IMessageLogStore`)
 - Game-specific ActorId scheme (string with generation)
+
+Potentially belongs here in the future:
+- Cross-server event bus (currently: Redis pub-sub recommended)
+- Service discovery and leader election (currently: static config + INodeDirectory)
 
 ### Belongs in a shared Analyzer
 

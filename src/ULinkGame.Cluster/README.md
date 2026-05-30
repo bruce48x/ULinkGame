@@ -140,3 +140,12 @@ The core package includes transport-neutral node-directory contracts and the in-
 Persistent storage is required so `NodeEpoch` allocation does not roll back after a directory restart and active leases can be recovered or expired consistently. It is live membership metadata, not a business event log and not durable route ownership.
 
 The core cluster package does not depend on a persistent provider. Concrete persistent providers such as SQL databases, Redis, Consul, etcd, or Kubernetes API integration should be adapters selected by project configuration, not assumptions baked into route or messaging APIs.
+
+## Route Key Conventions
+
+`ClusterActorRouteKeys` provides standard route key helpers:
+
+- `ForActor("player/alice")` → route key `"actor:player/alice"` — actor-targeted messages
+- `ForReply(nodeId)` → route key `"actor-reply:<nodeId>"` — reply messages for `RemoteActorGateway`
+
+These are conventions, not protocol requirements. Projects can define their own route key schemes.

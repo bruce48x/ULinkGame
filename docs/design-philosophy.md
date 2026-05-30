@@ -142,27 +142,29 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 
 ## Roadmap
 
-### Phase 1: Foundation hardening (current)
+### Phase 1: Foundation hardening (mostly complete)
 
 - [x] ULinkActor 0.3.0: execution timeout, state machine, interceptor hooks, circular call fast-fail
-- [ ] ULinkGame adapts ULinkActor 0.3.0 features (expose config, wire interceptor for message recording)
-- [ ] Gate/Watchdog/Agent pattern documented and scaffolded by `ULinkGame.Tool`
+- [x] ULinkGame adapts ULinkActor 0.3.0 features: `ExecutionTimeout`, `GetState()`, `ActorState` enum
+- [x] Message recording/replay via `IMessageLogStore` and `ActorCell.DispatchAsync` hook
 
-### Phase 2: Developer experience
+### Phase 2: Developer experience (complete)
 
-- [ ] Component-based assembly (`IGameComponent`, single-process dev / multi-process prod)
-- [ ] Location-aware actor messaging (`AskRemoteAsync` / `TellRemoteAsync`)
-- [ ] Full-link test framework (`ULinkGame.Testing`)
+- [x] Feature/Role component-based assembly (`IFeature` / `INodeRole`, single-process dev / multi-process prod)
+- [x] Location-aware actor messaging (`AskRemoteAsync` / `TellRemoteAsync` + `RemoteActorGateway`)
+- [x] Gate/Watchdog/Agent pattern documented (see `docs/gate-watchdog-agent.md`)
 
-### Phase 3: Distributed operations
+### Phase 3: Deferred
 
-- [ ] Cross-server event bus (`IClusterEventBus`)
-- [ ] Gate auto-routing (client-transparent backend routing)
-- [ ] Service discovery with leader election
-- [ ] Soft routing anti-DDoS
+These are not currently needed. Existing infrastructure or external tools handle them:
 
-### Phase 4: Production hardening
+- Cross-server event bus — Redis pub-sub is sufficient for most deployments
+- Gate auto-routing — manual routing with `AskRemoteAsync` works; automatic routing can be added later
+- Service discovery with leader election — static config + `INodeDirectory` suffices for most topologies
+- Full-link test framework — no pressing need; revisit when concrete requirements emerge
+- Soft routing anti-DDoS — can use an external reverse proxy / load balancer
 
-- [ ] Message recording/replay on ULinkGame layer (using ULinkActor interceptor)
-- [ ] Distributed tracing across cluster boundaries (using ULinkActor Activity propagation)
-- [ ] Systematic resource boundaries (session count, cluster send queue, route table size)
+### Phase 4: Future
+
+- [ ] Distributed tracing export (OTLP) — `TraceId` and `Activity` propagation exist; export is plumbing
+- [ ] Systematic resource boundary documentation — list all configurable limits in one place
