@@ -98,6 +98,12 @@ dotnet run --project "Server/Server/Server.csproj" -- --ulinkgame-check
 
 The check prints the generated Cluster, Hotfix, Reliable Push, and RPC state so the default `appsettings.json` does not need to expose every derived setting.
 
+Use JSON output when CI or deployment scripts need machine-readable validation results:
+
+```bash
+dotnet run --project "Server/Server/Server.csproj" -- --ulinkgame-check --json
+```
+
 ## Cluster Configuration
 
 The generated server derives a node-local service model. A node is one .NET server process; generated defaults include gateway, node-directory, and route-directory services inside that node.

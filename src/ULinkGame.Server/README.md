@@ -10,6 +10,10 @@ It builds on ULinkActor so room, battle, and service state can run with predicta
 dotnet add package ULinkGame.Server
 ```
 
+## Runtime Guardrails
+
+ULinkGame.Server provides runtime guardrail diagnostics for framework invariants such as node identity, endpoint shape, hotfix assembly presence, and cluster service graph consistency. Generated projects use these diagnostics through `--ulinkgame-check`; server hosts can also register the default rules with `AddULinkGameRuntimeValidation()`.
+
 ## Host ULinkRPC servers
 
 Register one or more named RPC server configurators in your gateway process:

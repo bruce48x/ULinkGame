@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-05-31
+
+### Released
+
+- `ULinkGame.Server` `0.1.10`
+- `ULinkGame.Tool` `0.2.13`
+
+### Added
+
+- Added runtime guardrail diagnostics, a resolved runtime model, and initial validation rules for node id, endpoints, hotfix presence, and duplicate cluster services.
+- Updated generated `--ulinkgame-check` to reuse runtime guardrail diagnostics and support `--json` output.
+
 ## 2026-05-30
 
 ### Released
