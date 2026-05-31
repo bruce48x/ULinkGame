@@ -62,8 +62,6 @@ internal static class ToolTemplates
             """;
         }
 
-        var endpointPath = GetDefaultPath(options.Transport, "/ws");
-
         return $$"""
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
@@ -82,15 +80,13 @@ internal static class ToolTemplates
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
+        var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
         {{RenderClusterHealthCheckExit(options)}}
 
         builder.Services.AddULinkGameServer();
+        builder.Services.AddSingleton(runtimeOptions);
         {{RenderClusterServiceRegistration(options)}}
-        builder.Services.AddSingleton(_ =>
-            ServerRpcServerOptions.FromConfiguration(
-                builder.Configuration,
-                "ULinkGame:Endpoint",
-                new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
+        builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions());
         builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
         {{RenderHotfixServiceRegistration()}}
         builder.Services.AddULinkGameServerGateway();
@@ -379,35 +375,70 @@ using Microsoft.Extensions.Configuration;
 
 namespace Server.Hosting;
 
-internal sealed class ClusterOptions
+internal sealed class ULinkGameRuntimeOptions
 {
-    public string NodeId { get; init; } = ""gateway-1"";
-    public IReadOnlyDictionary<string, string> AdvertisedEndpoints { get; init; } =
-        new Dictionary<string, string>
-        {
-            [""cluster""] = ""tcp://127.0.0.1:21000"",
-            [""client""] = ""tcp://127.0.0.1:20000""
-        };
-    public ClusterBootstrapOptions Bootstrap { get; init; } = new();
-    public ClusterNodeDirectoryOptions NodeDirectory { get; init; } = new();
-    public IReadOnlyList<ClusterServiceOptions> Services { get; init; } =
-        new[]
-        {
-            new ClusterServiceOptions { Kind = ""node-directory"", Name = ""node-directory"" },
-            new ClusterServiceOptions { Kind = ""route-directory"", Name = ""route-directory"" },
-            new ClusterServiceOptions { Kind = ""gateway"", Name = ""gateway"" }
-        };
-    public int RouteLeaseSeconds { get; init; } = 30;
-    public int SendTimeoutMilliseconds { get; init; } = 2000;
+    private const string NodeIdConfigurationKey = ""ULinkGame:Node:Id"";
+    private const string EndpointTransportConfigurationKey = ""ULinkGame:Endpoint:Transport"";
+    private const string EndpointHostConfigurationKey = ""ULinkGame:Endpoint:Host"";
+    private const string EndpointPortConfigurationKey = ""ULinkGame:Endpoint:Port"";
+    private const string EndpointPathConfigurationKey = ""ULinkGame:Endpoint:Path"";
 
-    public static ClusterOptions FromConfiguration(IConfiguration configuration)
+    public ULinkGameNodeOptions Node { get; init; } = new();
+    public ULinkGameEndpointOptions Endpoint { get; init; } = new();
+    public string ClusterEndpoint { get; init; } = ""tcp://127.0.0.1:21000"";
+    public string AdvertisedClientEndpoint => Endpoint.ToAdvertisedEndpoint();
+
+    public static ULinkGameRuntimeOptions FromConfiguration(IConfiguration configuration)
     {
-        var section = configuration.GetSection(""Cluster"");
-        var ulinkGameNodeSection = configuration.GetSection(""ULinkGame:Node"");
-        var defaults = new ClusterOptions();
+        var section = configuration.GetSection(""ULinkGame"");
+        return new ULinkGameRuntimeOptions
+        {
+            Node = ULinkGameNodeOptions.FromConfiguration(section.GetSection(""Node"")),
+            Endpoint = ULinkGameEndpointOptions.FromConfiguration(section.GetSection(""Endpoint""))
+        };
+    }
+
+    public ServerRpcServerOptions ToServerRpcServerOptions()
+    {
+        return new ServerRpcServerOptions
+        {
+            Transport = Endpoint.Transport,
+            Host = Endpoint.Host,
+            Port = Endpoint.Port,
+            Path = Endpoint.Path
+        };
+    }
+
+    public ClusterOptions ToClusterOptions()
+    {
         return new ClusterOptions
         {
-            NodeId = ReadString(section, ""NodeId"", ReadString(ulinkGameNodeSection, ""Id"", defaults.NodeId)),
+            NodeId = Node.Id,
+            AdvertisedEndpoints = new Dictionary<string, string>
+            {
+                [""cluster""] = ClusterEndpoint,
+                [""client""] = AdvertisedClientEndpoint
+            },
+            Bootstrap = new ClusterBootstrapOptions
+            {
+                NodeDirectoryEndpoints = new[] { ClusterEndpoint }
+            },
+            Services = new[]
+            {
+                new ClusterServiceOptions { Kind = ""node-directory"", Name = ""node-directory"" },
+                new ClusterServiceOptions { Kind = ""route-directory"", Name = ""route-directory"" },
+                new ClusterServiceOptions { Kind = ""gateway"", Name = ""gateway"" }
+            }
+        };
+    }
+
+    public ClusterOptions ToClusterOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(""Cluster"");
+        var defaults = ToClusterOptions();
+        return new ClusterOptions
+        {
+            NodeId = ReadString(section, ""NodeId"", defaults.NodeId),
             AdvertisedEndpoints = ReadDictionary(section.GetSection(""AdvertisedEndpoints""), defaults.AdvertisedEndpoints),
             Bootstrap = ClusterBootstrapOptions.FromConfiguration(section.GetSection(""Bootstrap""), defaults.Bootstrap),
             NodeDirectory = ClusterNodeDirectoryOptions.FromConfiguration(section.GetSection(""NodeDirectory""), defaults.NodeDirectory),
@@ -466,6 +497,105 @@ internal sealed class ClusterOptions
         }
 
         return values.Count == 0 ? fallback : values;
+    }
+}
+
+internal sealed class ULinkGameNodeOptions
+{
+    public string Id { get; init; } = ""dev-1"";
+
+    public static ULinkGameNodeOptions FromConfiguration(IConfiguration section)
+    {
+        return new ULinkGameNodeOptions
+        {
+            Id = ReadString(section, ""Id"", ""dev-1"")
+        };
+    }
+
+    private static string ReadString(IConfiguration section, string name, string fallback)
+    {
+        var value = section[name];
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+}
+
+internal sealed class ULinkGameEndpointOptions
+{
+    public string Transport { get; init; } = ""kcp"";
+    public string Host { get; init; } = ""127.0.0.1"";
+    public int Port { get; init; } = 20000;
+    public string Path { get; init; } = """";
+
+    public static ULinkGameEndpointOptions FromConfiguration(IConfiguration section)
+    {
+        return new ULinkGameEndpointOptions
+        {
+            Transport = NormalizeTransport(section[""Transport""], ""kcp""),
+            Host = ReadString(section, ""Host"", ""127.0.0.1""),
+            Port = ReadInt(section, ""Port"", 20000),
+            Path = ReadString(section, ""Path"", """")
+        };
+    }
+
+    public string ToAdvertisedEndpoint()
+    {
+        var scheme = Transport switch
+        {
+            ""websocket"" => ""ws"",
+            ""tcp"" => ""tcp"",
+            _ => ""kcp""
+        };
+
+        return string.IsNullOrWhiteSpace(Path)
+            ? $""{scheme}://{Host}:{Port}""
+            : $""{scheme}://{Host}:{Port}{Path}"";
+    }
+
+    private static string NormalizeTransport(string? rawValue, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(rawValue)
+            ? fallback
+            : rawValue.Trim().ToLowerInvariant();
+    }
+
+    private static string ReadString(IConfiguration section, string name, string fallback)
+    {
+        var value = section[name];
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+
+    private static int ReadInt(IConfiguration section, string name, int fallback)
+    {
+        return int.TryParse(section[name], out var value) && value > 0 ? value : fallback;
+    }
+}
+
+internal sealed class ClusterOptions
+{
+    public string NodeId { get; init; } = ""gateway-1"";
+    public IReadOnlyDictionary<string, string> AdvertisedEndpoints { get; init; } =
+        new Dictionary<string, string>
+        {
+            [""cluster""] = ""tcp://127.0.0.1:21000"",
+            [""client""] = ""tcp://127.0.0.1:20000""
+        };
+    public ClusterBootstrapOptions Bootstrap { get; init; } = new();
+    public ClusterNodeDirectoryOptions NodeDirectory { get; init; } = new();
+    public IReadOnlyList<ClusterServiceOptions> Services { get; init; } =
+        new[]
+        {
+            new ClusterServiceOptions { Kind = ""node-directory"", Name = ""node-directory"" },
+            new ClusterServiceOptions { Kind = ""route-directory"", Name = ""route-directory"" },
+            new ClusterServiceOptions { Kind = ""gateway"", Name = ""gateway"" }
+        };
+    public int RouteLeaseSeconds { get; init; } = 30;
+    public int SendTimeoutMilliseconds { get; init; } = 2000;
+
+    public static ClusterOptions FromConfiguration(IConfiguration configuration)
+    {
+        return ULinkGameRuntimeOptions
+            .FromConfiguration(configuration)
+            .ToClusterOptions(configuration);
     }
 }
 
@@ -807,7 +937,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string RenderClusterServiceRegistration(NewCommandOptions options)
     {
         return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
-            ? "builder.Services.AddSingleton(_ => ClusterOptions.FromConfiguration(builder.Configuration));"
+            ? "builder.Services.AddSingleton(runtimeOptions.ToClusterOptions(builder.Configuration));"
             : string.Empty;
     }
 
@@ -817,7 +947,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             ? """
               if (args.Contains("--health-check", StringComparer.Ordinal))
               {
-                  return ClusterHealthCheck.Run(ClusterOptions.FromConfiguration(builder.Configuration));
+                  return ClusterHealthCheck.Run(runtimeOptions.ToClusterOptions(builder.Configuration));
               }
               """
             : string.Empty;

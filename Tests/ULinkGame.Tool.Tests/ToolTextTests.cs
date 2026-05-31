@@ -121,11 +121,14 @@ public sealed class ToolTextTests
         Assert.Contains("<RootNamespace>Server</RootNamespace>", project, StringComparison.Ordinal);
         Assert.Contains("<ULinkRPCServerGeneratedNamespace>Server.Generated</ULinkRPCServerGeneratedNamespace>", project, StringComparison.Ordinal);
         Assert.Contains("--health-check", program, StringComparison.Ordinal);
-        Assert.Contains("ClusterOptions.FromConfiguration", program, StringComparison.Ordinal);
+        Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", program, StringComparison.Ordinal);
+        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration)", program, StringComparison.Ordinal);
         Assert.Contains("using Server.Hosting;", program, StringComparison.Ordinal);
+        Assert.Contains("ULinkGameRuntimeOptions", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("ToClusterOptions()", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("[\"cluster\"] = \"tcp://127.0.0.1:21000\"", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("[\"client\"] = \"tcp://127.0.0.1:20000\"", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("[\"client\"] = AdvertisedClientEndpoint", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("Services", clusterOptions, StringComparison.Ordinal);
         Assert.DoesNotContain("NodeEpoch", clusterHealthCheck, StringComparison.Ordinal);
         Assert.Contains("cluster=healthy", clusterHealthCheck, StringComparison.Ordinal);
