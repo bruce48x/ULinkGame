@@ -163,6 +163,7 @@ internal sealed class ProjectScaffolder
 
         EnsureProjectReference(project, @"..\..\Shared\Shared.csproj", "net10.0");
         EnsureProjectReferenceWithoutOutput(project, @"..\Hotfix\Server.Hotfix.csproj");
+        EnsurePackageReference(project, "Microsoft.Extensions.Hosting", ToolPackageVersions.MicrosoftExtensionsHosting);
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
         EnsurePackageReference(project, "ULinkGame.Server.Hotfix", ToolPackageVersions.ULinkGameServerHotfix);
         EnsureClusterPackageReferences(project, options);
