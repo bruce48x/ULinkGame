@@ -82,6 +82,32 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public void RenderServerProgram_DefaultSingleEndpoint_IncludesULinkGameCheckCommand()
+    {
+        var options = new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: ProjectConventions.DefaultClientEngine,
+            Transport: "kcp",
+            NetworkProfile: ProjectConventions.DefaultNetworkProfile,
+            Serializer: ProjectConventions.DefaultSerializer,
+            Persistence: ProjectConventions.DefaultPersistence,
+            NuGetForUnitySource: ProjectConventions.DefaultNuGetForUnitySource,
+            DeployProfile: ProjectConventions.DefaultDeployProfile);
+
+        var source = ToolTemplates.RenderServerProgram(options);
+
+        Assert.Contains("--ulinkgame-check", source);
+        Assert.Contains("ULinkGameCheck", source);
+        Assert.True(
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions)", StringComparison.Ordinal) >
+            source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
+        Assert.True(
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions)", StringComparison.Ordinal) <
+            source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RenderServerProgram_RealtimeProfile_DoesNotReferenceRuntimeOptionsHelper()
     {
         var options = new NewCommandOptions(
@@ -140,5 +166,19 @@ public sealed class ToolTemplateTests
         Assert.Contains("Services = ReadServices(section.GetSection(\"Services\"), defaults.Services)", source);
         Assert.Contains("RouteLeaseSeconds = ReadInt(section, \"RouteLeaseSeconds\", defaults.RouteLeaseSeconds)", source);
         Assert.Contains("SendTimeoutMilliseconds = ReadInt(section, \"SendTimeoutMilliseconds\", defaults.SendTimeoutMilliseconds)", source);
+    }
+
+    [Fact]
+    public void RenderClusterOptions_IncludesULinkGameCheckOutputLabels()
+    {
+        var source = ToolTemplates.RenderClusterOptions();
+
+        Assert.Contains("ULinkGameCheck", source);
+        Assert.Contains("cluster:", source);
+        Assert.Contains("node:", source);
+        Assert.Contains("services:", source);
+        Assert.Contains("hotfix:", source);
+        Assert.Contains("reliable-push:", source);
+        Assert.Contains("rpc:", source);
     }
 }

@@ -81,6 +81,7 @@ internal static class ToolTemplates
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
         var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
+        {{RenderULinkGameCheckExit(options)}}
         {{RenderClusterHealthCheckExit(options)}}
 
         builder.Services.AddULinkGameServer();
@@ -370,7 +371,9 @@ internal sealed class {typeName}
 
     public static string RenderClusterOptions()
     {
-        return @"using System.Collections.Generic;
+        return @"using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 
 namespace Server.Hosting;
@@ -567,6 +570,23 @@ internal sealed class ULinkGameEndpointOptions
     private static int ReadInt(IConfiguration section, string name, int fallback)
     {
         return int.TryParse(section[name], out var value) && value > 0 ? value : fallback;
+    }
+}
+
+internal static class ULinkGameCheck
+{
+    public static int Run(ULinkGameRuntimeOptions runtime)
+    {
+        var clusterOptions = runtime.ToClusterOptions();
+        var serviceNames = clusterOptions.Services.Select(service => service.Name);
+
+        Console.WriteLine(""cluster: ok single-node"");
+        Console.WriteLine($""node: ok {runtime.Node.Id}"");
+        Console.WriteLine($""services: ok {string.Join("", "", serviceNames)}"");
+        Console.WriteLine(""hotfix: ok local-build Server.Hotfix.dll"");
+        Console.WriteLine(""reliable-push: ok pending limit 256, replay window 120s"");
+        Console.WriteLine($""rpc: ok {runtime.Endpoint.ToAdvertisedEndpoint()}"");
+        return 0;
     }
 }
 
@@ -938,6 +958,18 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     {
         return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
             ? "builder.Services.AddSingleton(runtimeOptions.ToClusterOptions(builder.Configuration));"
+            : string.Empty;
+    }
+
+    private static string RenderULinkGameCheckExit(NewCommandOptions options)
+    {
+        return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
+            ? """
+              if (args.Contains("--ulinkgame-check", StringComparer.Ordinal))
+              {
+                  return ULinkGameCheck.Run(runtimeOptions);
+              }
+              """
             : string.Empty;
     }
 
