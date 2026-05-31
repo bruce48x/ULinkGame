@@ -37,7 +37,7 @@ Use errors for framework invariants:
 - gateway service is configured without reachable route-directory or node-directory support
 - advertised endpoint cannot be parsed
 - advertised endpoint conflicts with the configured listener in a way the runtime cannot route
-- Hotfix is expected but no initial hotfix assembly can be loaded
+- Hotfix assembly is missing or no initial hotfix assembly can be loaded
 - Hotfix reload produces duplicate dispatch keys or unsupported method signatures
 - Reliable Push is enabled but no session identity or resume identity resolver is available
 - production profile advertises localhost or loopback endpoints
@@ -55,11 +55,12 @@ Use warnings for local or temporary defaults:
 - advertised endpoint is loopback in a development profile
 - endpoint uses a default port
 - single-node topology is active
-- Hotfix assembly is missing during a local check before the hotfix project has been built
 - persistence is not configured
 - route lease duration, send timeout, replay retention, or pending push limit uses defaults
 
 Warnings should not make local development painful. They should be visible in `--ulinkgame-check` and diagnostics.
+
+Hotfix assembly absence is not a warning in any profile or command mode. It is always an error because Hotfix is part of the ULinkGame default application model. `--ulinkgame-check` should make the repair path friendly, but it must still return a non-zero exit code.
 
 ### Info
 
@@ -191,6 +192,8 @@ rpc: ok kcp://127.0.0.1:20000
 
 The generated check command may add friendly grouping and project-specific wording, but it must not maintain a separate validation logic fork. Framework validators own the rules; generated code owns presentation.
 
+When Hotfix build output is missing, the check command should print the repair command and fail. It should not report a degraded or warning-only state.
+
 ## Configuration Boundary
 
 Default generated configuration should remain compact:
@@ -252,7 +255,7 @@ Avoid user-facing defaults for:
 
 - Add development and production validation profiles.
 - Promote loopback advertised endpoints and in-memory directory storage to production errors.
-- Keep development defaults warning-only.
+- Keep local-only development defaults warning-only when they do not violate core runtime invariants.
 
 ### Phase 4: Reliable Push And Cluster Readiness
 
