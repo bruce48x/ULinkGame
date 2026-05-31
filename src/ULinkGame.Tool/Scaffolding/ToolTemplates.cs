@@ -531,12 +531,13 @@ internal sealed class ULinkGameEndpointOptions
 
     public static ULinkGameEndpointOptions FromConfiguration(IConfiguration section)
     {
+        var transport = NormalizeTransport(section[""Transport""], ""kcp"");
         return new ULinkGameEndpointOptions
         {
-            Transport = NormalizeTransport(section[""Transport""], ""kcp""),
+            Transport = transport,
             Host = ReadString(section, ""Host"", ""127.0.0.1""),
             Port = ReadInt(section, ""Port"", 20000),
-            Path = ReadString(section, ""Path"", """")
+            Path = ReadString(section, ""Path"", GetDefaultPath(transport))
         };
     }
 
@@ -571,21 +572,42 @@ internal sealed class ULinkGameEndpointOptions
     {
         return int.TryParse(section[name], out var value) && value > 0 ? value : fallback;
     }
+
+    private static string GetDefaultPath(string transport)
+    {
+        return string.Equals(transport, ""websocket"", StringComparison.OrdinalIgnoreCase)
+            ? ""/ws""
+            : """";
+    }
 }
 
 internal static class ULinkGameCheck
 {
-    public static int Run(ULinkGameRuntimeOptions runtime)
+    public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions)
     {
-        var clusterOptions = runtime.ToClusterOptions();
         var serviceNames = clusterOptions.Services.Select(service => service.Name);
+        var rpcEndpoint = clusterOptions.AdvertisedEndpoints.TryGetValue(""client"", out var clientEndpoint)
+            ? clientEndpoint
+            : runtime.Endpoint.ToAdvertisedEndpoint();
+        var hotfixPath = System.IO.Path.GetFullPath(
+                System.IO.Path.Combine(
+                    AppContext.BaseDirectory,
+                    ""../../../../Hotfix/bin/Debug/net10.0"",
+                    ""Server.Hotfix.dll""));
 
         Console.WriteLine(""cluster: ok single-node"");
-        Console.WriteLine($""node: ok {runtime.Node.Id}"");
+        Console.WriteLine($""node: ok {clusterOptions.NodeId}"");
         Console.WriteLine($""services: ok {string.Join("", "", serviceNames)}"");
+        if (!System.IO.File.Exists(hotfixPath))
+        {
+            Console.Error.WriteLine(""hotfix: failed local build output not found"");
+            Console.Error.WriteLine(""fix: dotnet build Server/Hotfix/Server.Hotfix.csproj"");
+            return 1;
+        }
+
         Console.WriteLine(""hotfix: ok local-build Server.Hotfix.dll"");
         Console.WriteLine(""reliable-push: ok pending limit 256, replay window 120s"");
-        Console.WriteLine($""rpc: ok {runtime.Endpoint.ToAdvertisedEndpoint()}"");
+        Console.WriteLine($""rpc: ok {rpcEndpoint}"");
         return 0;
     }
 }
@@ -849,11 +871,9 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string RenderHotfixServiceRegistration()
     {
         return """
-        var hotfixDirectory = ResolveHotfixDirectory(
-            builder.Configuration["Hotfix:Directory"] ?? "../../../Hotfix/bin/Debug/net10.0");
-        var hotfixAssembly = builder.Configuration["Hotfix:Assembly"] ?? "Server.Hotfix.dll";
+        var hotfixDirectory = ResolveHotfixDirectory("../../../../Hotfix/bin/Debug/net10.0");
         builder.Services.AddULinkGameHotfix(
-            new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, hotfixAssembly),
+            new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, "Server.Hotfix.dll"),
             sharedAssemblyNames: ["Shared"]);
         """;
     }
@@ -899,18 +919,6 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredDirectory));
         }
         """;
-    }
-
-    private static string RenderHotfixAppSettingsBlock(int indent)
-    {
-        var block = """
-        "Hotfix": {
-          "Source": "current-directory",
-          "Directory": "../../../Hotfix/bin/Debug/net10.0",
-          "Assembly": "Server.Hotfix.dll"
-        }
-        """;
-        return TemplateText.IndentBlock(block, indent / 4);
     }
 
     private static string GetDefaultPath(string transport, string websocketPath)
@@ -967,7 +975,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             ? """
               if (args.Contains("--ulinkgame-check", StringComparer.Ordinal))
               {
-                  return ULinkGameCheck.Run(runtimeOptions);
+                  return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration));
               }
               """
             : string.Empty;

@@ -100,10 +100,10 @@ public sealed class ToolTemplateTests
         Assert.Contains("--ulinkgame-check", source);
         Assert.Contains("ULinkGameCheck", source);
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions)", StringComparison.Ordinal) >
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration))", StringComparison.Ordinal) >
             source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions)", StringComparison.Ordinal) <
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration))", StringComparison.Ordinal) <
             source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
     }
 
@@ -140,6 +140,8 @@ public sealed class ToolTemplateTests
         Assert.Contains("configuration.GetSection(\"ULinkGame\")", source);
         Assert.Contains("ToClusterOptions()", source);
         Assert.Contains("ToServerRpcServerOptions()", source);
+        Assert.Contains("Path = ReadString(section, \"Path\", GetDefaultPath(transport))", source);
+        Assert.Contains("return string.Equals(transport, \"websocket\", StringComparison.OrdinalIgnoreCase)", source);
         Assert.Contains("ULinkGame:Node:Id", source);
         Assert.Contains("ULinkGame:Endpoint:Transport", source);
         Assert.Contains("ULinkGame:Endpoint:Host", source);
@@ -180,5 +182,14 @@ public sealed class ToolTemplateTests
         Assert.Contains("hotfix:", source);
         Assert.Contains("reliable-push:", source);
         Assert.Contains("rpc:", source);
+        Assert.Contains("public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions)", source);
+        Assert.Contains("node: ok {clusterOptions.NodeId}", source);
+        Assert.Contains("clusterOptions.AdvertisedEndpoints.TryGetValue(\"client\"", source);
+        Assert.Contains("hotfix: failed local build output not found", source);
+        Assert.Contains("fix: dotnet build Server/Hotfix/Server.Hotfix.csproj", source);
+        Assert.Contains("../../../../Hotfix/bin/Debug/net10.0", source);
+        Assert.Contains("System.IO.File.Exists(hotfixPath)", source);
+        Assert.DoesNotContain("Hotfix:Directory", source);
+        Assert.DoesNotContain("Hotfix:Assembly", source);
     }
 }
