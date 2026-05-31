@@ -89,7 +89,7 @@ internal static class ToolTemplates
         builder.Services.AddSingleton(_ =>
             ServerRpcServerOptions.FromConfiguration(
                 builder.Configuration,
-                "Endpoint",
+                "ULinkGame:Endpoint",
                 new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(endpointPath)}}" }));
         builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
         {{RenderHotfixServiceRegistration()}}
@@ -148,79 +148,22 @@ internal static class ToolTemplates
 
     public static string RenderServerAppSettings(NewCommandOptions options)
     {
-        var realtimePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/realtime" : "";
-        var controlPlanePath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
-        var clientEndpoint = RenderAdvertisedClientEndpoint(options.Transport, "127.0.0.1", 20000, controlPlanePath);
-        if (!ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
-        {
-            if (ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile))
-            {
-                return $$"""
-                {
-                  "Endpoint": {
-                    "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
-                    "Host": "127.0.0.1",
-                    "Port": 20000,
-                    "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
-                  },
-                  "Cluster": {
-                    "NodeId": "gateway-1",
-                    "AdvertisedEndpoints": {
-                      "cluster": "tcp://127.0.0.1:21000",
-                      "client": "{{TemplateText.SanitizeStringLiteral(clientEndpoint)}}"
-                    },
-                    "Bootstrap": {
-                      "NodeDirectoryEndpoints": [
-                        "tcp://127.0.0.1:21000"
-                      ]
-                    },
-                    "NodeDirectory": {
-                      "Enabled": true,
-                      "Storage": {
-                        "Mode": "InMemory"
-                      }
-                    },
-                    "Services": [
-                      { "Kind": "node-directory", "Name": "node-directory" },
-                      { "Kind": "route-directory", "Name": "route-directory" },
-                      { "Kind": "gateway", "Name": "gateway" }
-                    ],
-                    "RouteLeaseSeconds": 30,
-                    "SendTimeoutMilliseconds": 2000
-                  },
-                  {{RenderHotfixAppSettingsBlock(9)}}
-                }
-                """;
-            }
-
-            return $$"""
-            {
-              "Endpoint": {
-                "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
-                "Host": "127.0.0.1",
-                "Port": 20000,
-                "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
-              },
-              {{RenderHotfixAppSettingsBlock(7)}}
-            }
-            """;
-        }
+        var pathLine = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase)
+            ? "," + Environment.NewLine + "          \"Path\": \"/ws\""
+            : string.Empty;
 
         return $$"""
         {
-          "ControlPlane": {
-            "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
-            "Host": "127.0.0.1",
-            "Port": 20000,
-            "Path": "{{TemplateText.SanitizeStringLiteral(controlPlanePath)}}"
-          },
-          "Realtime": {
-            "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
-            "Host": "127.0.0.1",
-            "Port": 20001,
-            "Path": "{{TemplateText.SanitizeStringLiteral(realtimePath)}}"
-          },
-          {{RenderHotfixAppSettingsBlock(5)}}
+          "ULinkGame": {
+            "Node": {
+              "Id": "dev-1"
+            },
+            "Endpoint": {
+              "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
+              "Host": "127.0.0.1",
+              "Port": 20000{{pathLine}}
+            }
+          }
         }
         """;
     }
@@ -460,10 +403,11 @@ internal sealed class ClusterOptions
     public static ClusterOptions FromConfiguration(IConfiguration configuration)
     {
         var section = configuration.GetSection(""Cluster"");
+        var ulinkGameNodeSection = configuration.GetSection(""ULinkGame:Node"");
         var defaults = new ClusterOptions();
         return new ClusterOptions
         {
-            NodeId = ReadString(section, ""NodeId"", defaults.NodeId),
+            NodeId = ReadString(section, ""NodeId"", ReadString(ulinkGameNodeSection, ""Id"", defaults.NodeId)),
             AdvertisedEndpoints = ReadDictionary(section.GetSection(""AdvertisedEndpoints""), defaults.AdvertisedEndpoints),
             Bootstrap = ClusterBootstrapOptions.FromConfiguration(section.GetSection(""Bootstrap""), defaults.Bootstrap),
             NodeDirectory = ClusterNodeDirectoryOptions.FromConfiguration(section.GetSection(""NodeDirectory""), defaults.NodeDirectory),
@@ -907,10 +851,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
               context: .
               dockerfile: Server/Dockerfile
             environment:
-              Endpoint__Transport: "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"
-              Endpoint__Host: "0.0.0.0"
-              Endpoint__Port: "20000"
-              Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
+              ULinkGame__Endpoint__Transport: "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"
+              ULinkGame__Endpoint__Host: "0.0.0.0"
+              ULinkGame__Endpoint__Port: "20000"
+              ULinkGame__Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
               Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-gateway-1}"
               Cluster__AdvertisedEndpoints__cluster: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER:-tcp://gateway:21000}"
               Cluster__AdvertisedEndpoints__client: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT:-{{TemplateText.SanitizeStringLiteral(advertisedClientEndpoint)}}}"
