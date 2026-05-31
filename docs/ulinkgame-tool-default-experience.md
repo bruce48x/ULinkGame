@@ -24,7 +24,7 @@ Every generated project includes:
 - reliable push services
 - a default health/check command that explains the derived runtime state
 
-The default local topology is a single process that hosts the node-directory, route-directory, gateway, and game services. This is still a cluster topology; it is simply collapsed into one process for local development. Production deployments can split services across nodes without changing the user-facing game code structure.
+The default local topology is a single process with generated defaults for the node-directory, route-directory, and gateway. This is still a cluster topology; it is simply collapsed into one process for local development. Project/game services can be added by project configuration or future templates, and production deployments can split services across nodes without changing the user-facing game code structure.
 
 ## Configuration Principle
 
@@ -96,7 +96,7 @@ From the default local topology, it derives:
 - node-directory service
 - route-directory service
 - gateway service
-- game service entries
+- project/game services as explicit additions outside the generated default
 - in-memory node-directory storage for local development
 - loopback or local cluster routing defaults
 
@@ -142,7 +142,7 @@ The command should print derived runtime state in stable, readable lines:
 ```txt
 cluster: ok single-node
 node: ok dev-1
-services: ok node-directory, route-directory, gateway, room
+services: ok node-directory, route-directory, gateway
 hotfix: ok local-build Server.Hotfix.dll
 reliable-push: ok pending limit 256, replay window 120s
 rpc: ok kcp://127.0.0.1:20000

@@ -45,6 +45,19 @@ public sealed class ToolTextTests
     }
 
     [Fact]
+    public void NewProjectReadyText_PointsToULinkGameCheck()
+    {
+        var english = ToolText.ForCulture(CultureInfo.GetCultureInfo("en-US"));
+        var simplifiedChinese = ToolText.ForCulture(CultureInfo.GetCultureInfo("zh-CN"));
+
+        Assert.Contains("--ulinkgame-check", english.CheckProjectStep, StringComparison.Ordinal);
+        Assert.Contains("--ulinkgame-check", simplifiedChinese.CheckProjectStep, StringComparison.Ordinal);
+        Assert.StartsWith("  2)", english.CheckProjectStep, StringComparison.Ordinal);
+        Assert.StartsWith("  3)", english.StartServerStep, StringComparison.Ordinal);
+        Assert.StartsWith("  4)", english.RebuildContractsStep, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ParserUsesLocalizedUnsupportedValueMessage()
     {
         var text = ToolText.ForCulture(CultureInfo.GetCultureInfo("zh-CN"));
