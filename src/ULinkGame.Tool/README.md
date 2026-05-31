@@ -54,6 +54,8 @@ By default, the generated project includes:
 - Reliable Push infrastructure
 - `ulinkgame.tool.json`
 
+For Unity and Tuanjie clients, the tool pins `ULinkGame.Client` and `ULinkGame.Abstractions` in `Assets/packages.config` and generates an editor import guard that prevents NuGet analyzer DLLs from being loaded as Unity runtime plugins.
+
 The generated `appsettings.json` intentionally stays small. It contains only the local node identity and client endpoint binding under `ULinkGame`; cluster services, hotfix defaults, reliable push defaults, and RPC check output are derived by generated server helper code.
 
 For a local Docker Compose rehearsal:

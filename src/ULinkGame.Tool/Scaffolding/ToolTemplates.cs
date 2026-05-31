@@ -306,6 +306,62 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderUnityNuGetPackageImportGuard()
+    {
+        return """
+        #if UNITY_EDITOR
+        using System;
+        using UnityEditor;
+
+        internal sealed class ULinkGameNuGetPackageImportGuard : AssetPostprocessor
+        {
+            private static void OnPostprocessAllAssets(
+                string[] importedAssets,
+                string[] deletedAssets,
+                string[] movedAssets,
+                string[] movedFromAssetPaths)
+            {
+                foreach (var assetPath in importedAssets)
+                {
+                    DisableAnalyzerPlugin(assetPath);
+                }
+
+                foreach (var assetPath in movedAssets)
+                {
+                    DisableAnalyzerPlugin(assetPath);
+                }
+            }
+
+            private static void DisableAnalyzerPlugin(string assetPath)
+            {
+                var normalizedPath = assetPath.Replace('\\', '/');
+                if (!normalizedPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
+                    normalizedPath.IndexOf("Assets/Packages/", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    normalizedPath.IndexOf("/analyzers/", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    return;
+                }
+
+                var importer = AssetImporter.GetAtPath(assetPath) as PluginImporter;
+                if (importer == null)
+                {
+                    return;
+                }
+
+                if (!importer.GetCompatibleWithAnyPlatform() && !importer.GetCompatibleWithEditor())
+                {
+                    return;
+                }
+
+                importer.SetCompatibleWithAnyPlatform(false);
+                importer.SetCompatibleWithEditor(false);
+                importer.SaveAndReimport();
+            }
+        }
+        #endif
+        """;
+    }
+
     public static string RenderServerRpcServerOptions()
     {
         return @"using Microsoft.Extensions.Configuration;

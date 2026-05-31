@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ulinkgame-tool</ToolCommandName>
     <PackageId>ULinkGame.Tool</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Description>Command-line project management tool for ULinkGame project scaffolding and source-generator based RPC workflows.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;tool;cli;scaffold;source-generator</PackageTags>
   </PropertyGroup>
@@ -22,6 +22,11 @@
   </PropertyGroup>
 
   <Target Name="GenerateToolPackageVersions" BeforeTargets="CoreCompile">
+    <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Abstractions\ULinkGame.Abstractions.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameAbstractionsPackageVersion" />
+    </XmlPeek>
     <XmlPeek
       XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Client\ULinkGame.Client.csproj"
       Query="/Project/PropertyGroup/Version/text()">
@@ -64,6 +69,7 @@
       <GeneratedToolPackageVersionsLine Include="// &lt;auto-generated /&gt;" />
       <GeneratedToolPackageVersionsLine Include="internal static partial class ToolPackageVersions" />
       <GeneratedToolPackageVersionsLine Include="{" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameAbstractions = &quot;$(ULinkGameAbstractionsPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClient = &quot;$(ULinkGameClientPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServer = &quot;$(ULinkGameServerPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameCluster = &quot;$(ULinkGameClusterPackageVersion)&quot;%3B" />

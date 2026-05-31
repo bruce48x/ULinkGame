@@ -225,6 +225,41 @@ public sealed class ToolTextTests
     }
 
     [Fact]
+    public async Task UnityClientScaffoldPinsClientDependenciesAndAnalyzerImportGuard()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Server", "Server"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            var packagesConfig = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "packages.config"),
+                TestContext.Current.CancellationToken);
+            var importGuard = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameNuGetPackageImportGuard.cs"),
+                TestContext.Current.CancellationToken);
+
+            Assert.Contains("id=\"ULinkGame.Client\"", packagesConfig, StringComparison.Ordinal);
+            Assert.Contains("id=\"ULinkGame.Abstractions\"", packagesConfig, StringComparison.Ordinal);
+            Assert.Contains("AssetPostprocessor", importGuard, StringComparison.Ordinal);
+            Assert.Contains("Assets/Packages/", importGuard, StringComparison.Ordinal);
+            Assert.Contains("/analyzers/", importGuard, StringComparison.Ordinal);
+            Assert.Contains("SetCompatibleWithAnyPlatform(false)", importGuard, StringComparison.Ordinal);
+            Assert.Contains("SetCompatibleWithEditor(false)", importGuard, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ClusterEnvExampleUsesSelectedTransportForAdvertisedClientEndpoint()
     {
         var websocketOptions = new NewCommandOptions(

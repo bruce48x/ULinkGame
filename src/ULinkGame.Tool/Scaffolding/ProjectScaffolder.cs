@@ -86,8 +86,17 @@ internal sealed class ProjectScaffolder
         }
 
         EnsureNuGetForUnityPackage(packages, "ULinkGame.Client", ToolPackageVersions.ULinkGameClient);
+        EnsureNuGetForUnityPackage(packages, "ULinkGame.Abstractions", ToolPackageVersions.ULinkGameAbstractions);
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
+        await WriteUnityNuGetPackageImportGuardAsync(projectRoot).ConfigureAwait(false);
+    }
+
+    private static Task WriteUnityNuGetPackageImportGuardAsync(string projectRoot)
+    {
+        return WriteIfMissingAsync(
+            Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameNuGetPackageImportGuard.cs"),
+            ToolTemplates.RenderUnityNuGetPackageImportGuard());
     }
 
     private static Task WriteServerSolutionAsync(string projectRoot)

@@ -6,11 +6,17 @@
 
 - `ULinkGame.Server` `0.1.10`
 - `ULinkGame.Tool` `0.2.13`
+- `ULinkGame.Tool` `0.3.1`
 
 ### Added
 
 - Added runtime guardrail diagnostics, a resolved runtime model, and initial validation rules for node id, endpoints, hotfix presence, and duplicate cluster services.
 - Updated generated `--ulinkgame-check` to reuse runtime guardrail diagnostics and support `--json` output.
+
+### Fixed
+
+- Updated Unity/Tuanjie scaffolding to pin `ULinkGame.Abstractions` beside `ULinkGame.Client` in `Assets/packages.config`.
+- Added a generated Unity editor import guard that disables NuGet analyzer DLLs under `Assets/Packages/**/analyzers/` so Unity does not load Roslyn analyzers as runtime plugins.
 
 ## 2026-05-30
 
