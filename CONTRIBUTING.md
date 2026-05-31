@@ -8,6 +8,7 @@ Before contributing, read the design philosophy and architectural boundary docum
 
 - **[Design Philosophy](docs/design-philosophy.md)** — The design principles (influenced by skynet), analysis of four reference frameworks (skynet, ET, Fantasy, GeekServer), what we absorb and reject, and the development roadmap.
 - **[ULinkActor Boundary](docs/ulinkactor-boundary.md)** — The responsibility split between ULinkActor (process-local actor runtime) and ULinkGame (distributed game server), the facade pattern, and configuration flow.
+- **[ULinkGame.Tool Default Experience](docs/ulinkgame-tool-default-experience.md)** — The generated project experience, reduced default configuration surface, derived runtime state, and check-command direction for `ulinkgame-tool new`.
 
 The core principle: **skynet compatibility is the litmus test.** Features from ET, Fantasy, or GeekServer are adopted only when they do not conflict with skynet's philosophy of explicit boundaries, fail-fast behavior, and bounded resources.
 
