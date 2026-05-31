@@ -18,6 +18,32 @@ Tooling and runtime validation have different responsibilities:
 
 Do not make Cluster, Hotfix, or Reliable Push ordinary optional modules in generated projects. They are part of the ULinkGame application model. Users may change their source, storage, topology, or deployment profile, but generated projects should not teach users to disable the core model.
 
+## Responsibility Boundary
+
+Use this boundary when deciding where a rule or default belongs:
+
+| Concern | Owner |
+| --- | --- |
+| New project command shape and first-run text | `ULinkGame.Tool` |
+| Default runtime derivation | framework defaults |
+| Compact `appsettings.json` rendering | `ULinkGame.Tool` |
+| Runtime invariants | framework validators |
+| Local repair guidance | check formatter |
+| Production readiness | profile validators |
+| Legacy project compatibility | validators and migration warnings |
+| Internal derived values | resolved runtime model |
+
+Generated projects should call framework APIs for default derivation when possible instead of embedding framework rules in generated source. Generated source may provide project-specific presentation, but it should not become the long-term owner of Cluster, Hotfix, Reliable Push, or endpoint derivation rules.
+
+Suggested generated host shape:
+
+```csharp
+builder.Services.AddULinkGameDefaults(builder.Configuration);
+builder.Services.AddULinkGameRuntimeValidation();
+```
+
+This keeps old generated projects from freezing old framework assumptions. When a default rule improves in the framework, projects should benefit by updating package versions rather than by regenerating their server host.
+
 ## Validation Levels
 
 Runtime guardrails use three levels.
@@ -84,6 +110,67 @@ Production-oriented profiles must be stricter. A production profile should rejec
 
 Profiles should not reintroduce `Hotfix.Enabled`, `Cluster.Enabled`, or `ReliablePush.Enabled` as normal user-facing switches. A profile changes topology, storage, endpoints, and operational strictness; it does not redefine the ULinkGame application model.
 
+Profiles should be represented as framework-owned values, not arbitrary strings. This keeps validation testable and avoids making users guess hidden mode names.
+
+Suggested profile values:
+
+- `Development`: generated default; allows single-node topology, loopback endpoints, and in-memory local stores.
+- `Compose`: local multi-container rehearsal; allows private container-network endpoints but should surface external advertised endpoint warnings.
+- `Production`: rejects local-only defaults and requires explicit operational choices for advertised endpoints and durable cluster directory storage.
+
+Each profile should define:
+
+- which defaults are allowed
+- which warnings become errors
+- whether loopback advertised endpoints are valid
+- whether in-memory node-directory or route-directory storage is valid
+- whether advertised endpoints must be explicit
+- whether Reliable Push requires durable storage or only identity validation
+
+## Resolved Runtime Model
+
+Validation should run against a resolved runtime model, not raw configuration.
+
+The data flow is:
+
+```txt
+raw configuration
+  -> source options
+  -> resolved runtime model
+  -> validators
+  -> startup behavior / check output
+```
+
+The resolved model should contain final values and where they came from. Provenance makes diagnostics clearer and helps users understand whether a value came from `appsettings.json`, environment variables, a profile default, or a generated project convention.
+
+Suggested model shape:
+
+```csharp
+public enum ULinkGameValueSource
+{
+    Default,
+    Configuration,
+    Environment,
+    GeneratedConvention,
+    Code
+}
+
+public sealed record ULinkGameResolvedValue<T>(
+    T Value,
+    ULinkGameValueSource Source,
+    string? Path = null);
+
+public sealed record ULinkGameResolvedRuntime(
+    ULinkGameResolvedValue<string> NodeId,
+    ULinkGameResolvedEndpoint Endpoint,
+    ULinkGameResolvedCluster Cluster,
+    ULinkGameResolvedHotfix Hotfix,
+    ULinkGameResolvedReliablePush ReliablePush,
+    ULinkGameRuntimeProfile Profile);
+```
+
+The exact type names can change during implementation, but the boundary should remain: validators read the same resolved state that server startup will use.
+
 ## Runtime Validation API
 
 Add a framework-owned validation model that can be reused by server startup, generated check commands, tests, and future tooling.
@@ -110,24 +197,39 @@ public sealed record ULinkGameValidationResult(
     public bool Succeeded => Diagnostics.All(diagnostic => diagnostic.Severity != ULinkGameDiagnosticSeverity.Error);
 }
 
-public interface IULinkGameRuntimeValidator
+public interface IULinkGameValidationRule
 {
-    ULinkGameValidationResult Validate(ULinkGameRuntimeContext context);
+    IEnumerable<ULinkGameDiagnostic> Validate(ULinkGameResolvedRuntime runtime);
 }
 ```
 
-The context should be built from resolved runtime options, not directly from raw JSON. Validators should see the same final state the server will use.
+The resolved runtime model should be built before validation, and it should not expose raw JSON as the validator input. Validators should see the same final state the server will use.
 
 Suggested validator groups:
 
-- `NodeValidator`
-- `EndpointValidator`
-- `ClusterValidator`
-- `HotfixValidator`
-- `ReliablePushValidator`
-- `ProfileValidator`
+- `NodeIdentityRules`
+- `EndpointRules`
+- `ClusterServiceGraphRules`
+- `HotfixSourceRules`
+- `ReliablePushIdentityRules`
+- `ProductionReadinessRules`
 
-Each validator should be small, deterministic, and testable. It should not start network listeners or mutate runtime state.
+Each rule should be small, deterministic, and testable. It should answer one question and should not start network listeners or mutate runtime state. A composed runtime validator can aggregate the rules and produce a single `ULinkGameValidationResult`.
+
+## Package Boundaries
+
+Guardrails cross several packages, so ownership must stay explicit.
+
+Recommended package split:
+
+- diagnostic primitives belong in the lowest package that both client-facing and server-facing tooling can reference without pulling in transport or hosting dependencies
+- server hosting composes the validation pipeline and owns startup behavior
+- Cluster packages provide Cluster-specific rules without depending on `ULinkGame.Server`
+- Hotfix packages provide Hotfix-specific rules without depending on `ULinkGame.Tool`
+- Reliable Push and session rules live with the server-side session/push abstractions they validate
+- `ULinkGame.Tool` calls the generated host/check surface; it does not own runtime invariants
+
+Do not make `ULinkGame.Cluster` depend on `ULinkGame.Server` only to participate in validation. Prefer extension methods or rule registration hooks that allow server hosting to compose optional package rules.
 
 ## Diagnostic Codes
 
@@ -194,6 +296,30 @@ The generated check command may add friendly grouping and project-specific wordi
 
 When Hotfix build output is missing, the check command should print the repair command and fail. It should not report a degraded or warning-only state.
 
+The check command should also support machine-readable output:
+
+```bash
+dotnet run --project Server/Server/Server.csproj -- --ulinkgame-check --json
+```
+
+Suggested JSON shape:
+
+```json
+{
+  "succeeded": false,
+  "diagnostics": [
+    {
+      "code": "ULINK071",
+      "severity": "error",
+      "message": "Hotfix assembly was not found.",
+      "repair": "dotnet build Server/Hotfix/Server.Hotfix.csproj"
+    }
+  ]
+}
+```
+
+The text output is for humans. The JSON output is for CI, deployment checks, IDE integration, and future `ulinkgame-tool doctor` commands.
+
 ## Configuration Boundary
 
 Default generated configuration should remain compact:
@@ -225,6 +351,30 @@ Acceptable advanced values:
 - advertised endpoints when deployment requires them
 - service descriptors for split-node deployments
 
+Advanced configuration should still use user-facing ULinkGame concepts:
+
+```json
+{
+  "ULinkGame": {
+    "Deployment": {
+      "Profile": "production",
+      "Topology": "split-directory"
+    },
+    "Node": {
+      "Id": "gateway-1"
+    },
+    "Endpoint": {
+      "Transport": "kcp",
+      "Host": "0.0.0.0",
+      "Port": 20000,
+      "AdvertisedHost": "game.example.com"
+    }
+  }
+}
+```
+
+This keeps advanced configuration centered on deployment intent instead of exposing the internal object graph.
+
 Avoid user-facing defaults for:
 
 - `Hotfix.Enabled`
@@ -241,7 +391,7 @@ Avoid user-facing defaults for:
 ### Phase 1: Foundation
 
 - Add diagnostic result types.
-- Add a runtime validation context built from resolved options.
+- Add a resolved runtime model with value provenance.
 - Add validators for node id, endpoint transport/path, duplicate service names, and hotfix assembly availability.
 - Add unit tests for each diagnostic.
 
@@ -249,6 +399,7 @@ Avoid user-facing defaults for:
 
 - Make generated `--ulinkgame-check` call the framework validation pipeline.
 - Keep current readable output shape.
+- Add `--json` output for automation and CI.
 - Ensure missing Hotfix build output returns a clear repair command.
 
 ### Phase 3: Profile-Aware Validation
