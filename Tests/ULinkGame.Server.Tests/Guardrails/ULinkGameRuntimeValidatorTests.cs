@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using ULinkGame.Server.Guardrails;
 using ULinkGame.Server.Guardrails.Rules;
 using Xunit;
@@ -120,6 +121,19 @@ public sealed class ULinkGameRuntimeValidatorTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "ULINK041");
+    }
+
+    [Fact]
+    public void AddULinkGameRuntimeValidation_RegistersDefaultValidator()
+    {
+        var services = new ServiceCollection();
+
+        services.AddULinkGameRuntimeValidation();
+
+        using var provider = services.BuildServiceProvider();
+        var validator = provider.GetRequiredService<ULinkGameRuntimeValidator>();
+
+        Assert.NotNull(validator);
     }
 
     private static ULinkGameResolvedRuntime TestRuntime()
