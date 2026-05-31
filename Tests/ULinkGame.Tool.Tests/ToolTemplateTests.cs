@@ -100,10 +100,10 @@ public sealed class ToolTemplateTests
         Assert.Contains("--ulinkgame-check", source);
         Assert.Contains("ULinkGameCheck", source);
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration))", StringComparison.Ordinal) >
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) >
             source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration))", StringComparison.Ordinal) <
+            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) <
             source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
     }
 
@@ -182,13 +182,22 @@ public sealed class ToolTemplateTests
         Assert.Contains("hotfix:", source);
         Assert.Contains("reliable-push:", source);
         Assert.Contains("rpc:", source);
-        Assert.Contains("public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions)", source);
+        Assert.Contains("using System.Text.Json;", source);
+        Assert.Contains("using ULinkGame.Server.Guardrails;", source);
+        Assert.Contains("using ULinkGame.Server.Guardrails.Rules;", source);
+        Assert.Contains("ULinkGameValidationResult", source);
+        Assert.Contains("--json", source);
+        Assert.Contains("JsonSerializer.Serialize", source);
+        Assert.Contains("\"succeeded\"", source);
+        Assert.Contains("ULINK071", source);
+        Assert.Contains("public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions, string[] args)", source);
         Assert.Contains("node: ok {clusterOptions.NodeId}", source);
         Assert.Contains("clusterOptions.AdvertisedEndpoints.TryGetValue(\"client\"", source);
         Assert.Contains("hotfix: failed local build output not found", source);
-        Assert.Contains("fix: dotnet build Server/Hotfix/Server.Hotfix.csproj", source);
+        Assert.Contains("fix: {hotfixFailure.Repair}", source);
         Assert.Contains("../../../../Hotfix/bin/Debug/net10.0", source);
-        Assert.Contains("System.IO.File.Exists(hotfixPath)", source);
+        Assert.Contains("new HotfixSourceRule()", source);
+        Assert.Contains("new ULinkGameResolvedHotfix", source);
         Assert.DoesNotContain("Hotfix:Directory", source);
         Assert.DoesNotContain("Hotfix:Assembly", source);
     }

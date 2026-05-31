@@ -374,7 +374,10 @@ internal sealed class {typeName}
         return @"using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using ULinkGame.Server.Guardrails;
+using ULinkGame.Server.Guardrails.Rules;
 
 namespace Server.Hosting;
 
@@ -583,32 +586,109 @@ internal sealed class ULinkGameEndpointOptions
 
 internal static class ULinkGameCheck
 {
-    public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions)
+    public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions, string[] args)
+    {
+        var resolved = ToResolvedRuntime(runtime, clusterOptions);
+        var validator = new ULinkGameRuntimeValidator(
+            new IULinkGameValidationRule[]
+            {
+                new NodeIdentityRule(),
+                new EndpointRule(),
+                new HotfixSourceRule(),
+                new ClusterServiceGraphRule()
+            });
+        var result = validator.Validate(resolved);
+
+        if (args.Contains(""--json"", StringComparer.Ordinal))
+        {
+            Console.WriteLine(JsonSerializer.Serialize(
+                new Dictionary<string, object?>
+                {
+                    [""succeeded""] = result.Succeeded,
+                    [""diagnostics""] = result.Diagnostics.Select(diagnostic => new
+                    {
+                        code = diagnostic.Code,
+                        severity = diagnostic.Severity.ToString().ToLowerInvariant(),
+                        message = diagnostic.Message,
+                        repair = diagnostic.Repair
+                    })
+                },
+                new JsonSerializerOptions { WriteIndented = true }));
+            return result.Succeeded ? 0 : 1;
+        }
+
+        return WriteText(runtime, clusterOptions, result);
+    }
+
+    private static int WriteText(
+        ULinkGameRuntimeOptions runtime,
+        ClusterOptions clusterOptions,
+        ULinkGameValidationResult result)
     {
         var serviceNames = clusterOptions.Services.Select(service => service.Name);
         var rpcEndpoint = clusterOptions.AdvertisedEndpoints.TryGetValue(""client"", out var clientEndpoint)
             ? clientEndpoint
             : runtime.Endpoint.ToAdvertisedEndpoint();
-        var hotfixPath = System.IO.Path.GetFullPath(
-                System.IO.Path.Combine(
-                    AppContext.BaseDirectory,
-                    ""../../../../Hotfix/bin/Debug/net10.0"",
-                    ""Server.Hotfix.dll""));
 
         Console.WriteLine(""cluster: ok single-node"");
         Console.WriteLine($""node: ok {clusterOptions.NodeId}"");
         Console.WriteLine($""services: ok {string.Join("", "", serviceNames)}"");
-        if (!System.IO.File.Exists(hotfixPath))
+        var hotfixFailure = result.Diagnostics.FirstOrDefault(diagnostic => diagnostic.Code == ""ULINK071"");
+        if (hotfixFailure is not null)
         {
             Console.Error.WriteLine(""hotfix: failed local build output not found"");
-            Console.Error.WriteLine(""fix: dotnet build Server/Hotfix/Server.Hotfix.csproj"");
+            Console.Error.WriteLine($""fix: {hotfixFailure.Repair}"");
             return 1;
         }
 
         Console.WriteLine(""hotfix: ok local-build Server.Hotfix.dll"");
         Console.WriteLine(""reliable-push: ok pending limit 256, replay window 120s"");
         Console.WriteLine($""rpc: ok {rpcEndpoint}"");
-        return 0;
+
+        foreach (var diagnostic in result.Diagnostics.Where(diagnostic => diagnostic.Severity == ULinkGameDiagnosticSeverity.Error))
+        {
+            Console.Error.WriteLine($""{diagnostic.Code}: {diagnostic.Message}"");
+            if (!string.IsNullOrWhiteSpace(diagnostic.Repair))
+            {
+                Console.Error.WriteLine($""fix: {diagnostic.Repair}"");
+            }
+        }
+
+        return result.Succeeded ? 0 : 1;
+    }
+
+    private static ULinkGameResolvedRuntime ToResolvedRuntime(
+        ULinkGameRuntimeOptions runtime,
+        ClusterOptions clusterOptions)
+    {
+        var hotfixPath = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(
+                AppContext.BaseDirectory,
+                ""../../../../Hotfix/bin/Debug/net10.0"",
+                ""Server.Hotfix.dll""));
+
+        return new ULinkGameResolvedRuntime(
+            NodeId: new ULinkGameResolvedValue<string>(clusterOptions.NodeId, ULinkGameValueSource.Configuration, ""ULinkGame:Node:Id""),
+            Endpoint: new ULinkGameResolvedEndpoint(
+                Transport: new ULinkGameResolvedValue<string>(runtime.Endpoint.Transport, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Transport""),
+                Host: new ULinkGameResolvedValue<string>(runtime.Endpoint.Host, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Host""),
+                Port: new ULinkGameResolvedValue<int>(runtime.Endpoint.Port, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Port""),
+                Path: new ULinkGameResolvedValue<string>(runtime.Endpoint.Path, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Path""),
+                AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention)),
+            Cluster: new ULinkGameResolvedCluster(
+                Services: clusterOptions.Services
+                    .Select(service => new ULinkGameResolvedClusterService(service.Kind, service.Name))
+                    .ToArray(),
+                AdvertisedEndpoints: clusterOptions.AdvertisedEndpoints),
+            Hotfix: new ULinkGameResolvedHotfix(
+                AssemblyPath: new ULinkGameResolvedValue<string>(hotfixPath, ULinkGameValueSource.GeneratedConvention),
+                AssemblyFileName: new ULinkGameResolvedValue<string>(""Server.Hotfix.dll"", ULinkGameValueSource.GeneratedConvention)),
+            ReliablePush: new ULinkGameResolvedReliablePush(
+                StorageMode: new ULinkGameResolvedValue<string>(""InMemory"", ULinkGameValueSource.Default),
+                PendingLimit: new ULinkGameResolvedValue<int>(256, ULinkGameValueSource.Default),
+                ReplayWindowSeconds: new ULinkGameResolvedValue<int>(120, ULinkGameValueSource.Default),
+                HasSessionIdentityResolver: true),
+            Profile: ULinkGameRuntimeProfile.Development);
     }
 }
 
@@ -975,7 +1055,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             ? """
               if (args.Contains("--ulinkgame-check", StringComparer.Ordinal))
               {
-                  return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration));
+                  return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args);
               }
               """
             : string.Empty;
