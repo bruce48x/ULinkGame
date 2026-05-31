@@ -1,6 +1,7 @@
 #nullable enable
 
 using Shared.Interfaces;
+using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 using ULinkGame.Client.Sessions;
 
@@ -109,7 +110,7 @@ namespace SampleClient.Gameplay
                 ? string.IsNullOrWhiteSpace(sessionToken) ? playerId : sessionToken
                 : sessionId;
             var generation = sessionGeneration <= 0 ? 1 : sessionGeneration;
-            SessionController.StartSession(new ReliablePushSession(playerId, reliableSessionId, generation));
+            SessionController.StartSession(new GameSessionKey(playerId, reliableSessionId, generation));
         }
     }
 
