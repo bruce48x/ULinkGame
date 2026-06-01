@@ -51,6 +51,10 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
         Assert.Contains("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)", result.GeneratedSource);
         Assert.Contains("return _serializer.Deserialize<JoinRoomReply>(result.Payload);", result.GeneratedSource);
+        Assert.Contains("public sealed class RoomActorClusterHandler", result.GeneratedSource);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask<global::ULinkGame.Cluster.ClusterSendStatus> HandleAsync", result.GeneratedSource);
+        Assert.Contains("case \"join\":", result.GeneratedSource);
+        Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorGateway.SendReplyAsync", result.GeneratedSource);
     }
 
     [Fact]
@@ -229,6 +233,7 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("public MetricsLocalRef Local(MetricsId id)", result.GeneratedSource);
         Assert.DoesNotContain("MetricsRemoteRef", result.GeneratedSource);
         Assert.DoesNotContain("Remote(global::ULinkGame.Cluster.NodeId nodeId", result.GeneratedSource);
+        Assert.DoesNotContain("MetricsActorClusterHandler", result.GeneratedSource);
     }
 
     [Fact]

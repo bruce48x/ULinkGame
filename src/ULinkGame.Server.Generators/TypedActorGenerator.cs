@@ -203,6 +203,8 @@ namespace ULinkGame.Server.Generators
             {
                 builder.AppendLine();
                 AppendRemoteRef(builder, actor, remoteRefType, keyType, actor.ActorName, indentLevel);
+                builder.AppendLine();
+                AppendClusterHandler(builder, actor, indentLevel);
             }
 
             if (namespaceName != null)
@@ -456,6 +458,124 @@ namespace ULinkGame.Server.Generators
                     .AppendLine(">(result.Payload);");
             }
 
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendClusterHandler(
+            StringBuilder builder,
+            ActorInfo actor,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var handlerType = actor.Symbol.Name + "ClusterHandler";
+
+            builder.Append(indent).Append("public sealed class ").Append(handlerType).AppendLine(" : global::ULinkGame.Cluster.IClusterMessageHandler");
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorRuntime _runtime;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IRemoteActorSerializer _serializer;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Cluster.IClusterRouter _router;");
+            builder.AppendLine();
+            builder.Append(indent).Append("    public ").Append(handlerType).AppendLine("(");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorRuntime runtime,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorSerializer serializer,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Cluster.IClusterRouter router)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        _runtime = runtime;");
+            builder.Append(indent).AppendLine("        _serializer = serializer;");
+            builder.Append(indent).AppendLine("        _router = router;");
+            builder.Append(indent).AppendLine("    }");
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("    public async global::System.Threading.Tasks.ValueTask<global::ULinkGame.Cluster.ClusterSendStatus> HandleAsync(");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Cluster.ClusterMessage message,");
+            builder.Append(indent).AppendLine("        global::System.Threading.CancellationToken cancellationToken = default)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        if (!global::ULinkGame.Cluster.ClusterActorEnvelope.TryFromClusterMessage(message, out var envelope) || envelope is null)");
+            builder.Append(indent).AppendLine("        {");
+            builder.Append(indent).AppendLine("            return global::ULinkGame.Cluster.ClusterSendStatus.RouteNotFound;");
+            builder.Append(indent).AppendLine("        }");
+            builder.AppendLine();
+            builder.Append(indent)
+                .Append("        if (!envelope.ActorId.StartsWith(\"")
+                .Append(actor.ActorName)
+                .Append("/\", global::System.StringComparison.Ordinal))")
+                .AppendLine();
+            builder.Append(indent).AppendLine("        {");
+            builder.Append(indent).AppendLine("            return global::ULinkGame.Cluster.ClusterSendStatus.RouteNotFound;");
+            builder.Append(indent).AppendLine("        }");
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("        var actorId = global::ULinkGame.Server.Actors.ActorId.From(envelope.ActorId);");
+            builder.Append(indent).AppendLine("        switch (envelope.Kind)");
+            builder.Append(indent).AppendLine("        {");
+
+            foreach (var method in actor.Methods)
+            {
+                AppendClusterHandlerCase(builder, actor, method, indentLevel + 3);
+            }
+
+            builder.Append(indent).AppendLine("            default:");
+            builder.Append(indent).AppendLine("                return global::ULinkGame.Cluster.ClusterSendStatus.RouteNotFound;");
+            builder.Append(indent).AppendLine("        }");
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendClusterHandlerCase(
+            StringBuilder builder,
+            ActorInfo actor,
+            MethodInfo method,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var actorType = actor.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var requestType = DisplayType(method.RequestType, actor.Symbol.ContainingNamespace);
+
+            builder.Append(indent).Append("case \"").Append(method.ActorMethodName).AppendLine("\":");
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).Append("    var request = _serializer.Deserialize<").Append(requestType).AppendLine(">(envelope.Payload);");
+
+            if (method.ResultType == null)
+            {
+                builder.Append(indent)
+                    .Append("    await _runtime.TellAsync<")
+                    .Append(actorType)
+                    .Append(">(actorId, (actor, ct) => actor.")
+                    .Append(method.Name)
+                    .Append("(request");
+                if (method.HasCancellationToken)
+                {
+                    builder.Append(", ct");
+                }
+
+                builder.AppendLine("), cancellationToken).ConfigureAwait(false);");
+            }
+            else
+            {
+                builder.Append(indent)
+                    .Append("    var reply = await _runtime.AskAsync<")
+                    .Append(actorType)
+                    .Append(", ")
+                    .Append(DisplayType(method.ResultType, actor.Symbol.ContainingNamespace))
+                    .Append(">(actorId, (actor, ct) => actor.")
+                    .Append(method.Name)
+                    .Append("(request");
+                if (method.HasCancellationToken)
+                {
+                    builder.Append(", ct");
+                }
+
+                builder.AppendLine("), cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("    if (envelope.ReplyCorrelationId is not null)");
+                builder.Append(indent).AppendLine("    {");
+                builder.Append(indent).AppendLine("        await global::ULinkGame.Server.Actors.RemoteActorGateway.SendReplyAsync(");
+                builder.Append(indent).AppendLine("            _router,");
+                builder.Append(indent).AppendLine("            envelope.SourceNode,");
+                builder.Append(indent).AppendLine("            envelope.ReplyCorrelationId,");
+                builder.Append(indent).AppendLine("            _serializer.Serialize(reply),");
+                builder.Append(indent).AppendLine("            cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("    }");
+            }
+
+            builder.Append(indent).AppendLine("    return global::ULinkGame.Cluster.ClusterSendStatus.Accepted;");
             builder.Append(indent).AppendLine("}");
         }
 
