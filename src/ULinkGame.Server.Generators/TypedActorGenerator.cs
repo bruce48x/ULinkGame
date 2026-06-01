@@ -207,6 +207,9 @@ namespace ULinkGame.Server.Generators
                 AppendClusterHandler(builder, actor, indentLevel);
             }
 
+            builder.AppendLine();
+            AppendServiceCollectionExtensions(builder, actor, actorsType, indentLevel);
+
             if (namespaceName != null)
             {
                 builder.AppendLine("}");
@@ -458,6 +461,36 @@ namespace ULinkGame.Server.Generators
                     .AppendLine(">(result.Payload);");
             }
 
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendServiceCollectionExtensions(
+            StringBuilder builder,
+            ActorInfo actor,
+            string actorsType,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var extensionType = actor.Symbol.Name + "ServiceCollectionExtensions";
+            var methodName = "Add" + actorsType;
+
+            builder.Append(indent).Append("public static class ").Append(extensionType).AppendLine();
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).Append("    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection ").Append(methodName).AppendLine("(");
+            builder.Append(indent).AppendLine("        this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).Append("        global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton<").Append(actorsType).AppendLine(">(services);");
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("        global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddEnumerable(");
+                builder.Append(indent).AppendLine("            services,");
+                builder.Append(indent).AppendLine("            global::Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<");
+                builder.Append(indent).AppendLine("                global::ULinkGame.Cluster.IClusterMessageHandler,");
+                builder.Append(indent).Append("                ").Append(actor.Symbol.Name).AppendLine("ClusterHandler>());");
+            }
+
+            builder.Append(indent).AppendLine("        return services;");
+            builder.Append(indent).AppendLine("    }");
             builder.Append(indent).AppendLine("}");
         }
 

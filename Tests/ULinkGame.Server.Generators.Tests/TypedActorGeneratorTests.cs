@@ -55,6 +55,10 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("public async global::System.Threading.Tasks.ValueTask<global::ULinkGame.Cluster.ClusterSendStatus> HandleAsync", result.GeneratedSource);
         Assert.Contains("case \"join\":", result.GeneratedSource);
         Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorGateway.SendReplyAsync", result.GeneratedSource);
+        Assert.Contains("public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddRoomActors", result.GeneratedSource);
+        Assert.Contains("TryAddSingleton<RoomActors>(services);", result.GeneratedSource);
+        Assert.Contains("TryAddEnumerable", result.GeneratedSource);
+        Assert.Contains("RoomActorClusterHandler", result.GeneratedSource);
     }
 
     [Fact]

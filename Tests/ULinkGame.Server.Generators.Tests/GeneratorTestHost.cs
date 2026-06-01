@@ -14,7 +14,9 @@ internal static class GeneratorTestHost
             .Concat(new[]
             {
                 MetadataReference.CreateFromFile(typeof(ULinkGame.Server.Actors.Actor<>).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(ULinkGame.Cluster.NodeId).Assembly.Location)
+                MetadataReference.CreateFromFile(typeof(ULinkGame.Cluster.NodeId).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.IServiceCollection).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions).Assembly.Location)
             })
             .Distinct(MetadataReferencePathComparer.Instance)
             .ToArray();
