@@ -640,11 +640,11 @@ Suggested node concepts:
 - node endpoints: named addresses for internal or external communication
 - node state: starting, ready, draining, suspect, dead
 
-Actor execution remains process-local first. An actor belongs to one local execution domain at a time. Cross-thread or cross-node communication should use message delivery, not shared mutable objects. Actor location is separate from actor identity: stable actor ids should not encode node id, ports, endpoints, business category, or thread id.
+Actor execution remains process-local first. Cross-thread or cross-node communication should use message delivery, not shared mutable objects. Actor location is separate from actor identity: stable actor ids should not encode node id, ports, endpoints, business category, or local runtime scheduling details.
 
 Cross-node actor communication should be route-based, not proxy-based. A local actor runtime may expose `TellAsync` or `AskAsync` for process-local actor calls, but remote actor communication should go through an explicitly named cluster API such as `IClusterActorRouter`. That API should require route lookup, timeout, expiration, and result handling at the call site. Do not make a remote actor look like a local actor reference.
 
-If `ULinkActor` internally schedules actors through `LogicThread` or a similar execution lane, that remains a node-local runtime detail. Cluster state should route only to `NodeId` and `RouteLocation`; the receiving node then hands the message to its local actor runtime, which chooses the mailbox or logic thread. Cluster code must not store, expose, or target `LogicThread` identifiers.
+Cluster state should route only to `NodeId` and `RouteLocation`; the receiving node then hands the message to its local actor runtime, which owns mailbox dispatch and scheduling. Cluster code must not store, expose, or target local actor runtime scheduler identifiers.
 
 ### Cluster Location And Messaging
 

@@ -16,7 +16,7 @@ ULinkGame's design is informed by four reference frameworks:
 | Framework | Language | Key strength |
 |-----------|----------|-------------|
 | [skynet](https://github.com/cloudwu/skynet) | C/Lua | Pragmatic simplicity, fault isolation, decade of production use |
-| [ET](https://github.com/egametang/ET) | C# | Component-based assembly, fiber model, AI-native architecture |
+| [ET](https://github.com/egametang/ET) | C# | Component-based assembly, location-directory patterns, AI-native architecture |
 | [Fantasy](https://github.com/qq362946/Fantasy) | C# | Zero-reflection source generation, roaming route system |
 | [GeekServer](https://github.com/leeveel/GeekServer) | C# | Compile-time enforcement, TPL Dataflow actor model |
 
