@@ -32,11 +32,11 @@
 - [x] Remove `ClusterName` and `EndpointName` from `RemoteActorOptions`.
 - [x] Refactor `RemoteActorInvoker` to call `IClusterNodeSender.SendAsync`.
 - [x] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~RemoteActor"`.
-- [ ] Commit `Route remote actor sends through cluster node sender`.
+- [x] Commit `Route remote actor sends through cluster node sender`.
 
 ## Task 3: Verification
 
-- [ ] Run `dotnet test Tests\ULinkGame.Cluster.Tests\ULinkGame.Cluster.Tests.csproj --no-restore`.
-- [ ] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore -m:1`.
-- [ ] Run `dotnet test Tests\tests.slnx --no-restore -m:1`.
-- [ ] Update docs/changelog if stale references to `RemoteActorOptions.ClusterName` or `EndpointName` remain.
+- [x] Run `dotnet test Tests\ULinkGame.Cluster.Tests\ULinkGame.Cluster.Tests.csproj --no-restore`.
+- [x] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore -m:1`.
+- [x] Run `dotnet test Tests\tests.slnx --no-restore -m:1`.
+- [x] Update docs/changelog if stale references to `RemoteActorOptions.ClusterName` or `EndpointName` remain.
