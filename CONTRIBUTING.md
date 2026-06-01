@@ -124,6 +124,18 @@ Open `samples/Agar.Godot` in Godot 4 .NET for the Godot client playground.
 
 ## Contributor Workflow
 
+### Git Commit Checklist
+
+Run this checklist before every commit:
+
+1. Inspect the staged diff. If it changes shippable package content under `src/<PackageName>/`, bump that package's `<Version>` in `src/<PackageName>/<PackageName>.csproj` in the same commit.
+2. Update `CHANGELOG.md` with every package id and version that will be released from the commit.
+3. If the changed package version is consumed by `ULinkGame.Tool` scaffolding or samples, update the generated template constants, package-version readers, sample package references, or changelog entries in the same commit so newly scaffolded projects consume the intended package version.
+4. Do not bump package versions for test-only or docs-only changes unless those changes alter files packed into a package or otherwise need to ship in a NuGet artifact.
+5. Run the relevant local tests before committing.
+
+Package version bumps are a commit-time rule. The publish workflow pushes with `--skip-duplicate`; if a changed package keeps an already-published version, the CI run can still succeed while nuget.org silently skips that package. Downstream consumers then keep receiving the stale package.
+
 ### Build And Test
 
 Build framework projects:
@@ -148,56 +160,17 @@ The Unity project may generate local `Library`, `Temp`, `obj`, and restored NuGe
 
 ### NuGet Release
 
-Framework packages are published to nuget.org by the `Publish NuGet` GitHub Actions workflow:
+Framework packages are published to nuget.org by GitHub Actions:
 
 ```txt
 .github/workflows/publish-nuget.yml
 ```
 
-The workflow runs automatically on pushes to `main` when one of these paths changes:
+The workflow runs on pushes to `main` that change `.github/workflows/publish-nuget.yml`, `Directory.Build.props`, `NuGet.config`, `src/**`, or `Tests/**`. It restores test and package projects, runs `Tests/tests.slnx`, packs every project under `src/*/*.csproj`, then pushes generated `.nupkg` files with `--skip-duplicate`.
 
-- `.github/workflows/publish-nuget.yml`
-- `Directory.Build.props`
-- `NuGet.config`
-- `src/**`
-- `Tests/**`
+Each published package is versioned by the `<Version>` property in its own `src/<PackageName>/<PackageName>.csproj`. Version bump and changelog rules live in [Git Commit Checklist](#git-commit-checklist) because they must be handled before the commit, not during release.
 
-The workflow uses .NET `10.0.x`, restores all test and package projects, runs the client and server package tests, packs every project under `src/*/*.csproj`, then pushes all generated `.nupkg` files to nuget.org with `--skip-duplicate`.
-
-The packages currently published by this workflow are:
-
-- `ULinkGame.Abstractions`, versioned in `src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj`
-- `ULinkGame.Client`, versioned in `src/ULinkGame.Client/ULinkGame.Client.csproj`
-- `ULinkGame.Server`, versioned in `src/ULinkGame.Server/ULinkGame.Server.csproj`
-- `ULinkGame.Cluster`, versioned in `src/ULinkGame.Cluster/ULinkGame.Cluster.csproj`
-- `ULinkGame.Cluster.Sql`, versioned in `src/ULinkGame.Cluster.Sql/ULinkGame.Cluster.Sql.csproj`
-- `ULinkGame.Cluster.ULinkRPC`, versioned in `src/ULinkGame.Cluster.ULinkRPC/ULinkGame.Cluster.ULinkRPC.csproj`
-- `ULinkGame.Tool`, versioned in `src/ULinkGame.Tool/ULinkGame.Tool.csproj`
-
-Release credentials are managed through the GitHub `release` environment. The workflow uses `NuGet/login@v1` with the `NUGET_USER` secret and then passes the action-provided temporary API key to `dotnet nuget push`.
-
-NuGet publishing is handled by GitHub Actions, not by a local manual push. Do not rely on a local `NUGET_API_KEY` for the normal release path.
-
-#### Version Bumping
-
-Each package version is defined in its `.csproj` through the `<Version>` property.
-
-**Critical rule: any change to source files under a package directory in `src/` that must ship to users must bump that package's `<Version>` before pushing.** The publish workflow pushes with `--skip-duplicate`; if a changed package keeps an already-published version, the CI run can still succeed while nuget.org silently skips that package. Downstream consumers then keep receiving the stale package.
-
-- Bump the `<Version>` in every modified `src/*/*.csproj` package when source, templates, packed content, analyzers, or tool behavior in that package changes.
-- Bump even for small bug fixes. The version is the only release signal nuget.org accepts for new package contents.
-- Do not bump package versions for test-only or docs-only changes unless those changes alter files packed into a package or otherwise need to ship in a NuGet artifact.
-- If a package version is consumed by `ULinkGame.Tool` scaffolding or samples, update the generated template constants, package-version readers, sample package references, or changelog entries in the same change so newly scaffolded projects consume the intended package version.
-
-If you forget the version bump, the fix is to bump the package version in a follow-up commit and push again. The earlier CI run may look green, but the package contents did not reach nuget.org.
-
-To release a new package version:
-
-1. Update the `<Version>` in the owning `.csproj`.
-2. Update `CHANGELOG.md` with the released package id and version.
-3. Update generated template constants or sample package references if the released package is consumed by scaffolding or samples.
-4. Run the relevant local tests before merging.
-5. Merge or push to `main`; the GitHub Actions workflow publishes the packages.
+Release credentials are managed through the GitHub `release` environment with `NuGet/login@v1`. Normal releases should not use a local `NUGET_API_KEY`.
 
 Useful local checks:
 
