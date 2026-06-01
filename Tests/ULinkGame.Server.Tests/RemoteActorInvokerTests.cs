@@ -114,6 +114,42 @@ public sealed class RemoteActorInvokerTests
     }
 
     [Fact]
+    public async Task AskAsync_send_exception_releases_pending_reply_and_propagates()
+    {
+        var gateway = new RemoteActorGateway();
+        var invocation = CreateInvocation();
+        var messenger = new RecordingNodeMessenger
+        {
+            ExceptionToThrow = new InvalidOperationException("send failed")
+        };
+        var invoker = CreateInvoker(invocation, gateway, messenger);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await invoker.AskAsync(invocation, TestContext.Current.CancellationToken));
+
+        Assert.Equal("send failed", exception.Message);
+
+        var pending = gateway.RegisterPendingAsync(
+            invocation.CorrelationId,
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+        var replyPayload = new byte[] { 7, 8, 9 };
+
+        await gateway.CreateReplyHandler().HandleAsync(
+            new ClusterMessage(
+                ClusterActorRouteKeys.ForReply(new NodeId("node-local")),
+                RemoteActorGateway.ReplyKind,
+                replyPayload,
+                DateTimeOffset.UtcNow.AddSeconds(5),
+                invocation.Node,
+                invocation.CorrelationId),
+            TestContext.Current.CancellationToken);
+
+        var payload = await pending.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.Equal(replyPayload, payload.ToArray());
+    }
+
+    [Fact]
     public async Task TellAsync_sends_to_requested_node_directory_record()
     {
         var requestedNode = new NodeId("node-requested");
@@ -357,6 +393,8 @@ public sealed class RemoteActorInvokerTests
 
         public Action<ClusterMessage>? OnSend { get; set; }
 
+        public Exception? ExceptionToThrow { get; set; }
+
         public ValueTask<ClusterSendStatus> SendAsync(
             RouteLocation target,
             ClusterMessage message,
@@ -365,6 +403,12 @@ public sealed class RemoteActorInvokerTests
             LastTarget = target;
             LastMessage = message;
             OnSend?.Invoke(message);
+
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
             return ValueTask.FromResult(Status);
         }
     }

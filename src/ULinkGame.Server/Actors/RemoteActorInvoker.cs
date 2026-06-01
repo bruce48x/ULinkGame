@@ -39,24 +39,33 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
         }
 
         Task<ReadOnlyMemory<byte>> pendingReply;
+        pendingReply = _gateway.RegisterPendingAsync(
+            invocation.CorrelationId,
+            timeout,
+            cancellationToken);
+
+        ClusterSendStatus status;
         try
         {
-            pendingReply = _gateway.RegisterPendingAsync(
-                invocation.CorrelationId,
-                timeout,
-                cancellationToken);
-
-            var status = await SendToInvocationNodeAsync(
+            status = await SendToInvocationNodeAsync(
                 invocation,
                 includeReply: true,
                 cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            _gateway.TryCancelPending(invocation.CorrelationId);
+            throw;
+        }
 
-            if (status != ClusterSendStatus.Accepted)
-            {
-                _gateway.TryCancelPending(invocation.CorrelationId);
-                return ToResult(status);
-            }
+        if (status != ClusterSendStatus.Accepted)
+        {
+            _gateway.TryCancelPending(invocation.CorrelationId);
+            return ToResult(status);
+        }
 
+        try
+        {
             var payload = await pendingReply.ConfigureAwait(false);
             return RemoteActorInvocationResult.Replied(payload);
         }
