@@ -35,6 +35,17 @@ public sealed class RemoteActorInvokerTests
         Assert.Equal(1, result.Payload.ToArray()[0]);
     }
 
+    [Theory]
+    [InlineData(typeof(RemoteActorInvocation))]
+    [InlineData(typeof(RemoteActorInvocationResult))]
+    public void RemoteActor_payload_has_no_public_setter(Type type)
+    {
+        var payload = type.GetProperty(nameof(RemoteActorInvocation.Payload));
+
+        Assert.NotNull(payload);
+        Assert.Null(payload.SetMethod);
+    }
+
     [Fact]
     public void RemoteActorException_preserves_structured_failure_fields()
     {

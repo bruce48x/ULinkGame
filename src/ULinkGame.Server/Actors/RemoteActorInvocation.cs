@@ -2,14 +2,37 @@ using ULinkGame.Cluster;
 
 namespace ULinkGame.Server.Actors;
 
-public sealed record RemoteActorInvocation(
-    NodeId Node,
-    ActorId ActorId,
-    string ActorName,
-    string MethodName,
-    ReadOnlyMemory<byte> Payload,
-    DateTimeOffset Deadline,
-    string CorrelationId)
+public sealed class RemoteActorInvocation
 {
-    public ReadOnlyMemory<byte> Payload { get; init; } = Payload.ToArray();
+    public RemoteActorInvocation(
+        NodeId node,
+        ActorId actorId,
+        string actorName,
+        string methodName,
+        ReadOnlyMemory<byte> payload,
+        DateTimeOffset deadline,
+        string correlationId)
+    {
+        Node = node;
+        ActorId = actorId;
+        ActorName = actorName;
+        MethodName = methodName;
+        Payload = payload.ToArray();
+        Deadline = deadline;
+        CorrelationId = correlationId;
+    }
+
+    public NodeId Node { get; }
+
+    public ActorId ActorId { get; }
+
+    public string ActorName { get; }
+
+    public string MethodName { get; }
+
+    public ReadOnlyMemory<byte> Payload { get; }
+
+    public DateTimeOffset Deadline { get; }
+
+    public string CorrelationId { get; }
 }

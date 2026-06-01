@@ -1,11 +1,22 @@
 namespace ULinkGame.Server.Actors;
 
-public sealed record RemoteActorInvocationResult(
-    RemoteActorStatus Status,
-    ReadOnlyMemory<byte> Payload,
-    string? Message = null)
+public sealed class RemoteActorInvocationResult
 {
-    public ReadOnlyMemory<byte> Payload { get; init; } = Payload.ToArray();
+    public RemoteActorInvocationResult(
+        RemoteActorStatus status,
+        ReadOnlyMemory<byte> payload,
+        string? message = null)
+    {
+        Status = status;
+        Payload = payload.ToArray();
+        Message = message;
+    }
+
+    public RemoteActorStatus Status { get; }
+
+    public ReadOnlyMemory<byte> Payload { get; }
+
+    public string? Message { get; }
 
     public static RemoteActorInvocationResult Accepted()
     {
