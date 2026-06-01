@@ -28,29 +28,35 @@ public sealed class RemoteActorGateway
                 $"A pending request with correlation id '{correlationId}' already exists.");
         }
 
-        cancellationToken.Register(static state =>
+        var registration = new PendingRegistration(tcs, _pending, correlationId);
+        var timeoutTimer = new Timer(static state =>
         {
-            var (tcs, dict, key) = (Tuple<TaskCompletionSource<ReadOnlyMemory<byte>>,
-                ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>>,
-                string>)state!;
-            if (dict.TryRemove(key, out _))
+            var pending = (PendingRegistration)state!;
+            if (pending.Requests.TryRemove(pending.CorrelationId, out _))
             {
-                tcs.TrySetCanceled();
+                pending.Completion.TrySetException(new TimeoutException(
+                    $"No reply received for correlation id '{pending.CorrelationId}' within the timeout."));
             }
-        }, Tuple.Create(tcs, _pending, correlationId));
+        }, registration, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        registration.TimeoutTimer = timeoutTimer;
+        timeoutTimer.Change(timeout, Timeout.InfiniteTimeSpan);
 
-        using var timeoutCts = new CancellationTokenSource(timeout);
-        timeoutCts.Token.Register(static state =>
+        if (cancellationToken.CanBeCanceled)
         {
-            var (tcs, dict, key) = (Tuple<TaskCompletionSource<ReadOnlyMemory<byte>>,
-                ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>>,
-                string>)state!;
-            if (dict.TryRemove(key, out _))
+            registration.Cancellation = cancellationToken.Register(static state =>
             {
-                tcs.TrySetException(new TimeoutException(
-                    $"No reply received for correlation id '{key}' within the timeout."));
-            }
-        }, Tuple.Create(tcs, _pending, correlationId));
+                var pending = (PendingRegistration)state!;
+                if (pending.Requests.TryRemove(pending.CorrelationId, out _))
+                {
+                    pending.Completion.TrySetCanceled();
+                }
+            }, registration);
+        }
+
+        tcs.Task.ContinueWith(static (_, state) =>
+        {
+            ((PendingRegistration)state!).Dispose();
+        }, registration, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
         return tcs.Task;
     }
@@ -100,6 +106,35 @@ public sealed class RemoteActorGateway
             }
 
             return ValueTask.FromResult(ClusterSendStatus.Accepted);
+        }
+    }
+
+    private sealed class PendingRegistration : IDisposable
+    {
+        public PendingRegistration(
+            TaskCompletionSource<ReadOnlyMemory<byte>> completion,
+            ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>> requests,
+            string correlationId)
+        {
+            Completion = completion;
+            Requests = requests;
+            CorrelationId = correlationId;
+        }
+
+        public TaskCompletionSource<ReadOnlyMemory<byte>> Completion { get; }
+
+        public ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>> Requests { get; }
+
+        public string CorrelationId { get; }
+
+        public Timer? TimeoutTimer { get; set; }
+
+        public CancellationTokenRegistration Cancellation { get; set; }
+
+        public void Dispose()
+        {
+            TimeoutTimer?.Dispose();
+            Cancellation.Dispose();
         }
     }
 }

@@ -50,11 +50,8 @@ jobs:
             dotnet restore "$project"
           done
 
-      - name: Test client package
-        run: dotnet test Tests/ULinkGame.Client.Tests/ULinkGame.Client.Tests.csproj --no-restore -c Release -m:1 /nr:false /p:UseSharedCompilation=false
-
-      - name: Test server package
-        run: dotnet test Tests/ULinkGame.Server.Tests/ULinkGame.Server.Tests.csproj --no-restore -c Release -m:1 /nr:false /p:UseSharedCompilation=false
+      - name: Test packages
+        run: dotnet test Tests/tests.slnx --no-restore -c Release -m:1 /nr:false /p:UseSharedCompilation=false
 
       - name: Pack NuGet packages
         run: |

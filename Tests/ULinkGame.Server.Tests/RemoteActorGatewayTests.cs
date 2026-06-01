@@ -147,6 +147,21 @@ public sealed class RemoteActorGatewayTests
     }
 
     [Fact]
+    public async Task RegisterPendingAsync_times_out_when_reply_never_arrives()
+    {
+        var gateway = new RemoteActorGateway();
+
+        var pending = gateway.RegisterPendingAsync(
+            "missing-reply",
+            TimeSpan.FromMilliseconds(50),
+            TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(async () =>
+            await pending.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken));
+        Assert.Contains("No reply received", exception.Message);
+    }
+
+    [Fact]
     public async Task Composite_handler_tries_handlers_in_order()
     {
         var handlerA = new StatusHandler(ClusterSendStatus.RouteNotFound);
