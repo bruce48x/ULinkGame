@@ -8,10 +8,13 @@
 - `ULinkGame.Server` `0.1.13`
 - `ULinkGame.Server` `0.1.14`
 - `ULinkGame.Server` `0.1.15`
+- `ULinkGame.Server.Generators` `0.1.0`
 
 ### Added
 
 - Added typed actor metadata primitives for the server actor runtime API.
+- Added server-side typed actor source generation for `Actor<TKey>` local/remote accessors, cluster handlers, and service registration.
+- Added `ULinkGame.Server.Generators` analyzer references to generated server projects.
 
 ### Fixed
 

@@ -38,6 +38,11 @@
       <Output TaskParameter="Result" PropertyName="ULinkGameServerPackageVersion" />
     </XmlPeek>
     <XmlPeek
+      XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Server.Generators\ULinkGame.Server.Generators.csproj"
+      Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" PropertyName="ULinkGameServerGeneratorsPackageVersion" />
+    </XmlPeek>
+    <XmlPeek
       XmlInputPath="$(MSBuildProjectDirectory)\..\ULinkGame.Cluster\ULinkGame.Cluster.csproj"
       Query="/Project/PropertyGroup/Version/text()">
       <Output TaskParameter="Result" PropertyName="ULinkGameClusterPackageVersion" />
@@ -72,6 +77,7 @@
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameAbstractions = &quot;$(ULinkGameAbstractionsPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClient = &quot;$(ULinkGameClientPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServer = &quot;$(ULinkGameServerPackageVersion)&quot;%3B" />
+      <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServerGenerators = &quot;$(ULinkGameServerGeneratorsPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameCluster = &quot;$(ULinkGameClusterPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameClusterULinkRpc = &quot;$(ULinkGameClusterULinkRpcPackageVersion)&quot;%3B" />
       <GeneratedToolPackageVersionsLine Include="    public const string ULinkGameServerHotfix = &quot;$(ULinkGameServerHotfixPackageVersion)&quot;%3B" />

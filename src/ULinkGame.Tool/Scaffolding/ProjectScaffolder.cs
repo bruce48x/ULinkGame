@@ -174,6 +174,12 @@ internal sealed class ProjectScaffolder
         EnsureProjectReferenceWithoutOutput(project, @"..\Hotfix\Server.Hotfix.csproj");
         EnsurePackageReference(project, "Microsoft.Extensions.Hosting", ToolPackageVersions.MicrosoftExtensionsHosting);
         EnsurePackageReference(project, "ULinkGame.Server", ToolPackageVersions.ULinkGameServer);
+        EnsurePackageReference(
+            project,
+            "ULinkGame.Server.Generators",
+            ToolPackageVersions.ULinkGameServerGenerators,
+            ("PrivateAssets", "all"),
+            ("OutputItemType", "Analyzer"));
         EnsurePackageReference(project, "ULinkGame.Server.Hotfix", ToolPackageVersions.ULinkGameServerHotfix);
         EnsureClusterPackageReferences(project, options);
         EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: true);
@@ -325,7 +331,11 @@ internal sealed class ProjectScaffolder
         reference.SetAttributeValue("ReferenceOutputAssembly", "false");
     }
 
-    private static void EnsurePackageReference(System.Xml.Linq.XElement project, string include, string version)
+    private static void EnsurePackageReference(
+        System.Xml.Linq.XElement project,
+        string include,
+        string version,
+        params (string Name, string Value)[] attributes)
     {
         var reference = project
             .Descendants("PackageReference")
@@ -333,14 +343,21 @@ internal sealed class ProjectScaffolder
 
         if (reference is null)
         {
-            FindOrAddItemGroup(project).Add(new System.Xml.Linq.XElement(
+            reference = new System.Xml.Linq.XElement(
                 "PackageReference",
                 new System.Xml.Linq.XAttribute("Include", include),
-                new System.Xml.Linq.XAttribute("Version", version)));
-            return;
+                new System.Xml.Linq.XAttribute("Version", version));
+            FindOrAddItemGroup(project).Add(reference);
+        }
+        else
+        {
+            reference.SetAttributeValue("Version", version);
         }
 
-        reference.SetAttributeValue("Version", version);
+        foreach (var attribute in attributes)
+        {
+            reference.SetAttributeValue(attribute.Name, attribute.Value);
+        }
     }
 
     private static void EnsureConditionalPackageReference(

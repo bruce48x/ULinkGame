@@ -129,6 +129,7 @@ internal static class ToolTemplates
           <ItemGroup>
             <PackageReference Include="Microsoft.Extensions.Hosting" Version="{{ToolPackageVersions.MicrosoftExtensionsHosting}}" />
             <PackageReference Include="ULinkGame.Server" Version="{{ToolPackageVersions.ULinkGameServer}}" />
+            <PackageReference Include="ULinkGame.Server.Generators" Version="{{ToolPackageVersions.ULinkGameServerGenerators}}" PrivateAssets="all" OutputItemType="Analyzer" />
             <PackageReference Include="ULinkGame.Server.Hotfix" Version="{{ToolPackageVersions.ULinkGameServerHotfix}}" />
         {{clusterReferences}}
         {{persistenceReferences}}
