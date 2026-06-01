@@ -4,18 +4,24 @@ namespace ULinkGame.Server.Actors;
 
 public sealed class RemoteActorInvoker : IRemoteActorInvoker
 {
-    private readonly IClusterRouter _router;
     private readonly RemoteActorGateway _gateway;
     private readonly NodeId _localNode;
+    private readonly INodeDirectory _nodeDirectory;
+    private readonly INodeMessenger _nodeMessenger;
+    private readonly RemoteActorOptions _options;
 
     public RemoteActorInvoker(
-        IClusterRouter router,
         RemoteActorGateway gateway,
-        NodeId localNode)
+        NodeId localNode,
+        INodeDirectory nodeDirectory,
+        INodeMessenger nodeMessenger,
+        RemoteActorOptions? options = null)
     {
-        _router = router ?? throw new ArgumentNullException(nameof(router));
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _localNode = localNode;
+        _nodeDirectory = nodeDirectory ?? throw new ArgumentNullException(nameof(nodeDirectory));
+        _nodeMessenger = nodeMessenger ?? throw new ArgumentNullException(nameof(nodeMessenger));
+        _options = options ?? new RemoteActorOptions();
     }
 
     public async ValueTask<RemoteActorInvocationResult> AskAsync(
@@ -40,12 +46,14 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
                 timeout,
                 cancellationToken);
 
-            var status = await _router.SendAsync(
-                CreateMessage(invocation, includeReply: true),
+            var status = await SendToInvocationNodeAsync(
+                invocation,
+                includeReply: true,
                 cancellationToken).ConfigureAwait(false);
 
             if (status != ClusterSendStatus.Accepted)
             {
+                _gateway.TryCancelPending(invocation.CorrelationId);
                 return ToResult(status);
             }
 
@@ -74,8 +82,9 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
 
         try
         {
-            var status = await _router.SendAsync(
-                CreateMessage(invocation, includeReply: false),
+            var status = await SendToInvocationNodeAsync(
+                invocation,
+                includeReply: false,
                 cancellationToken).ConfigureAwait(false);
 
             return ToResult(status);
@@ -86,6 +95,48 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
                 RemoteActorStatus.Cancelled,
                 exception.Message);
         }
+    }
+
+    private async ValueTask<ClusterSendStatus> SendToInvocationNodeAsync(
+        RemoteActorInvocation invocation,
+        bool includeReply,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var now = DateTimeOffset.UtcNow;
+        if (invocation.Deadline <= now)
+        {
+            return ClusterSendStatus.Expired;
+        }
+
+        var record = await _nodeDirectory.ResolveAsync(
+            _options.ClusterName,
+            invocation.Node,
+            now,
+            cancellationToken).ConfigureAwait(false);
+
+        if (record is null || record.IsExpired(now))
+        {
+            return ClusterSendStatus.Failed;
+        }
+
+        if (!record.Endpoints.TryGetValue(_options.EndpointName, out var endpoint))
+        {
+            return ClusterSendStatus.Failed;
+        }
+
+        var target = new RouteLocation(
+            ClusterActorRouteKeys.ForActor(invocation.ActorId.Value),
+            invocation.Node,
+            endpoint,
+            record.LeaseExpiresAt,
+            record.NodeEpoch);
+
+        return await _nodeMessenger.SendAsync(
+            target,
+            CreateMessage(invocation, includeReply),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private ClusterMessage CreateMessage(

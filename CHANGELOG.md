@@ -5,10 +5,15 @@
 ### Released
 
 - `ULinkGame.Server` `0.1.12`
+- `ULinkGame.Server` `0.1.13`
 
 ### Added
 
 - Added typed actor metadata primitives for the server actor runtime API.
+
+### Fixed
+
+- Fixed `RemoteActorInvoker` pending-reply cleanup on send failure and direct-node delivery for remote actor invocations.
 
 ## 2026-05-31
 

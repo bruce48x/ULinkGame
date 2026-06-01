@@ -7,7 +7,7 @@ public sealed class RemoteActorGateway
 {
     public const string ReplyKind = "_actor_reply";
 
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>> _pending = new();
+    private readonly ConcurrentDictionary<string, PendingRegistration> _pending = new();
 
     public IClusterMessageHandler CreateReplyHandler()
     {
@@ -22,13 +22,13 @@ public sealed class RemoteActorGateway
         var tcs = new TaskCompletionSource<ReadOnlyMemory<byte>>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        if (!_pending.TryAdd(correlationId, tcs))
+        var registration = new PendingRegistration(tcs, _pending, correlationId);
+        if (!_pending.TryAdd(correlationId, registration))
         {
             throw new InvalidOperationException(
                 $"A pending request with correlation id '{correlationId}' already exists.");
         }
 
-        var registration = new PendingRegistration(tcs, _pending, correlationId);
         var timeoutTimer = new Timer(static state =>
         {
             var pending = (PendingRegistration)state!;
@@ -59,6 +59,28 @@ public sealed class RemoteActorGateway
         }, registration, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
         return tcs.Task;
+    }
+
+    public bool TryCancelPending(
+        string correlationId,
+        Exception? exception = null)
+    {
+        if (!_pending.TryRemove(correlationId, out var pending))
+        {
+            return false;
+        }
+
+        pending.Dispose();
+        if (exception is null)
+        {
+            pending.Completion.TrySetCanceled();
+        }
+        else
+        {
+            pending.Completion.TrySetException(exception);
+        }
+
+        return true;
     }
 
     public static async ValueTask SendReplyAsync(
@@ -100,9 +122,10 @@ public sealed class RemoteActorGateway
             }
 
             if (message.CorrelationId is not null &&
-                _gateway._pending.TryRemove(message.CorrelationId, out var tcs))
+                _gateway._pending.TryRemove(message.CorrelationId, out var pending))
             {
-                tcs.TrySetResult(message.Payload);
+                pending.Dispose();
+                pending.Completion.TrySetResult(message.Payload);
             }
 
             return ValueTask.FromResult(ClusterSendStatus.Accepted);
@@ -113,7 +136,7 @@ public sealed class RemoteActorGateway
     {
         public PendingRegistration(
             TaskCompletionSource<ReadOnlyMemory<byte>> completion,
-            ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>> requests,
+            ConcurrentDictionary<string, PendingRegistration> requests,
             string correlationId)
         {
             Completion = completion;
@@ -123,7 +146,7 @@ public sealed class RemoteActorGateway
 
         public TaskCompletionSource<ReadOnlyMemory<byte>> Completion { get; }
 
-        public ConcurrentDictionary<string, TaskCompletionSource<ReadOnlyMemory<byte>>> Requests { get; }
+        public ConcurrentDictionary<string, PendingRegistration> Requests { get; }
 
         public string CorrelationId { get; }
 

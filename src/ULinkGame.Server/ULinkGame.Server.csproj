@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ULinkGame.Server</RootNamespace>
     <PackageId>ULinkGame.Server</PackageId>
-    <Version>0.1.12</Version>
+    <Version>0.1.13</Version>
     <Description>Server-side actor runtime, RPC hosting helpers, session lifecycle, and reliable push infrastructure for ULinkGame applications.</Description>
     <PackageTags>ulinkgame;ulinkrpc;game;server;actor;rpc;reliable-push</PackageTags>
   </PropertyGroup>
