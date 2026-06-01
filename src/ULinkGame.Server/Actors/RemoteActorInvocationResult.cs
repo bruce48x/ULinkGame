@@ -5,6 +5,8 @@ public sealed record RemoteActorInvocationResult(
     ReadOnlyMemory<byte> Payload,
     string? Message = null)
 {
+    public ReadOnlyMemory<byte> Payload { get; init; } = Payload.ToArray();
+
     public static RemoteActorInvocationResult Accepted()
     {
         return new RemoteActorInvocationResult(RemoteActorStatus.Accepted, ReadOnlyMemory<byte>.Empty);

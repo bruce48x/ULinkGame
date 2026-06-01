@@ -9,4 +9,7 @@ public sealed record RemoteActorInvocation(
     string MethodName,
     ReadOnlyMemory<byte> Payload,
     DateTimeOffset Deadline,
-    string CorrelationId);
+    string CorrelationId)
+{
+    public ReadOnlyMemory<byte> Payload { get; init; } = Payload.ToArray();
+}
