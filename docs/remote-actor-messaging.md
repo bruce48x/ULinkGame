@@ -95,7 +95,7 @@ public readonly struct RoomRemoteRef
 
 The generated `Local(...)` ref invokes the process-local `IActorRuntime`.
 
-The generated `Remote(node, ...)` ref serializes the request, sends a cluster actor envelope through the remote actor invoker, waits for a reply when the actor method returns a value, deserializes the reply, and maps delivery failures to `RemoteActorException`.
+The generated `Remote(nodeId, ...)` ref serializes the request, sends a cluster actor envelope through the remote actor invoker, waits for a reply when the actor method returns a value, deserializes the reply, and maps delivery failures to `RemoteActorException`.
 
 The business method surface is intentionally not doubled with `TryJoinAsync` or `TryLeaveAsync`. Normal remote actor calls return normally or throw. Lower-level result-returning APIs remain available for framework internals and rare boundary services.
 
@@ -109,7 +109,7 @@ public sealed class RoomActor : Actor<RoomId>
 }
 ```
 
-This avoids separate `[ActorKey]` attributes and avoids generator guessing. The generator uses `TKey` to type `Local(TKey id)` and `Remote(NodeId node, TKey id)`.
+This avoids separate `[ActorKey]` attributes and avoids generator guessing. The generator uses `TKey` to type `Local(TKey id)` and `Remote(NodeId nodeId, TKey id)`.
 
 Default key-to-string conversion:
 
@@ -267,7 +267,7 @@ Local calls may still fail for local actor runtime reasons such as unavailable a
 
 ## Remote Calls
 
-`Remote(node, id)` uses the cluster layer. Generated remote refs should:
+`Remote(nodeId, id)` uses the cluster layer. Generated remote refs should:
 
 1. Build a stable actor id from actor name and key.
 2. Build a stable method id.

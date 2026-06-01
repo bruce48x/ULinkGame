@@ -281,23 +281,19 @@ See `docs/feature-role.md` for details.
 
 ## Remote Actor Messaging
 
-Send messages to actors on other nodes with explicit remote semantics:
+Use generated typed actor accessors for frequent actor calls. Local and remote calls expose the same business methods, while `Remote(nodeId, id)` keeps the network boundary visible:
 
 ```csharp
-// Request-reply
-var result = await runtime.AskRemoteAsync<TResult>(
-    router, gateway, routeDirectory, localNode,
-    "player/alice", "login",
-    () => Serialize(request),
-    payload => Deserialize<TResult>(payload),
-    TimeSpan.FromSeconds(5));
+var localReply = await rooms
+    .Local(roomId)
+    .JoinAsync(request, cancellationToken);
 
-// Fire-and-forget
-await runtime.TellRemoteAsync(
-    router, localNode, "player/alice", "notify",
-    () => Serialize(notification),
-    TimeSpan.FromSeconds(5));
+var remoteReply = await rooms
+    .Remote(nodeId, roomId)
+    .JoinAsync(request, cancellationToken);
 ```
+
+The lower-level `AskRemoteAsync` and `TellRemoteAsync` helpers remain available for custom cluster actor envelope plumbing.
 
 See `docs/remote-actor-messaging.md` for details.
 

@@ -84,7 +84,7 @@ These belong to game projects. The framework provides infrastructure; the game p
 | Session lifecycle + reconnect | skynet (gate/watchdog/agent) | Done (ULinkGame.Server) | Connection management |
 | Component-based assembly (N→1, 1→N) | ET | Planned | Single-process dev, multi-process prod |
 | Cross-server event bus | Fantasy (SphereEvent) | Planned | Pub-sub for announcements, leaderboards |
-| Location-aware actor messaging | ET | Planned | `AskRemoteAsync` with explicit Remote naming |
+| Location-aware actor messaging | ET | Done | Typed `Local(id)` / `Remote(nodeId, id)` actor refs with visible remote boundary |
 | Gate auto-routing (Roaming) | Fantasy | Planned | Client-transparent backend routing |
 | Service discovery + leader election | ET | Planned | Automatic failover |
 | Deadlock detection → immediate failure | GeekServer (adapted) | Done (ULinkActor 0.3.0) | Circular calls throw synchronously |
@@ -124,9 +124,9 @@ This mirrors skynet's 32-bit address scheme (8-bit node + 24-bit local) but with
 
 ### Why explicit cluster API instead of transparent routing?
 
-skynet's harbor system requires explicit cross-node addressing. ULinkGame follows the same model: `IClusterRouter.SendAsync()` is a different API from `IActorRuntime.TellAsync()`. This makes the cost and failure modes of cross-node communication visible at the call site.
+skynet's harbor system requires explicit cross-node addressing. ULinkGame follows the same model: generated actor accessors expose `Local(id)` and `Remote(nodeId, id)` as different call objects. The business method names stay the same, but the network boundary remains visible at the call site.
 
-The planned `AskRemoteAsync` extension method will simplify the syntax but keep the "Remote" naming to preserve visibility.
+The lower-level `AskRemoteAsync` and `TellRemoteAsync` helpers remain plumbing APIs for cluster actor envelopes and reply correlation, not the preferred day-to-day business API.
 
 ### Why at-least-once instead of exactly-once?
 
@@ -151,7 +151,7 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 ### Phase 2: Developer experience (complete)
 
 - [x] Feature/Role component-based assembly (`IFeature` / `INodeRole`, single-process dev / multi-process prod)
-- [x] Location-aware actor messaging (`AskRemoteAsync` / `TellRemoteAsync` + `RemoteActorGateway`)
+- [x] Location-aware actor messaging (typed `Local(id)` / `Remote(nodeId, id)` refs + `RemoteActorGateway`)
 - [x] Gate/Watchdog/Agent pattern documented (see `docs/gate-watchdog-agent.md`)
 
 ### Phase 3: Deferred
@@ -159,7 +159,7 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 These are not currently needed. Existing infrastructure or external tools handle them:
 
 - Cross-server event bus — Redis pub-sub is sufficient for most deployments
-- Gate auto-routing — manual routing with `AskRemoteAsync` works; automatic routing can be added later
+- Gate auto-routing — explicit `Remote(nodeId, id)` routing works; automatic route lookup can be added later
 - Service discovery with leader election — static config + `INodeDirectory` suffices for most topologies
 - Full-link test framework — no pressing need; revisit when concrete requirements emerge
 - Soft routing anti-DDoS — can use an external reverse proxy / load balancer

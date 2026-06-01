@@ -49,7 +49,7 @@ Currently implemented:
 - Reliable push outbox/inbox
 - Hotfix assembly loading and dispatch table swap
 - Component-based server assembly (`IFeature` / `INodeRole`)
-- Remote actor messaging (`AskRemoteAsync` / `TellRemoteAsync`)
+- Remote actor messaging (typed `Local(id)` / `Remote(nodeId, id)` refs over lower-level `AskRemoteAsync` / `TellRemoteAsync` plumbing)
 - Message recording storage and replay (`IMessageLogStore`)
 - Game-specific ActorId scheme (string with generation)
 
