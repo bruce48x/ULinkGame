@@ -136,4 +136,122 @@ public sealed class TypedActorGeneratorTests
         Assert.Empty(result.ErrorDiagnostics);
         Assert.Equal(string.Empty, result.GeneratedSource);
     }
+
+    [Fact]
+    public void Generator_uses_explicit_actor_and_method_names()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct RoomId(string Value);
+            public sealed record JoinRoomRequest(string PlayerId);
+            public sealed record JoinRoomReply(bool Accepted);
+
+            [ActorName("battle-room")]
+            public sealed class BattleRoomActor : Actor<RoomId>
+            {
+                [ActorMethod("join")]
+                public ValueTask<JoinRoomReply> EnterAsync(
+                    JoinRoomRequest request,
+                    CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.FromResult(new JoinRoomReply(true));
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("global::ULinkGame.Server.Actors.ActorId.From(\"battle-room/\" + _id.Value)", result.GeneratedSource);
+        Assert.Contains("\"battle-room\", \"join\"", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_skips_actor_ignore_methods()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct RoomId(string Value);
+            public sealed record PingRequest;
+
+            public sealed class RoomActor : Actor<RoomId>
+            {
+                [ActorIgnore]
+                public ValueTask HiddenAsync(PingRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.DoesNotContain("HiddenAsync", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_skips_remote_ref_for_local_only_actor()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct MetricsId(string Value);
+            public sealed record PingRequest;
+
+            [ActorLocalOnly]
+            public sealed class MetricsActor : Actor<MetricsId>
+            {
+                public ValueTask PingAsync(PingRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("public MetricsLocalRef Local(MetricsId id)", result.GeneratedSource);
+        Assert.DoesNotContain("MetricsRemoteRef", result.GeneratedSource);
+        Assert.DoesNotContain("Remote(global::ULinkGame.Cluster.NodeId nodeId", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_reports_warning_for_unsupported_public_method()
+    {
+        var source = """
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct RoomId(string Value);
+
+            public sealed class RoomActor : Actor<RoomId>
+            {
+                public int Count()
+                {
+                    return 1;
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Contains(result.GeneratorDiagnostics, diagnostic => diagnostic.Id == "ULINKACTOR001");
+    }
 }
