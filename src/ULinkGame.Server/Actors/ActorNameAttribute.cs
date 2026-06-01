@@ -1,6 +1,6 @@
 namespace ULinkGame.Server.Actors;
 
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ActorNameAttribute : Attribute
 {
     public ActorNameAttribute(string name)

@@ -1,6 +1,6 @@
 namespace ULinkGame.Server.Actors;
 
-[AttributeUsage(AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class ActorIgnoreAttribute : Attribute
 {
 }
