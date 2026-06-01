@@ -38,11 +38,85 @@ public sealed class TypedActorGeneratorTests
         Assert.Empty(result.ErrorDiagnostics);
         Assert.Contains("public sealed class RoomActors", result.GeneratedSource);
         Assert.Contains("public RoomLocalRef Local(RoomId id)", result.GeneratedSource);
-        Assert.Contains("public RoomRemoteRef Remote(global::ULinkGame.Cluster.NodeId node, RoomId id)", result.GeneratedSource);
+        Assert.Contains("public RoomRemoteRef Remote(global::ULinkGame.Cluster.NodeId nodeId, RoomId id)", result.GeneratedSource);
+        Assert.Contains("return new RoomRemoteRef(_remote, _serializer, _options, nodeId, id);", result.GeneratedSource);
         Assert.Contains("public global::System.Threading.Tasks.ValueTask<JoinRoomReply> JoinAsync", result.GeneratedSource);
         Assert.Contains("private readonly global::ULinkGame.Server.Actors.IActorRuntime _runtime;", result.GeneratedSource);
         Assert.Contains("return _runtime.AskAsync<global::Game.Server.RoomActor, JoinRoomReply>", result.GeneratedSource);
         Assert.Contains("global::ULinkGame.Server.Actors.ActorId.From(\"room/\" + _id.Value)", result.GeneratedSource);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask<JoinRoomReply> JoinAsync", result.GeneratedSource);
+        Assert.Contains("var payload = _serializer.Serialize(request);", result.GeneratedSource);
+        Assert.Contains("new global::ULinkGame.Server.Actors.RemoteActorInvocation(_node, actorId, \"room\", \"join\", payload, deadline, correlationId)", result.GeneratedSource);
+        Assert.Contains("var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)", result.GeneratedSource);
+        Assert.Contains("return _serializer.Deserialize<JoinRoomReply>(result.Payload);", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_uses_ToString_for_key_without_Value_property()
+    {
+        var source = """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public sealed class PingRequest
+            {
+            }
+
+            public sealed class PingReply
+            {
+            }
+
+            public sealed class SessionActor : Actor<Guid>
+            {
+                public ValueTask<PingReply> PingAsync(PingRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.FromResult(new PingReply());
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("global::ULinkGame.Server.Actors.ActorId.From(\"session/\" + _id.ToString())", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_uses_string_key_directly()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public sealed class PingRequest
+            {
+            }
+
+            public sealed class PingReply
+            {
+            }
+
+            public sealed class SessionActor : Actor<string>
+            {
+                public ValueTask<PingReply> PingAsync(PingRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.FromResult(new PingReply());
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("global::ULinkGame.Server.Actors.ActorId.From(\"session/\" + _id)", result.GeneratedSource);
     }
 
     [Fact]
