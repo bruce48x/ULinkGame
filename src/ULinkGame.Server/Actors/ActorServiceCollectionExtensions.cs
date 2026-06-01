@@ -13,6 +13,8 @@ public static class ActorServiceCollectionExtensions
         configure?.Invoke(options);
 
         services.TryAddSingleton(options);
+        services.TryAddSingleton<RemoteActorGateway>();
+        services.TryAddSingleton<RemoteActorOptions>();
         services.TryAddSingleton<IActorRuntime, ULinkActorRuntime>();
         return services;
     }
