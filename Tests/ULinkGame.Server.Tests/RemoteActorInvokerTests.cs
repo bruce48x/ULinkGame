@@ -150,6 +150,43 @@ public sealed class RemoteActorInvokerTests
     }
 
     [Fact]
+    public async Task AskAsync_send_cancellation_releases_pending_reply_and_returns_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var gateway = new RemoteActorGateway();
+        var invocation = CreateInvocation();
+        var messenger = new RecordingNodeMessenger
+        {
+            OnSend = _ => cancellation.Cancel(),
+            ExceptionToThrow = new OperationCanceledException(cancellation.Token)
+        };
+        var invoker = CreateInvoker(invocation, gateway, messenger);
+
+        var result = await invoker.AskAsync(invocation, cancellation.Token);
+
+        Assert.Equal(RemoteActorStatus.Cancelled, result.Status);
+
+        var pending = gateway.RegisterPendingAsync(
+            invocation.CorrelationId,
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+        var replyPayload = new byte[] { 1, 3, 5 };
+
+        await gateway.CreateReplyHandler().HandleAsync(
+            new ClusterMessage(
+                ClusterActorRouteKeys.ForReply(new NodeId("node-local")),
+                RemoteActorGateway.ReplyKind,
+                replyPayload,
+                DateTimeOffset.UtcNow.AddSeconds(5),
+                invocation.Node,
+                invocation.CorrelationId),
+            TestContext.Current.CancellationToken);
+
+        var payload = await pending.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.Equal(replyPayload, payload.ToArray());
+    }
+
+    [Fact]
     public async Task TellAsync_sends_to_requested_node_directory_record()
     {
         var requestedNode = new NodeId("node-requested");

@@ -52,6 +52,13 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
                 includeReply: true,
                 cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            _gateway.TryCancelPending(invocation.CorrelationId);
+            return RemoteActorInvocationResult.Failed(
+                RemoteActorStatus.Cancelled,
+                exception.Message);
+        }
         catch
         {
             _gateway.TryCancelPending(invocation.CorrelationId);

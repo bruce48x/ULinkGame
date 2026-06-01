@@ -7,6 +7,7 @@
 - `ULinkGame.Server` `0.1.12`
 - `ULinkGame.Server` `0.1.13`
 - `ULinkGame.Server` `0.1.14`
+- `ULinkGame.Server` `0.1.15`
 
 ### Added
 
@@ -16,6 +17,7 @@
 
 - Fixed `RemoteActorInvoker` pending-reply cleanup on send failure and direct-node delivery for remote actor invocations.
 - Fixed `RemoteActorInvoker.AskAsync` pending-reply cleanup when direct node send throws.
+- Fixed `RemoteActorInvoker.AskAsync` cancellation mapping during direct node send.
 
 ## 2026-05-31
 
