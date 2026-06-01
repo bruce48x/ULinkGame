@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-01
+
+### Released
+
+- `ULinkGame.Server` `0.1.12`
+
+### Added
+
+- Added typed actor metadata primitives for the server actor runtime API.
+
 ## 2026-05-31
 
 ### Released

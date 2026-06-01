@@ -11,7 +11,7 @@ public sealed class ActorRuntimeTests
     public async Task ActorRuntime_supports_typed_actor_base()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var provider = CreateProvider();
+        await using var provider = CreateProvider();
         var runtime = provider.GetRequiredService<IActorRuntime>();
 
         var result = await runtime.AskAsync<TypedRoomActor, string>(
