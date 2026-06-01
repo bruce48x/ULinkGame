@@ -326,13 +326,13 @@ namespace ULinkGame.Server.Generators
             builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorInvoker remote,");
             builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorSerializer serializer,");
             builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.RemoteActorOptions options,");
-            builder.Append(indent).AppendLine("        global::ULinkGame.Cluster.NodeId node,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Cluster.NodeId nodeId,");
             builder.Append(indent).Append("        ").Append(keyType).AppendLine(" id)");
             builder.Append(indent).AppendLine("    {");
             builder.Append(indent).AppendLine("        _remote = remote;");
             builder.Append(indent).AppendLine("        _serializer = serializer;");
             builder.Append(indent).AppendLine("        _options = options;");
-            builder.Append(indent).AppendLine("        _node = node;");
+            builder.Append(indent).AppendLine("        _node = nodeId;");
             builder.Append(indent).AppendLine("        _id = id;");
             builder.Append(indent).AppendLine("    }");
 

@@ -40,6 +40,7 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("public RoomLocalRef Local(RoomId id)", result.GeneratedSource);
         Assert.Contains("public RoomRemoteRef Remote(global::ULinkGame.Cluster.NodeId nodeId, RoomId id)", result.GeneratedSource);
         Assert.Contains("return new RoomRemoteRef(_remote, _serializer, _options, nodeId, id);", result.GeneratedSource);
+        Assert.Contains("global::ULinkGame.Cluster.NodeId nodeId,", result.GeneratedSource);
         Assert.Contains("public global::System.Threading.Tasks.ValueTask<JoinRoomReply> JoinAsync", result.GeneratedSource);
         Assert.Contains("private readonly global::ULinkGame.Server.Actors.IActorRuntime _runtime;", result.GeneratedSource);
         Assert.Contains("return _runtime.AskAsync<global::Game.Server.RoomActor, JoinRoomReply>", result.GeneratedSource);
