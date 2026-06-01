@@ -6,21 +6,18 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
 {
     private readonly RemoteActorGateway _gateway;
     private readonly NodeId _localNode;
-    private readonly INodeDirectory _nodeDirectory;
-    private readonly INodeMessenger _nodeMessenger;
+    private readonly IClusterNodeSender _nodeSender;
     private readonly RemoteActorOptions _options;
 
     public RemoteActorInvoker(
         RemoteActorGateway gateway,
         NodeId localNode,
-        INodeDirectory nodeDirectory,
-        INodeMessenger nodeMessenger,
+        IClusterNodeSender nodeSender,
         RemoteActorOptions? options = null)
     {
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _localNode = localNode;
-        _nodeDirectory = nodeDirectory ?? throw new ArgumentNullException(nameof(nodeDirectory));
-        _nodeMessenger = nodeMessenger ?? throw new ArgumentNullException(nameof(nodeMessenger));
+        _nodeSender = nodeSender ?? throw new ArgumentNullException(nameof(nodeSender));
         _options = options ?? new RemoteActorOptions();
     }
 
@@ -126,31 +123,11 @@ public sealed class RemoteActorInvoker : IRemoteActorInvoker
             return ClusterSendStatus.Expired;
         }
 
-        var record = await _nodeDirectory.ResolveAsync(
-            _options.ClusterName,
+        var route = ClusterActorRouteKeys.ForActor(invocation.ActorId.Value);
+
+        return await _nodeSender.SendAsync(
             invocation.Node,
-            now,
-            cancellationToken).ConfigureAwait(false);
-
-        if (record is null || record.IsExpired(now))
-        {
-            return ClusterSendStatus.Failed;
-        }
-
-        if (!record.Endpoints.TryGetValue(_options.EndpointName, out var endpoint))
-        {
-            return ClusterSendStatus.Failed;
-        }
-
-        var target = new RouteLocation(
-            ClusterActorRouteKeys.ForActor(invocation.ActorId.Value),
-            invocation.Node,
-            endpoint,
-            record.LeaseExpiresAt,
-            record.NodeEpoch);
-
-        return await _nodeMessenger.SendAsync(
-            target,
+            route,
             CreateMessage(invocation, includeReply),
             cancellationToken).ConfigureAwait(false);
     }

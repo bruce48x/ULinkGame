@@ -21,17 +21,17 @@
 
 ## Task 1: Cluster Node Sender
 
-- [ ] Add failing `ClusterNodeSenderTests` covering successful node resolution, missing node, missing endpoint, and messenger status passthrough.
-- [ ] Implement `IClusterNodeSender`, `ClusterNodeSenderOptions`, and `ClusterNodeSender`.
-- [ ] Run `dotnet test Tests\ULinkGame.Cluster.Tests\ULinkGame.Cluster.Tests.csproj --no-restore --filter "FullyQualifiedName~ClusterNodeSender"`.
-- [ ] Commit `Add cluster node sender`.
+- [x] Add failing `ClusterNodeSenderTests` covering successful node resolution, missing node, missing endpoint, and messenger status passthrough.
+- [x] Implement `IClusterNodeSender`, `ClusterNodeSenderOptions`, and `ClusterNodeSender`.
+- [x] Run `dotnet test Tests\ULinkGame.Cluster.Tests\ULinkGame.Cluster.Tests.csproj --no-restore --filter "FullyQualifiedName~ClusterNodeSender"`.
+- [x] Commit `Add cluster node sender`.
 
 ## Task 2: Remote Actor Invoker Refactor
 
-- [ ] Update `RemoteActorInvokerTests` to stub `IClusterNodeSender`, proving `invocation.Node` and actor route are passed through.
-- [ ] Remove `ClusterName` and `EndpointName` from `RemoteActorOptions`.
-- [ ] Refactor `RemoteActorInvoker` to call `IClusterNodeSender.SendAsync`.
-- [ ] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~RemoteActor"`.
+- [x] Update `RemoteActorInvokerTests` to stub `IClusterNodeSender`, proving `invocation.Node` and actor route are passed through.
+- [x] Remove `ClusterName` and `EndpointName` from `RemoteActorOptions`.
+- [x] Refactor `RemoteActorInvoker` to call `IClusterNodeSender.SendAsync`.
+- [x] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~RemoteActor"`.
 - [ ] Commit `Route remote actor sends through cluster node sender`.
 
 ## Task 3: Verification
