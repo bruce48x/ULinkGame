@@ -25,3 +25,8 @@ public abstract class Actor : IActor
         return ValueTask.CompletedTask;
     }
 }
+
+public abstract class Actor<TKey> : Actor
+    where TKey : notnull
+{
+}

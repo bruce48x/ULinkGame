@@ -8,6 +8,21 @@ namespace ULinkGame.Server.Tests;
 public sealed class ActorRuntimeTests
 {
     [Fact]
+    public async Task ActorRuntime_supports_typed_actor_base()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var provider = CreateProvider();
+        var runtime = provider.GetRequiredService<IActorRuntime>();
+
+        var result = await runtime.AskAsync<TypedRoomActor, string>(
+            ActorId.From("room/alpha"),
+            static (actor, ct) => actor.EchoAsync("joined", ct),
+            cancellationToken);
+
+        Assert.Equal("room/alpha:joined", result);
+    }
+
+    [Fact]
     public void AddULinkGameServerActors_registers_ULinkActor_backed_runtime()
     {
         using var provider = new ServiceCollection()
@@ -601,5 +616,22 @@ public sealed class ActorRuntimeTests
 
             await Task.Delay(10, linked.Token);
         }
+    }
+
+    private static ServiceProvider CreateProvider()
+    {
+        return new ServiceCollection()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+    }
+}
+
+public readonly record struct RuntimeRoomId(string Value);
+
+public sealed class TypedRoomActor : Actor<RuntimeRoomId>
+{
+    public ValueTask<string> EchoAsync(string value, CancellationToken cancellationToken = default)
+    {
+        return ValueTask.FromResult($"{Context.Id.Value}:{value}");
     }
 }
