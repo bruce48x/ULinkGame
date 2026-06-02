@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>ULinkGame.Server.Hotfix</RootNamespace>
     <PackageId>ULinkGame.Server.Hotfix</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Description>Runtime loader and dispatcher for ULinkGame server hotfix assemblies.</Description>
     <PackageTags>ulinkgame;hotfix;server;reload</PackageTags>
   </PropertyGroup>

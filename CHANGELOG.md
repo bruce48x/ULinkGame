@@ -4,6 +4,8 @@
 
 ### Released
 
+- `ULinkGame.Server.Hotfix.Abstractions` `0.1.1`
+- `ULinkGame.Server.Hotfix` `0.1.1`
 - `ULinkGame.Cluster` `0.1.4`
 - `ULinkGame.Server` `0.1.16`
 - `ULinkGame.Server` `0.1.17`
@@ -29,6 +31,7 @@
 
 ### Changed
 
+- Reorganized `src/ULinkGame.Server.Hotfix.Abstractions` and `src/ULinkGame.Server.Hotfix` source files into responsibility-focused directories without changing public namespaces or APIs.
 - Updated generated remote actor methods to throw actor call exceptions on remote failure instead of emitting status checks and constructing `RemoteActorException` inline.
 - Updated generated actor lifecycle ordering to claim actor directory ownership before spawn hooks and unregister ownership before destroy hooks.
 
