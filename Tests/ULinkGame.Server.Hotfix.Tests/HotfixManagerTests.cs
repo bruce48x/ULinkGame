@@ -141,8 +141,8 @@ public sealed class HotfixManagerTests
     }
 
     [Theory]
-    [InlineData(@"..\Hotfix.dll")]
-    [InlineData(@"nested\Hotfix.dll")]
+    [InlineData(@"../Hotfix.dll")]
+    [InlineData(@"nested/Hotfix.dll")]
     [InlineData(@"/tmp/Hotfix.dll")]
     public async Task CurrentDirectorySource_rejects_unsafe_assembly_file_names(string assemblyFileName)
     {
@@ -152,10 +152,10 @@ public sealed class HotfixManagerTests
     }
 
     [Theory]
-    [InlineData(@"..\current.txt", "Hotfix.dll")]
-    [InlineData(@"nested\current.txt", "Hotfix.dll")]
-    [InlineData("current.txt", @"..\Hotfix.dll")]
-    [InlineData("current.txt", @"nested\Hotfix.dll")]
+    [InlineData(@"../current.txt", "Hotfix.dll")]
+    [InlineData(@"nested/current.txt", "Hotfix.dll")]
+    [InlineData("current.txt", @"../Hotfix.dll")]
+    [InlineData("current.txt", @"nested/Hotfix.dll")]
     [InlineData("current.txt", @"/tmp/Hotfix.dll")]
     public async Task VersionPointerSource_rejects_unsafe_file_names(string pointerFileName, string assemblyFileName)
     {
