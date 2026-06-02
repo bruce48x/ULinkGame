@@ -61,10 +61,10 @@
 
 ## Phase 5: Feature Node Discovery API
 
-- [ ] Add `IClusterNodeDiscovery` API with `ListAsync(feature)` and `AnyAsync(feature)`.
-- [ ] Return `NodeId`/node descriptors, never endpoints, from business-facing discovery.
+- [x] Add `IClusterNodeDiscovery` API with `ListAsync(feature)` and `AnyAsync(feature)`.
+- [x] Return `NodeId`/node descriptors, never endpoints, from business-facing discovery.
 - [ ] Use the API internally for actor-directory host discovery.
-- [ ] Add tests for ready node filtering, missing feature, and default selection.
+- [x] Add tests for ready node filtering, missing feature, and default selection.
 - [ ] Commit `Add cluster feature node discovery`.
 
 ## Verification

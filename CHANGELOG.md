@@ -4,6 +4,7 @@
 
 ### Released
 
+- `ULinkGame.Cluster` `0.1.4`
 - `ULinkGame.Server` `0.1.16`
 - `ULinkGame.Server` `0.1.17`
 - `ULinkGame.Server` `0.1.18`
@@ -12,6 +13,7 @@
 ### Added
 
 - Added actor call exception types and a remote actor call helper for generated actor APIs.
+- Added cluster feature node discovery APIs for listing or selecting ready nodes by service feature without exposing endpoints.
 - Added server-side actor directory contracts and an in-memory actor directory implementation.
 - Added an in-memory actor directory cache for actor id to node id lookups.
 
