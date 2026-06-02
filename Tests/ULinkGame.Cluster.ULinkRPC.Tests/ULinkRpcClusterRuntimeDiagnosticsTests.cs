@@ -28,14 +28,17 @@ public sealed class ULinkRpcClusterRuntimeTests
         var serverTask = builder.RunAsync(stopServer.Token).AsTask();
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
+        var transport = new TcpTransport("127.0.0.1", port);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await transport.ConnectAsync(timeout.Token);
+
         await using var runtime = new RpcClientRuntime(
-            new RpcClientOptions(new TcpTransport("127.0.0.1", port), serializer));
+            new RpcClientOptions(transport, serializer));
         var runtimeTask = runtime.StartAsync(CancellationToken.None).AsTask();
         _ = runtimeTask.ContinueWith(
             task => _ = task.Exception,
             TaskContinuationOptions.OnlyOnFaulted);
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var reply = await runtime.CallAsync(
             ULinkRpcClusterProtocol.SendMethod,
             new ULinkRpcClusterSendRequest
