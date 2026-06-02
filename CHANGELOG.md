@@ -17,6 +17,7 @@
 - `ULinkGame.Server.Generators` `0.1.2`
 - `ULinkGame.Server.Generators` `0.1.3`
 - `ULinkGame.Server.Generators` `0.1.4`
+- `ULinkGame.Tool` `0.3.4`
 
 ### Added
 
@@ -31,7 +32,7 @@
 
 ### Changed
 
-- Reorganized `src/ULinkGame.Server.Hotfix.Abstractions` and `src/ULinkGame.Server.Hotfix` source files into responsibility-focused directories without changing public namespaces or APIs.
+- Replaced hardcoded hotfix assembly path with `Path.Combine(AppContext.BaseDirectory, "hotfix")` in generated server code, and added an MSBuild target to copy `Server.Hotfix.dll` into the server output directory after each build. The path is now configuration-independent (works in Debug/Release, any target framework).
 - Updated generated remote actor methods to throw actor call exceptions on remote failure instead of emitting status checks and constructing `RemoteActorException` inline.
 - Updated generated actor lifecycle ordering to claim actor directory ownership before spawn hooks and unregister ownership before destroy hooks.
 

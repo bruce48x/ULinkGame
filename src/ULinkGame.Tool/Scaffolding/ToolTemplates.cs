@@ -140,6 +140,13 @@ internal static class ToolTemplates
               <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             </None>
           </ItemGroup>
+
+          <Target Name="CopyHotfixOutput" AfterTargets="Build">
+            <Copy
+              SourceFiles="$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Server.Hotfix.dll"
+              DestinationFolder="$(OutDir)hotfix\"
+              Condition="Exists('$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Server.Hotfix.dll')" />
+          </Target>
         </Project>
         """;
     }
@@ -718,11 +725,10 @@ internal static class ULinkGameCheck
         ULinkGameRuntimeOptions runtime,
         ClusterOptions clusterOptions)
     {
-        var hotfixPath = System.IO.Path.GetFullPath(
-            System.IO.Path.Combine(
-                AppContext.BaseDirectory,
-                ""../../../../Hotfix/bin/Debug/net10.0"",
-                ""Server.Hotfix.dll""));
+        var hotfixPath = System.IO.Path.Combine(
+            AppContext.BaseDirectory,
+            ""hotfix"",
+            ""Server.Hotfix.dll"");
 
         return new ULinkGameResolvedRuntime(
             NodeId: new ULinkGameResolvedValue<string>(clusterOptions.NodeId, ULinkGameValueSource.Configuration, ""ULinkGame:Node:Id""),
@@ -1008,7 +1014,7 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string RenderHotfixServiceRegistration()
     {
         return """
-        var hotfixDirectory = ResolveHotfixDirectory("../../../../Hotfix/bin/Debug/net10.0");
+        var hotfixDirectory = Path.Combine(AppContext.BaseDirectory, "hotfix");
         builder.Services.AddULinkGameHotfix(
             new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, "Server.Hotfix.dll"),
             sharedAssemblyNames: ["Shared"]);
@@ -1046,15 +1052,6 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
             }
         }
 
-        static string ResolveHotfixDirectory(string configuredDirectory)
-        {
-            if (Path.IsPathFullyQualified(configuredDirectory))
-            {
-                return configuredDirectory;
-            }
-
-            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredDirectory));
-        }
         """;
     }
 

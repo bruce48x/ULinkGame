@@ -195,7 +195,7 @@ public sealed class ToolTemplateTests
         Assert.Contains("clusterOptions.AdvertisedEndpoints.TryGetValue(\"client\"", source);
         Assert.Contains("hotfix: failed local build output not found", source);
         Assert.Contains("fix: {hotfixFailure.Repair}", source);
-        Assert.Contains("../../../../Hotfix/bin/Debug/net10.0", source);
+        Assert.Contains("\"hotfix\"", source);
         Assert.Contains("new HotfixSourceRule()", source);
         Assert.Contains("new ULinkGameResolvedHotfix", source);
         Assert.DoesNotContain("Hotfix:Directory", source);
