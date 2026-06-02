@@ -26,6 +26,9 @@ static async Task<int> RunDirectoryAsync(SampleOptions options)
         return Usage();
     }
 
+    StartupDiagnostics.ValidatePort(options.Port.Value);
+    Console.WriteLine($"startup-check directory port={options.Port.Value} ok");
+
     var nodeDirectory = new InMemoryNodeDirectory();
     var routeDirectory = new InMemoryRouteDirectory();
     var serializer = new JsonSampleSerializer();
@@ -56,6 +59,10 @@ static async Task<int> RunWorkerAsync(SampleOptions options)
     {
         return Usage();
     }
+
+    StartupDiagnostics.ValidatePort(options.Port.Value);
+    StartupDiagnostics.ValidateDirectoryEndpoint(options.DirectoryEndpoint);
+    Console.WriteLine($"startup-check worker port={options.Port.Value} directory={options.DirectoryEndpoint} ok");
 
     var serializer = new JsonSampleSerializer();
     var handler = new WorkerHandler();

@@ -2,16 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Agar.Sample.State;
-using Gateway.Hosting;
-using Gateway.Realtime;
-using Gateway.Services;
-using Shared.Gameplay;
+using Gateway.Features;
+using ULinkGame.Server.Features;
 using ULinkGame.Server.Hotfix;
-using ULinkGame.Server.Hotfix.Loading;
-using ULinkGame.Server.Hosting;
-using ULinkGame.Server.ReliablePush;
-using ULinkGame.Server.Sessions;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration
@@ -19,36 +12,10 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddAgarSampleState();
-builder.Services.AddULinkGameServerSessions();
-builder.Services.AddSingleton<SessionDirectory>();
-builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-    GatewayRpcServerOptions.FromConfiguration(
-        builder.Configuration,
-        "ControlPlane",
-        new GatewayRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
-builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-    GatewayRpcServerOptions.FromConfiguration(
-        builder.Configuration,
-        "Realtime",
-        new GatewayRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
-builder.Services.AddSingleton<GatewayNodeIdentity>();
-builder.Services.AddSingleton<MatchmakingMonitor>();
-builder.Services.AddSingleton<RoomRuntimeHost>();
-builder.Services.AddSingleton<ReliableMatchmakingPublisher>();
-builder.Services.AddULinkGameServerReliablePush();
-builder.Services.AddSingleton<GatewayMatchmakingCoordinator>();
-builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
-builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
-builder.Services.AddHostedService<MatchmakingHostedService>();
-builder.Services.AddHostedService<DisconnectedSessionCleanupHostedService>();
-var hotfixDirectory = ResolveHotfixDirectory(
-    builder.Configuration["Hotfix:Directory"] ?? "../../../../Hotfix/bin/Debug/net10.0");
-var hotfixAssembly = builder.Configuration["Hotfix:Assembly"] ?? "Agar.Sample.Hotfix.dll";
-builder.Services.AddULinkGameHotfix(
-    new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, hotfixAssembly),
-    sharedAssemblyNames: [typeof(ArenaSimulation).Assembly.GetName().Name!]);
-builder.Services.AddULinkGameServerGateway();
+builder.Services.AddFeatures(builder.Configuration, features =>
+{
+    features.FromAssembly(typeof(GatewayRole).Assembly);
+});
 
 var host = builder.Build();
 
@@ -80,13 +47,3 @@ using (var scope = host.Services.CreateScope())
 }
 
 await host.RunAsync();
-
-static string ResolveHotfixDirectory(string configuredDirectory)
-{
-    if (Path.IsPathFullyQualified(configuredDirectory))
-    {
-        return configuredDirectory;
-    }
-
-    return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredDirectory));
-}

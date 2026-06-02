@@ -2,12 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Agar.Godot.Sample.State;
-using Gateway.Hosting;
-using Gateway.Realtime;
-using Gateway.Services;
-using ULinkGame.Server.Hosting;
-using ULinkGame.Server.ReliablePush;
+using Gateway.Features;
+using ULinkGame.Server.Features;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
@@ -17,29 +13,10 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddAgarGodotSampleState();
-builder.Services.AddSingleton<SessionDirectory>();
-builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-    GatewayRpcServerOptions.FromConfiguration(
-        builder.Configuration,
-        "ControlPlane",
-        new GatewayRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
-builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-    GatewayRpcServerOptions.FromConfiguration(
-        builder.Configuration,
-        "Realtime",
-        new GatewayRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
-builder.Services.AddSingleton<GatewayNodeIdentity>();
-builder.Services.AddSingleton<MatchmakingMonitor>();
-builder.Services.AddSingleton<RoomRuntimeHost>();
-builder.Services.AddSingleton<ReliableMatchmakingPublisher>();
-builder.Services.AddULinkGameServerReliablePush();
-builder.Services.AddSingleton<GatewayMatchmakingCoordinator>();
-builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
-builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
-builder.Services.AddHostedService<MatchmakingHostedService>();
-builder.Services.AddHostedService<DisconnectedSessionCleanupHostedService>();
-builder.Services.AddULinkGameServerGateway();
+builder.Services.AddFeatures(builder.Configuration, features =>
+{
+    features.FromAssembly(typeof(GatewayRole).Assembly);
+});
 
 var host = builder.Build();
 await host.RunAsync();

@@ -16,7 +16,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.1" />
-    <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.11" />
+    <PackageReference Include="ULinkRPC.Transport.Kcp" Version="0.11.13" />
     <PackageReference Include="ULinkRPC.Transport.WebSocket" Version="0.11.6" />
     <ProjectReference Include="../../Shared/Shared.csproj" TargetFramework="net10.0">
       <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
