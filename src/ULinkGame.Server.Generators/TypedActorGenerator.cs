@@ -443,18 +443,22 @@ namespace ULinkGame.Server.Generators
             if (method.ResultType == null)
             {
                 builder.Append(indent).AppendLine("    var result = await _remote.TellAsync(invocation, cancellationToken).ConfigureAwait(false);");
-                builder.Append(indent).AppendLine("    if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Accepted)");
-                builder.Append(indent).AppendLine("    {");
-                AppendThrowRemoteActorException(builder, actorName, methodName, indentLevel + 2);
-                builder.Append(indent).AppendLine("    }");
+                builder.Append(indent)
+                    .Append("    global::ULinkGame.Server.Actors.RemoteActorCall.EnsureAccepted(result, actorId, \"")
+                    .Append(actorName)
+                    .Append("\", \"")
+                    .Append(methodName)
+                    .AppendLine("\", _node, correlationId);");
             }
             else
             {
                 builder.Append(indent).AppendLine("    var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);");
-                builder.Append(indent).AppendLine("    if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)");
-                builder.Append(indent).AppendLine("    {");
-                AppendThrowRemoteActorException(builder, actorName, methodName, indentLevel + 2);
-                builder.Append(indent).AppendLine("    }");
+                builder.Append(indent)
+                    .Append("    global::ULinkGame.Server.Actors.RemoteActorCall.EnsureReplied(result, actorId, \"")
+                    .Append(actorName)
+                    .Append("\", \"")
+                    .Append(methodName)
+                    .AppendLine("\", _node, correlationId);");
                 builder.Append(indent)
                     .Append("    return _serializer.Deserialize<")
                     .Append(DisplayType(method.ResultType, actor.Symbol.ContainingNamespace))
@@ -636,23 +640,6 @@ namespace ULinkGame.Server.Generators
                 .Append("\", \"")
                 .Append(methodName)
                 .AppendLine("\", payload, deadline, correlationId);");
-        }
-
-        private static void AppendThrowRemoteActorException(
-            StringBuilder builder,
-            string actorName,
-            string methodName,
-            int indentLevel)
-        {
-            var indent = Indent(indentLevel);
-            builder.Append(indent).AppendLine("throw new global::ULinkGame.Server.Actors.RemoteActorException(");
-            builder.Append(indent).AppendLine("    result.Status,");
-            builder.Append(indent).AppendLine("    actorId,");
-            builder.Append(indent).Append("    \"").Append(actorName).AppendLine("\",");
-            builder.Append(indent).Append("    \"").Append(methodName).AppendLine("\",");
-            builder.Append(indent).AppendLine("    result.Message ?? string.Empty,");
-            builder.Append(indent).AppendLine("    _node,");
-            builder.Append(indent).AppendLine("    correlationId);");
         }
 
         private static string DisplayReturnType(ActorInfo actor, MethodInfo method)

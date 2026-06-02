@@ -24,11 +24,20 @@ public sealed class TypedActorGeneratorTests
             {
             }
 
+            public sealed class LeaveRoomRequest
+            {
+            }
+
             public sealed class RoomActor : Actor<RoomId>
             {
                 public ValueTask<JoinRoomReply> JoinAsync(JoinRoomRequest request, CancellationToken cancellationToken = default)
                 {
                     return ValueTask.FromResult(new JoinRoomReply());
+                }
+
+                public ValueTask LeaveAsync(LeaveRoomRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
                 }
             }
             """;
@@ -49,7 +58,12 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("var payload = _serializer.Serialize(request);", result.GeneratedSource);
         Assert.Contains("new global::ULinkGame.Server.Actors.RemoteActorInvocation(_node, actorId, \"room\", \"join\", payload, deadline, correlationId)", result.GeneratedSource);
         Assert.Contains("var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
-        Assert.Contains("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)", result.GeneratedSource);
+        Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorCall.EnsureReplied(result, actorId, \"room\", \"join\", _node, correlationId);", result.GeneratedSource);
+        Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorCall.EnsureAccepted(result, actorId, \"room\", \"leave\", _node, correlationId);", result.GeneratedSource);
+        Assert.DoesNotContain("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)", result.GeneratedSource);
+        Assert.DoesNotContain("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Accepted)", result.GeneratedSource);
+        Assert.DoesNotContain("RemoteActorStatus", result.GeneratedSource);
+        Assert.DoesNotContain("new global::ULinkGame.Server.Actors.RemoteActorException", result.GeneratedSource);
         Assert.Contains("return _serializer.Deserialize<JoinRoomReply>(result.Payload);", result.GeneratedSource);
         Assert.Contains("public sealed class RoomActorClusterHandler", result.GeneratedSource);
         Assert.Contains("public async global::System.Threading.Tasks.ValueTask<global::ULinkGame.Cluster.ClusterSendStatus> HandleAsync", result.GeneratedSource);

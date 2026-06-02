@@ -22,13 +22,13 @@
 
 ## Phase 1: Exception-First Generated Remote Calls
 
-- [ ] Add tests for actor call exception hierarchy and status mapping.
-- [ ] Add generator tests proving remote methods no longer emit `result.Status` switch/checks in user-facing generated methods.
-- [ ] Implement `ActorCallStatus`, `ActorCallException`, and common derived exceptions.
-- [ ] Add a runtime helper that maps `RemoteActorInvocationResult` to exceptions for generated code.
-- [ ] Update `TypedActorGenerator` to call the helper and return business results directly.
-- [ ] Run `dotnet test Tests\ULinkGame.Server.Generators.Tests\ULinkGame.Server.Generators.Tests.csproj --no-restore`.
-- [ ] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore -m:1`.
+- [x] Add tests for actor call exception hierarchy and status mapping.
+- [x] Add generator tests proving remote methods no longer emit `result.Status` switch/checks in user-facing generated methods.
+- [x] Implement `ActorCallStatus`, `ActorCallException`, and common derived exceptions.
+- [x] Add a runtime helper that maps `RemoteActorInvocationResult` to exceptions for generated code.
+- [x] Update `TypedActorGenerator` to call the helper and return business results directly.
+- [x] Run `dotnet test Tests\ULinkGame.Server.Generators.Tests\ULinkGame.Server.Generators.Tests.csproj --no-restore`.
+- [x] Run `dotnet test Tests\ULinkGame.Server.Tests\ULinkGame.Server.Tests.csproj --no-restore -m:1`.
 - [ ] Commit `Use exceptions for generated remote actor calls`.
 
 ## Phase 2: Actor Directory Contracts

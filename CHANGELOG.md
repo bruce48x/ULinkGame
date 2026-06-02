@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-02
+
+### Released
+
+- `ULinkGame.Server` `0.1.16`
+- `ULinkGame.Server.Generators` `0.1.1`
+
+### Added
+
+- Added actor call exception types and a remote actor call helper for generated actor APIs.
+
+### Changed
+
+- Updated generated remote actor methods to throw actor call exceptions on remote failure instead of emitting status checks and constructing `RemoteActorException` inline.
+
 ## 2026-06-01
 
 ### Released
