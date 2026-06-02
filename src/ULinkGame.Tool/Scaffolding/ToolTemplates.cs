@@ -225,22 +225,23 @@ internal static class ToolTemplates
         using System.Threading.Tasks;
         using ULinkRPC.Core;
 
-        namespace Shared.Chat;
-
-        [RpcService(2, Callback = typeof(IChatCallback))]
-        public interface IChatService
+        namespace Shared.Chat
         {
-            [RpcMethod(1)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
-            [RpcMethod(2)] ValueTask SendAsync(ChatSendRequest req);
-            [RpcMethod(3)] ValueTask LeaveAsync(ChatLeaveRequest req);
-        }
+            [RpcService(2, Callback = typeof(IChatCallback))]
+            public interface IChatService
+            {
+                [RpcMethod(1)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
+                [RpcMethod(2)] ValueTask SendAsync(ChatSendRequest req);
+                [RpcMethod(3)] ValueTask LeaveAsync(ChatLeaveRequest req);
+            }
 
-        [RpcCallback(typeof(IChatService))]
-        public interface IChatCallback
-        {
-            [RpcPush(1)] void OnMessageReceived(ChatMessage msg);
-            [RpcPush(2)] void OnUserJoined(ChatMember member);
-            [RpcPush(3)] void OnUserLeft(ChatUserLeft evt);
+            [RpcCallback(typeof(IChatService))]
+            public interface IChatCallback
+            {
+                [RpcPush(1)] void OnMessageReceived(ChatMessage msg);
+                [RpcPush(2)] void OnUserJoined(ChatMember member);
+                [RpcPush(3)] void OnUserLeft(ChatUserLeft evt);
+            }
         }
         """;
     }
@@ -251,50 +252,51 @@ internal static class ToolTemplates
         using System.Collections.Generic;
         using MemoryPack;
 
-        namespace Shared.Chat;
-
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatJoinRequest
+        namespace Shared.Chat
         {
-            [MemoryPackOrder(0)] public string PlayerName { get; set; } = "";
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatJoinRequest
+            {
+                [MemoryPackOrder(0)] public string PlayerName { get; set; } = "";
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatJoinReply
-        {
-            [MemoryPackOrder(0)] public List<ChatMember> Members { get; set; } = new();
-            [MemoryPackOrder(1)] public List<ChatMessage> RecentMessages { get; set; } = new();
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatJoinReply
+            {
+                [MemoryPackOrder(0)] public List<ChatMember> Members { get; set; } = new();
+                [MemoryPackOrder(1)] public List<ChatMessage> RecentMessages { get; set; } = new();
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatSendRequest
-        {
-            [MemoryPackOrder(0)] public string Text { get; set; } = "";
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatSendRequest
+            {
+                [MemoryPackOrder(0)] public string Text { get; set; } = "";
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatLeaveRequest
-        {
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatLeaveRequest
+            {
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatUserLeft
-        {
-            [MemoryPackOrder(0)] public string Name { get; set; } = "";
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatUserLeft
+            {
+                [MemoryPackOrder(0)] public string Name { get; set; } = "";
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatMember
-        {
-            [MemoryPackOrder(0)] public string Name { get; set; } = "";
-        }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatMember
+            {
+                [MemoryPackOrder(0)] public string Name { get; set; } = "";
+            }
 
-        [MemoryPackable(GenerateType.VersionTolerant)]
-        public partial class ChatMessage
-        {
-            [MemoryPackOrder(0)] public string SenderName { get; set; } = "";
-            [MemoryPackOrder(1)] public string Text { get; set; } = "";
-            [MemoryPackOrder(2)] public long Timestamp { get; set; }
+            [MemoryPackable(GenerateType.VersionTolerant)]
+            public partial class ChatMessage
+            {
+                [MemoryPackOrder(0)] public string SenderName { get; set; } = "";
+                [MemoryPackOrder(1)] public string Text { get; set; } = "";
+                [MemoryPackOrder(2)] public long Timestamp { get; set; }
+            }
         }
         """;
     }
@@ -308,85 +310,86 @@ internal static class ToolTemplates
         using System.Linq;
         using Shared.Chat;
 
-        namespace Server.Chat;
-
-        internal sealed class ChatRoom
+        namespace Server.Chat
         {
-            private const int MaxRecentMessages = 100;
-            private readonly ConcurrentDictionary<string, (string Name, IChatCallback Callback)> _members = new();
-            private readonly ConcurrentQueue<ChatMessage> _recentMessages = new();
-            private readonly object _lock = new();
-
-            public ChatJoinReply Join(string connectionId, string playerName, IChatCallback callback)
+            internal sealed class ChatRoom
             {
-                var member = new ChatMember { Name = playerName };
-                _members[connectionId] = (playerName, callback);
+                private const int MaxRecentMessages = 100;
+                private readonly ConcurrentDictionary<string, (string Name, IChatCallback Callback)> _members = new();
+                private readonly ConcurrentQueue<ChatMessage> _recentMessages = new();
+                private readonly object _lock = new();
 
-                Broadcast(cb => cb.OnUserJoined(member), excludeConnectionId: null);
-
-                return new ChatJoinReply
+                public ChatJoinReply Join(string connectionId, string playerName, IChatCallback callback)
                 {
-                    Members = _members.Values.Select(v => new ChatMember { Name = v.Name }).ToList(),
-                    RecentMessages = _recentMessages.ToList()
-                };
-            }
+                    var member = new ChatMember { Name = playerName };
+                    _members[connectionId] = (playerName, callback);
 
-            public void Send(string connectionId, string text)
-            {
-                if (!_members.TryGetValue(connectionId, out var entry))
-                {
-                    return;
+                    Broadcast(cb => cb.OnUserJoined(member), excludeConnectionId: null);
+
+                    return new ChatJoinReply
+                    {
+                        Members = _members.Values.Select(v => new ChatMember { Name = v.Name }).ToList(),
+                        RecentMessages = _recentMessages.ToList()
+                    };
                 }
 
-                var msg = new ChatMessage
+                public void Send(string connectionId, string text)
                 {
-                    SenderName = entry.Name,
-                    Text = text,
-                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                };
-
-                _recentMessages.Enqueue(msg);
-                lock (_lock)
-                {
-                    while (_recentMessages.Count > MaxRecentMessages)
+                    if (!_members.TryGetValue(connectionId, out var entry))
                     {
-                        _recentMessages.TryDequeue(out _);
+                        return;
                     }
+
+                    var msg = new ChatMessage
+                    {
+                        SenderName = entry.Name,
+                        Text = text,
+                        Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    };
+
+                    _recentMessages.Enqueue(msg);
+                    lock (_lock)
+                    {
+                        while (_recentMessages.Count > MaxRecentMessages)
+                        {
+                            _recentMessages.TryDequeue(out _);
+                        }
+                    }
+
+                    Broadcast(cb => cb.OnMessageReceived(msg), excludeConnectionId: null);
                 }
 
-                Broadcast(cb => cb.OnMessageReceived(msg), excludeConnectionId: null);
-            }
-
-            public void Leave(string connectionId)
-            {
-                if (!_members.TryRemove(connectionId, out var entry))
+                public void Leave(string connectionId)
                 {
-                    return;
+                    if (!_members.TryRemove(connectionId, out var entry))
+                    {
+                        return;
+                    }
+
+                    Broadcast(cb => cb.OnUserLeft(new ChatUserLeft { Name = entry.Name }), excludeConnectionId: null);
                 }
 
-                Broadcast(cb => cb.OnUserLeft(new ChatUserLeft { Name = entry.Name }), excludeConnectionId: null);
-            }
-
-            public void Disconnect(string connectionId)
-            {
-                Leave(connectionId);
-            }
-
-            private void Broadcast(Action<IChatCallback> action, string? excludeConnectionId)
-            {
-                foreach (var (connId, (_, callback)) in _members)
+                public void Disconnect(string connectionId)
                 {
-                    if (connId == excludeConnectionId)
-                    {
-                        continue;
-                    }
+                    Leave(connectionId);
+                }
 
-                    try
+                private void Broadcast(Action<IChatCallback> action, string? excludeConnectionId)
+                {
+                    foreach (var (connId, (_, callback)) in _members)
                     {
-                        action(callback);
-                    }
-                    catch
-                    {
+                        if (connId == excludeConnectionId)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            action(callback);
+                        }
+                        catch
+                        {
+                        }
                     }
                 }
             }
@@ -400,36 +403,37 @@ internal static class ToolTemplates
         using System;
         using Shared.Chat;
 
-        namespace Server.Chat;
-
-        internal sealed class ChatServiceImpl : IChatService
+        namespace Server.Chat
         {
-            private readonly IChatCallback _callback;
-            private readonly ChatRoom _room;
-            private readonly string _connectionId;
-
-            public ChatServiceImpl(IChatCallback callback, ChatRoom room)
+            internal sealed class ChatServiceImpl : IChatService
             {
-                _callback = callback;
-                _room = room;
-                _connectionId = Guid.NewGuid().ToString("N");
-            }
+                private readonly IChatCallback _callback;
+                private readonly ChatRoom _room;
+                private readonly string _connectionId;
 
-            public ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req)
-            {
-                return new ValueTask<ChatJoinReply>(_room.Join(_connectionId, req.PlayerName, _callback));
-            }
+                public ChatServiceImpl(IChatCallback callback, ChatRoom room)
+                {
+                    _callback = callback;
+                    _room = room;
+                    _connectionId = Guid.NewGuid().ToString("N");
+                }
 
-            public ValueTask SendAsync(ChatSendRequest req)
-            {
-                _room.Send(_connectionId, req.Text);
-                return ValueTask.CompletedTask;
-            }
+                public ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req)
+                {
+                    return new ValueTask<ChatJoinReply>(_room.Join(_connectionId, req.PlayerName, _callback));
+                }
 
-            public ValueTask LeaveAsync(ChatLeaveRequest req)
-            {
-                _room.Leave(_connectionId);
-                return ValueTask.CompletedTask;
+                public ValueTask SendAsync(ChatSendRequest req)
+                {
+                    _room.Send(_connectionId, req.Text);
+                    return ValueTask.CompletedTask;
+                }
+
+                public ValueTask LeaveAsync(ChatLeaveRequest req)
+                {
+                    _room.Leave(_connectionId);
+                    return ValueTask.CompletedTask;
+                }
             }
         }
         """;
@@ -440,22 +444,23 @@ internal static class ToolTemplates
         return """
         using Shared.Chat;
 
-        namespace Server.Hotfix.Chat;
-
-        public static class ChatSystem
+        namespace Server.Hotfix.Chat
         {
-            public static ChatMessage SanitizeMessage(this ChatMessage message)
+            public static class ChatSystem
             {
-                if (string.IsNullOrWhiteSpace(message.Text))
+                public static ChatMessage SanitizeMessage(this ChatMessage message)
                 {
-                    message.Text = "<empty>";
-                }
-                else if (message.Text.Length > 500)
-                {
-                    message.Text = message.Text[..500];
-                }
+                    if (string.IsNullOrWhiteSpace(message.Text))
+                    {
+                        message.Text = "<empty>";
+                    }
+                    else if (message.Text.Length > 500)
+                    {
+                        message.Text = message.Text[..500];
+                    }
 
-                return message;
+                    return message;
+                }
             }
         }
         """;
@@ -468,68 +473,69 @@ internal static class ToolTemplates
         using Shared.Chat;
         using ULinkRPC.Client;
 
-        namespace Client.Chat;
-
-        public sealed class ChatClient : IChatCallback
+        namespace Client.Chat
         {
-            private readonly RpcClient _rpcClient;
-            private IChatService? _chatService;
-
-            public event Action<ChatMessage>? OnMessageReceived;
-            public event Action<ChatMember>? OnUserJoined;
-            public event Action<string>? OnUserLeft;
-            public event Action? OnDisconnected;
-
-            public bool IsConnected => _rpcClient.IsConnected;
-
-            public ChatClient(RpcClient rpcClient)
+            public sealed class ChatClient : IChatCallback
             {
-                _rpcClient = rpcClient;
-                _rpcClient.OnDisconnected += () => OnDisconnected?.Invoke();
-            }
+                private readonly RpcClient _rpcClient;
+                private IChatService? _chatService;
 
-            public async Task ConnectAsync(string serverAddress, int port)
-            {
-                await _rpcClient.ConnectAsync(serverAddress, port);
-                _chatService = _rpcClient.CreateService<IChatService>(this);
-            }
+                public event Action<ChatMessage>? OnMessageReceived;
+                public event Action<ChatMember>? OnUserJoined;
+                public event Action<string>? OnUserLeft;
+                public event Action? OnDisconnected;
 
-            public async Task<ChatJoinReply> JoinAsync(string playerName)
-            {
-                if (_chatService == null) throw new InvalidOperationException("Not connected.");
-                return await _chatService.JoinAsync(new ChatJoinRequest { PlayerName = playerName });
-            }
+                public bool IsConnected => _rpcClient.IsConnected;
 
-            public async Task SendAsync(string text)
-            {
-                if (_chatService == null) throw new InvalidOperationException("Not connected.");
-                await _chatService.SendAsync(new ChatSendRequest { Text = text });
-            }
+                public ChatClient(RpcClient rpcClient)
+                {
+                    _rpcClient = rpcClient;
+                    _rpcClient.OnDisconnected += () => OnDisconnected?.Invoke();
+                }
 
-            public async Task LeaveAsync()
-            {
-                if (_chatService == null) return;
-                await _chatService.LeaveAsync();
-            }
+                public async Task ConnectAsync(string serverAddress, int port)
+                {
+                    await _rpcClient.ConnectAsync(serverAddress, port);
+                    _chatService = _rpcClient.CreateService<IChatService>(this);
+                }
 
-            public void Disconnect()
-            {
-                _rpcClient.Disconnect();
-            }
+                public async Task<ChatJoinReply> JoinAsync(string playerName)
+                {
+                    if (_chatService == null) throw new InvalidOperationException("Not connected.");
+                    return await _chatService.JoinAsync(new ChatJoinRequest { PlayerName = playerName });
+                }
 
-            void IChatCallback.OnMessageReceived(ChatMessage msg)
-            {
-                OnMessageReceived?.Invoke(msg);
-            }
+                public async Task SendAsync(string text)
+                {
+                    if (_chatService == null) throw new InvalidOperationException("Not connected.");
+                    await _chatService.SendAsync(new ChatSendRequest { Text = text });
+                }
 
-            void IChatCallback.OnUserJoined(ChatMember member)
-            {
-                OnUserJoined?.Invoke(member);
-            }
+                public async Task LeaveAsync()
+                {
+                    if (_chatService == null) return;
+                    await _chatService.LeaveAsync();
+                }
 
-            void IChatCallback.OnUserLeft(ChatUserLeft evt)
-            {
-                OnUserLeft?.Invoke(evt.Name);
+                public void Disconnect()
+                {
+                    _rpcClient.Disconnect();
+                }
+
+                void IChatCallback.OnMessageReceived(ChatMessage msg)
+                {
+                    OnMessageReceived?.Invoke(msg);
+                }
+
+                void IChatCallback.OnUserJoined(ChatMember member)
+                {
+                    OnUserJoined?.Invoke(member);
+                }
+
+                void IChatCallback.OnUserLeft(ChatUserLeft evt)
+                {
+                    OnUserLeft?.Invoke(evt.Name);
+                }
             }
         }
         """;
@@ -544,110 +550,111 @@ internal static class ToolTemplates
         using UnityEngine;
         using UnityEngine.UIElements;
 
-        namespace Client.Chat;
-
-        [RequireComponent(typeof(UIDocument))]
-        public sealed class ChatUI : MonoBehaviour
+        namespace Client.Chat
         {
-            [SerializeField] private string _serverHost = "127.0.0.1";
-            [SerializeField] private int _serverPort = 20000;
-
-            private ChatClient? _client;
-            private TextField? _inputField;
-            private ScrollView? _messageList;
-            private Label? _onlineCount;
-
-            private async void Start()
+            [RequireComponent(typeof(UIDocument))]
+            public sealed class ChatUI : MonoBehaviour
             {
-                var root = GetComponent<UIDocument>().rootVisualElement;
+                [SerializeField] private string _serverHost = "127.0.0.1";
+                [SerializeField] private int _serverPort = 20000;
 
-                _inputField = root.Q<TextField>("chat-input");
-                _messageList = root.Q<ScrollView>("message-list");
-                _onlineCount = root.Q<Label>("online-count");
+                private ChatClient? _client;
+                private TextField? _inputField;
+                private ScrollView? _messageList;
+                private Label? _onlineCount;
 
-                var sendButton = root.Q<Button>("send-button");
-                sendButton?.clicked += OnSendClicked;
-
-                _inputField?.RegisterCallback<KeyDownEvent>(evt =>
+                private async void Start()
                 {
-                    if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    var root = GetComponent<UIDocument>().rootVisualElement;
+
+                    _inputField = root.Q<TextField>("chat-input");
+                    _messageList = root.Q<ScrollView>("message-list");
+                    _onlineCount = root.Q<Label>("online-count");
+
+                    var sendButton = root.Q<Button>("send-button");
+                    sendButton?.clicked += OnSendClicked;
+
+                    _inputField?.RegisterCallback<KeyDownEvent>(evt =>
                     {
-                        OnSendClicked();
-                    }
-                });
-
-                var nameField = root.Q<TextField>("name-field");
-                var joinButton = root.Q<Button>("join-button");
-
-                joinButton?.clicked += async () =>
-                {
-                    var name = nameField?.value?.Trim();
-                    if (string.IsNullOrWhiteSpace(name)) return;
-
-                    var rpcClient = new RpcClient();
-                    _client = new ChatClient(rpcClient);
-                    _client.OnMessageReceived += AppendMessage;
-                    _client.OnUserJoined += OnUserJoinedHandler;
-                    _client.OnUserLeft += OnUserLeftHandler;
-                    _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
-
-                    try
-                    {
-                        await _client.ConnectAsync(_serverHost, _serverPort);
-                        var reply = await _client.JoinAsync(name);
-                        AppendSystemMessage($"Connected. {reply.Members.Count} online.");
-
-                        foreach (var msg in reply.RecentMessages)
+                        if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
                         {
-                            AppendMessage(msg);
+                            OnSendClicked();
                         }
-                    }
-                    catch (Exception ex)
+                    });
+
+                    var nameField = root.Q<TextField>("name-field");
+                    var joinButton = root.Q<Button>("join-button");
+
+                    joinButton?.clicked += async () =>
                     {
-                        AppendSystemMessage($"Connection failed: {ex.Message}");
-                    }
-                };
-            }
+                        var name = nameField?.value?.Trim();
+                        if (string.IsNullOrWhiteSpace(name)) return;
 
-            private async void OnSendClicked()
-            {
-                if (_client == null || !_client.IsConnected) return;
-                var text = _inputField?.value?.Trim();
-                if (string.IsNullOrWhiteSpace(text)) return;
+                        var rpcClient = new RpcClient();
+                        _client = new ChatClient(rpcClient);
+                        _client.OnMessageReceived += AppendMessage;
+                        _client.OnUserJoined += OnUserJoinedHandler;
+                        _client.OnUserLeft += OnUserLeftHandler;
+                        _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
 
-                await _client.SendAsync(text);
-                _inputField!.value = "";
-            }
+                        try
+                        {
+                            await _client.ConnectAsync(_serverHost, _serverPort);
+                            var reply = await _client.JoinAsync(name);
+                            AppendSystemMessage($"Connected. {reply.Members.Count} online.");
 
-            private void AppendMessage(ChatMessage msg)
-            {
-                var label = new Label($"[{msg.SenderName}]: {msg.Text}");
-                label.AddToClassList("chat-message");
-                _messageList?.Add(label);
-                _messageList?.ScrollTo(label);
-            }
+                            foreach (var msg in reply.RecentMessages)
+                            {
+                                AppendMessage(msg);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppendSystemMessage($"Connection failed: {ex.Message}");
+                        }
+                    };
+                }
 
-            private void AppendSystemMessage(string text)
-            {
-                var label = new Label(text);
-                label.AddToClassList("chat-system");
-                _messageList?.Add(label);
-                _messageList?.ScrollTo(label);
-            }
+                private async void OnSendClicked()
+                {
+                    if (_client == null || !_client.IsConnected) return;
+                    var text = _inputField?.value?.Trim();
+                    if (string.IsNullOrWhiteSpace(text)) return;
 
-            private void OnUserJoinedHandler(ChatMember member)
-            {
-                AppendSystemMessage($"{member.Name} joined.");
-            }
+                    await _client.SendAsync(text);
+                    _inputField!.value = "";
+                }
 
-            private void OnUserLeftHandler(string memberName)
-            {
-                AppendSystemMessage($"{memberName} left.");
-            }
+                private void AppendMessage(ChatMessage msg)
+                {
+                    var label = new Label($"[{msg.SenderName}]: {msg.Text}");
+                    label.AddToClassList("chat-message");
+                    _messageList?.Add(label);
+                    _messageList?.ScrollTo(label);
+                }
 
-            private void OnDestroy()
-            {
-                _client?.Disconnect();
+                private void AppendSystemMessage(string text)
+                {
+                    var label = new Label(text);
+                    label.AddToClassList("chat-system");
+                    _messageList?.Add(label);
+                    _messageList?.ScrollTo(label);
+                }
+
+                private void OnUserJoinedHandler(ChatMember member)
+                {
+                    AppendSystemMessage($"{member.Name} joined.");
+                }
+
+                private void OnUserLeftHandler(string memberName)
+                {
+                    AppendSystemMessage($"{memberName} left.");
+                }
+
+                private void OnDestroy()
+                {
+                    _client?.Disconnect();
+                }
             }
         }
         """;

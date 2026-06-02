@@ -18,6 +18,7 @@
 - `ULinkGame.Server.Generators` `0.1.3`
 - `ULinkGame.Server.Generators` `0.1.4`
 - `ULinkGame.Tool` `0.3.4`
+- `ULinkGame.Tool` `0.4.1`
 
 ### Added
 
@@ -39,6 +40,7 @@
 ### Fixed
 
 - Fixed lifecycle hook diagnostics so spawn hooks may take a request and destroy hooks may not.
+- Fixed `ulinkgame-tool new` chat templates to emit C# 9-compatible block-scoped namespaces instead of file-scoped namespaces for Unity-created projects.
 
 ## 2026-06-01
 

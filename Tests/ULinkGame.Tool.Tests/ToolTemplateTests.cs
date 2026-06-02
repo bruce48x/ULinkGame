@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace ULinkGame.Tool.Tests;
@@ -274,6 +276,37 @@ public sealed class ToolTemplateTests
         Assert.Contains("OnMessageReceived", source, StringComparison.Ordinal);
         Assert.Contains("OnUserJoined", source, StringComparison.Ordinal);
         Assert.Contains("OnUserLeft", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderUnityFacingChatTemplates_ParseAsCSharpNine()
+    {
+        var sources = new[]
+        {
+            ("Shared/Chat/ChatProtocols.cs", ToolTemplates.RenderSharedChatProtocols()),
+            ("Shared/Chat/ChatMessages.cs", ToolTemplates.RenderSharedChatMessages()),
+            ("Client/Assets/Scripts/Chat/ChatClient.cs", ToolTemplates.RenderClientChatClient()),
+            ("Client/Assets/Scripts/Chat/ChatUI.cs", ToolTemplates.RenderClientChatUI())
+        };
+
+        AssertGeneratedSourcesParseAsCSharp9(sources);
+    }
+
+    private static void AssertGeneratedSourcesParseAsCSharp9(IEnumerable<(string Path, string Source)> sources)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9);
+        var diagnostics = new List<string>();
+
+        foreach (var (path, source) in sources)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source, parseOptions, path);
+            diagnostics.AddRange(
+                tree.GetDiagnostics()
+                    .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .Select(diagnostic => $"{path}: {diagnostic.Id} {diagnostic.GetMessage()}"));
+        }
+
+        Assert.Empty(diagnostics);
     }
 
     [Fact]
