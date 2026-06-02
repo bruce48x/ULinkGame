@@ -4,6 +4,7 @@ internal sealed class ProjectScaffolder
     {
         EnsureStarterServerProjectDirectory(projectRoot);
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteClientChatFilesAsync(projectRoot, options).ConfigureAwait(false);
         await WriteSharedHotfixReferencesAsync(projectRoot).ConfigureAwait(false);
         await WriteSharedHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
@@ -13,6 +14,7 @@ internal sealed class ProjectScaffolder
         await WriteHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
         await WriteServerAppSettingsAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerConfiguratorsAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteServerChatFilesAsync(projectRoot).ConfigureAwait(false);
         await WriteOperationsScaffoldingAsync(projectRoot, options).ConfigureAwait(false);
     }
 
@@ -58,8 +60,11 @@ internal sealed class ProjectScaffolder
                 Path.Combine(projectRoot, "Shared", "Properties", "AssemblyInfo.cs"),
                 ToolTemplates.RenderSharedHotfixAssemblyInfo()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Shared", "Gameplay", "GameRules.cs"),
-                ToolTemplates.RenderSharedGameRules()));
+                Path.Combine(projectRoot, "Shared", "Chat", "ChatProtocols.cs"),
+                ToolTemplates.RenderSharedChatProtocols()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs"),
+                ToolTemplates.RenderSharedChatMessages()));
     }
 
     private static async Task WriteUnityClientPackageReferenceAsync(string projectRoot)
@@ -97,6 +102,41 @@ internal sealed class ProjectScaffolder
         return WriteIfMissingAsync(
             Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameNuGetPackageImportGuard.cs"),
             ToolTemplates.RenderUnityNuGetPackageImportGuard());
+    }
+
+    private static Task WriteClientChatFilesAsync(string projectRoot, NewCommandOptions options)
+    {
+        if (ProjectConventions.IsGodot(options.ClientEngine))
+        {
+            return WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatClient.cs"),
+                ToolTemplates.RenderClientChatClient());
+        }
+
+        return Task.WhenAll(
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatClient.cs"),
+                ToolTemplates.RenderClientChatClient()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatUI.cs"),
+                ToolTemplates.RenderClientChatUI()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml"),
+                ToolTemplates.RenderClientChatUxml()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uss"),
+                ToolTemplates.RenderClientChatUss()));
+    }
+
+    private static Task WriteServerChatFilesAsync(string projectRoot)
+    {
+        return Task.WhenAll(
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRoom.cs"),
+                ToolTemplates.RenderServerChatRoom()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatServiceImpl.cs"),
+                ToolTemplates.RenderServerChatServiceImpl()));
     }
 
     private static Task WriteServerSolutionAsync(string projectRoot)
@@ -201,8 +241,8 @@ internal sealed class ProjectScaffolder
     private static Task WriteHotfixBoundaryFilesAsync(string projectRoot)
     {
         return WriteIfMissingAsync(
-            Path.Combine(projectRoot, "Server", "Hotfix", "Gameplay", "GameRulesSystem.cs"),
-            ToolTemplates.RenderHotfixGameRulesSystem());
+            Path.Combine(projectRoot, "Server", "Hotfix", "Chat", "ChatSystem.cs"),
+            ToolTemplates.RenderHotfixChatSystem());
     }
 
     private static Task WriteServerConfiguratorsAsync(string projectRoot, NewCommandOptions options)

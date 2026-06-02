@@ -184,21 +184,27 @@ public sealed class ToolTextTests
         var project = ToolTemplates.RenderServerProject(options);
         var sharedProject = ToolTemplates.RenderSharedProjectHotfixItemGroup();
         var sharedAssemblyInfo = ToolTemplates.RenderSharedHotfixAssemblyInfo();
-        var sharedGameRules = ToolTemplates.RenderSharedGameRules();
+        var sharedProtocols = ToolTemplates.RenderSharedChatProtocols();
+        var sharedMessages = ToolTemplates.RenderSharedChatMessages();
         var hotfixProject = ToolTemplates.RenderHotfixProject();
-        var hotfixGameRules = ToolTemplates.RenderHotfixGameRulesSystem();
+        var hotfixChatSystem = ToolTemplates.RenderHotfixChatSystem();
         var appSettings = ToolTemplates.RenderServerAppSettings(options);
         var program = ToolTemplates.RenderServerProgram(options);
+        var chatRoom = ToolTemplates.RenderServerChatRoom();
+        var chatServiceImpl = ToolTemplates.RenderServerChatServiceImpl();
         var generatedText = string.Concat(
             solution,
             project,
             sharedProject,
             sharedAssemblyInfo,
-            sharedGameRules,
+            sharedProtocols,
+            sharedMessages,
             hotfixProject,
-            hotfixGameRules,
+            hotfixChatSystem,
             appSettings,
-            program);
+            program,
+            chatRoom,
+            chatServiceImpl);
 
         Assert.Contains(@"<Project Path=""Hotfix/Server.Hotfix.csproj"" />", solution, StringComparison.Ordinal);
         Assert.Contains(@"<ProjectReference Include=""..\Hotfix\Server.Hotfix.csproj"" ReferenceOutputAssembly=""false"" />", project, StringComparison.Ordinal);
@@ -208,18 +214,19 @@ public sealed class ToolTextTests
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
-        Assert.Contains("namespace Shared.Gameplay\r\n{", sharedGameRules.Replace("\n", "\r\n"), StringComparison.Ordinal);
-        Assert.DoesNotContain("namespace Shared.Gameplay;", sharedGameRules, StringComparison.Ordinal);
-        Assert.Contains("[HotfixState]", sharedGameRules, StringComparison.Ordinal);
-        Assert.Contains("public sealed partial class GameRulesState", sharedGameRules, StringComparison.Ordinal);
-        Assert.Contains("HotfixDispatch.Invoke<GameRulesState, GameRuleInput, GameRuleResult>", sharedGameRules, StringComparison.Ordinal);
-        Assert.Contains("EvaluateStable", sharedGameRules, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(2, Callback = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);
+        Assert.Contains("ChatMessage", sharedMessages, StringComparison.Ordinal);
         Assert.Contains(@"ProjectReference Include=""..\..\Shared\Shared.csproj""", hotfixProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", hotfixProject, StringComparison.Ordinal);
-        Assert.Contains("[FriendOf(typeof(GameRulesState))]", hotfixGameRules, StringComparison.Ordinal);
-        Assert.Contains("[HotfixSystemOf(typeof(GameRulesState))]", hotfixGameRules, StringComparison.Ordinal);
-        Assert.Contains("public static GameRuleResult Evaluate(this GameRulesState self, GameRuleInput input)", hotfixGameRules, StringComparison.Ordinal);
-        Assert.DoesNotContain("[HotfixState]", hotfixGameRules, StringComparison.Ordinal);
+        Assert.Contains("class ChatSystem", hotfixChatSystem, StringComparison.Ordinal);
+        Assert.Contains("SanitizeMessage", hotfixChatSystem, StringComparison.Ordinal);
+        Assert.Contains("ConcurrentDictionary", chatRoom, StringComparison.Ordinal);
+        Assert.Contains("class ChatRoom", chatRoom, StringComparison.Ordinal);
+        Assert.Contains("class ChatServiceImpl", chatServiceImpl, StringComparison.Ordinal);
+        Assert.Contains("IChatService", chatServiceImpl, StringComparison.Ordinal);
         Assert.Contains("AddULinkGameHotfix", program, StringComparison.Ordinal);
         Assert.Contains("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
         Assert.Contains("IHotfixManager", program, StringComparison.Ordinal);

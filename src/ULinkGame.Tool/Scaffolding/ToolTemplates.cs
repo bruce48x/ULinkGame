@@ -219,97 +219,523 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderSharedGameRules()
+    public static string RenderSharedChatProtocols()
     {
         return """
-        #nullable enable
+        using System.Threading.Tasks;
+        using ULinkRPC.Core;
 
-        #if NET10_0_OR_GREATER
-        using ULinkGame.Server.Hotfix.Abstractions;
-        using ULinkGame.Server.Hotfix.Dispatch;
-        #endif
+        namespace Shared.Chat;
 
-        namespace Shared.Gameplay
+        [RpcService(2, Callback = typeof(IChatCallback))]
+        public interface IChatService
         {
+            [RpcMethod(1)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
+            [RpcMethod(2)] ValueTask SendAsync(ChatSendRequest req);
+            [RpcMethod(3)] ValueTask LeaveAsync(ChatLeaveRequest req);
+        }
 
-            public sealed class GameRuleInput
+        [RpcCallback(typeof(IChatService))]
+        public interface IChatCallback
+        {
+            [RpcPush(1)] void OnMessageReceived(ChatMessage msg);
+            [RpcPush(2)] void OnUserJoined(ChatMember member);
+            [RpcPush(3)] void OnUserLeft(ChatUserLeft evt);
+        }
+        """;
+    }
+
+    public static string RenderSharedChatMessages()
+    {
+        return """
+        using System.Collections.Generic;
+        using MemoryPack;
+
+        namespace Shared.Chat;
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatJoinRequest
+        {
+            [MemoryPackOrder(0)] public string PlayerName { get; set; } = "";
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatJoinReply
+        {
+            [MemoryPackOrder(0)] public List<ChatMember> Members { get; set; } = new();
+            [MemoryPackOrder(1)] public List<ChatMessage> RecentMessages { get; set; } = new();
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatSendRequest
+        {
+            [MemoryPackOrder(0)] public string Text { get; set; } = "";
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatLeaveRequest
+        {
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatUserLeft
+        {
+            [MemoryPackOrder(0)] public string Name { get; set; } = "";
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatMember
+        {
+            [MemoryPackOrder(0)] public string Name { get; set; } = "";
+        }
+
+        [MemoryPackable(GenerateType.VersionTolerant)]
+        public partial class ChatMessage
+        {
+            [MemoryPackOrder(0)] public string SenderName { get; set; } = "";
+            [MemoryPackOrder(1)] public string Text { get; set; } = "";
+            [MemoryPackOrder(2)] public long Timestamp { get; set; }
+        }
+        """;
+    }
+
+    public static string RenderServerChatRoom()
+    {
+        return """
+        using System;
+        using System.Collections.Concurrent;
+        using System.Collections.Generic;
+        using System.Linq;
+        using Shared.Chat;
+
+        namespace Server.Chat;
+
+        internal sealed class ChatRoom
+        {
+            private const int MaxRecentMessages = 100;
+            private readonly ConcurrentDictionary<string, (string Name, IChatCallback Callback)> _members = new();
+            private readonly ConcurrentQueue<ChatMessage> _recentMessages = new();
+            private readonly object _lock = new();
+
+            public ChatJoinReply Join(string connectionId, string playerName, IChatCallback callback)
             {
-                public string PlayerId { get; set; } = string.Empty;
-                public int Score { get; set; }
-            }
+                var member = new ChatMember { Name = playerName };
+                _members[connectionId] = (playerName, callback);
 
-            public sealed class GameRuleResult
-            {
-                public bool Accepted { get; set; }
-                public string Reason { get; set; } = string.Empty;
-            }
+                Broadcast(cb => cb.OnUserJoined(member), excludeConnectionId: null);
 
-        #if NET10_0_OR_GREATER
-            [HotfixState]
-        #endif
-            public sealed partial class GameRulesState
-            {
-                private int _minimumScore = 1;
-
-                public GameRuleResult Evaluate(GameRuleInput input)
+                return new ChatJoinReply
                 {
-        #if NET10_0_OR_GREATER
-                    return HotfixDispatch.Invoke<GameRulesState, GameRuleInput, GameRuleResult>(
-                        nameof(Evaluate),
-                        this,
-                        input);
-        #else
-                    return EvaluateStable(input);
-        #endif
+                    Members = _members.Values.Select(v => new ChatMember { Name = v.Name }).ToList(),
+                    RecentMessages = _recentMessages.ToList()
+                };
+            }
+
+            public void Send(string connectionId, string text)
+            {
+                if (!_members.TryGetValue(connectionId, out var entry))
+                {
+                    return;
                 }
 
-                internal GameRuleResult EvaluateStable(GameRuleInput input)
+                var msg = new ChatMessage
                 {
-                    if (string.IsNullOrWhiteSpace(input.PlayerId))
+                    SenderName = entry.Name,
+                    Text = text,
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
+
+                _recentMessages.Enqueue(msg);
+                lock (_lock)
+                {
+                    while (_recentMessages.Count > MaxRecentMessages)
                     {
-                        return new GameRuleResult
-                        {
-                            Accepted = false,
-                            Reason = "Player id is required."
-                        };
+                        _recentMessages.TryDequeue(out _);
+                    }
+                }
+
+                Broadcast(cb => cb.OnMessageReceived(msg), excludeConnectionId: null);
+            }
+
+            public void Leave(string connectionId)
+            {
+                if (!_members.TryRemove(connectionId, out var entry))
+                {
+                    return;
+                }
+
+                Broadcast(cb => cb.OnUserLeft(new ChatUserLeft { Name = entry.Name }), excludeConnectionId: null);
+            }
+
+            public void Disconnect(string connectionId)
+            {
+                Leave(connectionId);
+            }
+
+            private void Broadcast(Action<IChatCallback> action, string? excludeConnectionId)
+            {
+                foreach (var (connId, (_, callback)) in _members)
+                {
+                    if (connId == excludeConnectionId)
+                    {
+                        continue;
                     }
 
-                    if (input.Score < _minimumScore)
+                    try
                     {
-                        return new GameRuleResult
-                        {
-                            Accepted = false,
-                            Reason = "Score is below the current rule threshold."
-                        };
+                        action(callback);
                     }
-
-                    return new GameRuleResult
+                    catch
                     {
-                        Accepted = true,
-                        Reason = "Accepted by stable rules."
-                    };
+                    }
                 }
             }
         }
         """;
     }
 
-    public static string RenderHotfixGameRulesSystem()
+    public static string RenderServerChatServiceImpl()
     {
         return """
-        using Shared.Gameplay;
-        using ULinkGame.Server.Hotfix.Abstractions;
+        using System;
+        using Shared.Chat;
 
-        namespace Server.Hotfix.Gameplay;
+        namespace Server.Chat;
 
-        [FriendOf(typeof(GameRulesState))]
-        [HotfixSystemOf(typeof(GameRulesState))]
-        public static class GameRulesSystem
+        internal sealed class ChatServiceImpl : IChatService
         {
-            public static GameRuleResult Evaluate(this GameRulesState self, GameRuleInput input)
+            private readonly IChatCallback _callback;
+            private readonly ChatRoom _room;
+            private readonly string _connectionId;
+
+            public ChatServiceImpl(IChatCallback callback, ChatRoom room)
             {
-                return self.EvaluateStable(input);
+                _callback = callback;
+                _room = room;
+                _connectionId = Guid.NewGuid().ToString("N");
             }
+
+            public ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req)
+            {
+                return new ValueTask<ChatJoinReply>(_room.Join(_connectionId, req.PlayerName, _callback));
+            }
+
+            public ValueTask SendAsync(ChatSendRequest req)
+            {
+                _room.Send(_connectionId, req.Text);
+                return ValueTask.CompletedTask;
+            }
+
+            public ValueTask LeaveAsync(ChatLeaveRequest req)
+            {
+                _room.Leave(_connectionId);
+                return ValueTask.CompletedTask;
+            }
+        }
+        """;
+    }
+
+    public static string RenderHotfixChatSystem()
+    {
+        return """
+        using Shared.Chat;
+
+        namespace Server.Hotfix.Chat;
+
+        public static class ChatSystem
+        {
+            public static ChatMessage SanitizeMessage(this ChatMessage message)
+            {
+                if (string.IsNullOrWhiteSpace(message.Text))
+                {
+                    message.Text = "<empty>";
+                }
+                else if (message.Text.Length > 500)
+                {
+                    message.Text = message.Text[..500];
+                }
+
+                return message;
+            }
+        }
+        """;
+    }
+
+    public static string RenderClientChatClient()
+    {
+        return """
+        using System;
+        using Shared.Chat;
+        using ULinkRPC.Client;
+
+        namespace Client.Chat;
+
+        public sealed class ChatClient : IChatCallback
+        {
+            private readonly RpcClient _rpcClient;
+            private IChatService? _chatService;
+
+            public event Action<ChatMessage>? OnMessageReceived;
+            public event Action<ChatMember>? OnUserJoined;
+            public event Action<string>? OnUserLeft;
+            public event Action? OnDisconnected;
+
+            public bool IsConnected => _rpcClient.IsConnected;
+
+            public ChatClient(RpcClient rpcClient)
+            {
+                _rpcClient = rpcClient;
+                _rpcClient.OnDisconnected += () => OnDisconnected?.Invoke();
+            }
+
+            public async Task ConnectAsync(string serverAddress, int port)
+            {
+                await _rpcClient.ConnectAsync(serverAddress, port);
+                _chatService = _rpcClient.CreateService<IChatService>(this);
+            }
+
+            public async Task<ChatJoinReply> JoinAsync(string playerName)
+            {
+                if (_chatService == null) throw new InvalidOperationException("Not connected.");
+                return await _chatService.JoinAsync(new ChatJoinRequest { PlayerName = playerName });
+            }
+
+            public async Task SendAsync(string text)
+            {
+                if (_chatService == null) throw new InvalidOperationException("Not connected.");
+                await _chatService.SendAsync(new ChatSendRequest { Text = text });
+            }
+
+            public async Task LeaveAsync()
+            {
+                if (_chatService == null) return;
+                await _chatService.LeaveAsync();
+            }
+
+            public void Disconnect()
+            {
+                _rpcClient.Disconnect();
+            }
+
+            void IChatCallback.OnMessageReceived(ChatMessage msg)
+            {
+                OnMessageReceived?.Invoke(msg);
+            }
+
+            void IChatCallback.OnUserJoined(ChatMember member)
+            {
+                OnUserJoined?.Invoke(member);
+            }
+
+            void IChatCallback.OnUserLeft(ChatUserLeft evt)
+            {
+                OnUserLeft?.Invoke(evt.Name);
+            }
+        }
+        """;
+    }
+
+    public static string RenderClientChatUI()
+    {
+        return """
+        using System;
+        using Shared.Chat;
+        using ULinkRPC.Client;
+        using UnityEngine;
+        using UnityEngine.UIElements;
+
+        namespace Client.Chat;
+
+        [RequireComponent(typeof(UIDocument))]
+        public sealed class ChatUI : MonoBehaviour
+        {
+            [SerializeField] private string _serverHost = "127.0.0.1";
+            [SerializeField] private int _serverPort = 20000;
+
+            private ChatClient? _client;
+            private TextField? _inputField;
+            private ScrollView? _messageList;
+            private Label? _onlineCount;
+
+            private async void Start()
+            {
+                var root = GetComponent<UIDocument>().rootVisualElement;
+
+                _inputField = root.Q<TextField>("chat-input");
+                _messageList = root.Q<ScrollView>("message-list");
+                _onlineCount = root.Q<Label>("online-count");
+
+                var sendButton = root.Q<Button>("send-button");
+                sendButton?.clicked += OnSendClicked;
+
+                _inputField?.RegisterCallback<KeyDownEvent>(evt =>
+                {
+                    if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    {
+                        OnSendClicked();
+                    }
+                });
+
+                var nameField = root.Q<TextField>("name-field");
+                var joinButton = root.Q<Button>("join-button");
+
+                joinButton?.clicked += async () =>
+                {
+                    var name = nameField?.value?.Trim();
+                    if (string.IsNullOrWhiteSpace(name)) return;
+
+                    var rpcClient = new RpcClient();
+                    _client = new ChatClient(rpcClient);
+                    _client.OnMessageReceived += AppendMessage;
+                    _client.OnUserJoined += OnUserJoinedHandler;
+                    _client.OnUserLeft += OnUserLeftHandler;
+                    _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
+
+                    try
+                    {
+                        await _client.ConnectAsync(_serverHost, _serverPort);
+                        var reply = await _client.JoinAsync(name);
+                        AppendSystemMessage($"Connected. {reply.Members.Count} online.");
+
+                        foreach (var msg in reply.RecentMessages)
+                        {
+                            AppendMessage(msg);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendSystemMessage($"Connection failed: {ex.Message}");
+                    }
+                };
+            }
+
+            private async void OnSendClicked()
+            {
+                if (_client == null || !_client.IsConnected) return;
+                var text = _inputField?.value?.Trim();
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                await _client.SendAsync(text);
+                _inputField!.value = "";
+            }
+
+            private void AppendMessage(ChatMessage msg)
+            {
+                var label = new Label($"[{msg.SenderName}]: {msg.Text}");
+                label.AddToClassList("chat-message");
+                _messageList?.Add(label);
+                _messageList?.ScrollTo(label);
+            }
+
+            private void AppendSystemMessage(string text)
+            {
+                var label = new Label(text);
+                label.AddToClassList("chat-system");
+                _messageList?.Add(label);
+                _messageList?.ScrollTo(label);
+            }
+
+            private void OnUserJoinedHandler(ChatMember member)
+            {
+                AppendSystemMessage($"{member.Name} joined.");
+            }
+
+            private void OnUserLeftHandler(string memberName)
+            {
+                AppendSystemMessage($"{memberName} left.");
+            }
+
+            private void OnDestroy()
+            {
+                _client?.Disconnect();
+            }
+        }
+        """;
+    }
+
+    public static string RenderClientChatUxml()
+    {
+        return """
+        <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+            <ui:VisualElement class="chat-container">
+                <ui:VisualElement class="chat-header">
+                    <ui:Label text="Chat Room" class="header-title" />
+                    <ui:Label text="Online: --" name="online-count" class="header-count" />
+                </ui:VisualElement>
+                <ui:ScrollView name="message-list" class="message-list" />
+                <ui:VisualElement class="chat-footer">
+                    <ui:VisualElement name="join-panel" class="join-panel">
+                        <ui:TextField name="name-field" label="Name" max-length="20" class="name-field" />
+                        <ui:Button text="Join" name="join-button" class="join-button" />
+                    </ui:VisualElement>
+                    <ui:TextField name="chat-input" label="Message" max-length="500" class="chat-input" />
+                    <ui:Button text="Send" name="send-button" class="send-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:UXML>
+        """;
+    }
+
+    public static string RenderClientChatUss()
+    {
+        return """
+        .chat-container {
+            flex-grow: 1;
+            background-color: rgb(30, 30, 30);
+        }
+        .chat-header {
+            flex-direction: row;
+            padding: 8px 16px;
+            background-color: rgb(40, 40, 40);
+            border-bottom-width: 1px;
+            border-bottom-color: rgb(60, 60, 60);
+        }
+        .header-title {
+            font-size: 18px;
+            color: rgb(200, 200, 200);
+        }
+        .header-count {
+            font-size: 14px;
+            color: rgb(120, 180, 120);
+            margin-left: auto;
+        }
+        .message-list {
+            flex-grow: 1;
+            padding: 8px;
+        }
+        .chat-message {
+            font-size: 14px;
+            color: rgb(220, 220, 220);
+            margin-bottom: 4px;
+        }
+        .chat-system {
+            font-size: 13px;
+            color: rgb(140, 140, 140);
+            -unity-font-style: italic;
+            margin-bottom: 4px;
+        }
+        .chat-footer {
+            padding: 8px;
+            background-color: rgb(40, 40, 40);
+            border-top-width: 1px;
+            border-top-color: rgb(60, 60, 60);
+        }
+        .join-panel {
+            flex-direction: row;
+            margin-bottom: 8px;
+        }
+        .name-field {
+            flex-grow: 1;
+            margin-right: 8px;
+        }
+        .join-button {
+            width: 80px;
+        }
+        .chat-input {
+            flex-grow: 1;
+        }
+        .send-button {
+            width: 80px;
         }
         """;
     }

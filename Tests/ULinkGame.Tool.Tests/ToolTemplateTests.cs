@@ -201,4 +201,132 @@ public sealed class ToolTemplateTests
         Assert.DoesNotContain("Hotfix:Directory", source);
         Assert.DoesNotContain("Hotfix:Assembly", source);
     }
+
+    [Fact]
+    public void DefaultScaffoldIncludesServerHotfixInfrastructure()
+    {
+        var options = CliParser.ParseNewOptions([]);
+
+        var solution = ToolTemplates.RenderServerSolution();
+        var project = ToolTemplates.RenderServerProject(options);
+        var sharedProject = ToolTemplates.RenderSharedProjectHotfixItemGroup();
+        var sharedAssemblyInfo = ToolTemplates.RenderSharedHotfixAssemblyInfo();
+        var sharedProtocols = ToolTemplates.RenderSharedChatProtocols();
+        var sharedMessages = ToolTemplates.RenderSharedChatMessages();
+        var hotfixProject = ToolTemplates.RenderHotfixProject();
+        var hotfixChatSystem = ToolTemplates.RenderHotfixChatSystem();
+        var appSettings = ToolTemplates.RenderServerAppSettings(options);
+        var program = ToolTemplates.RenderServerProgram(options);
+        var chatRoom = ToolTemplates.RenderServerChatRoom();
+        var chatServiceImpl = ToolTemplates.RenderServerChatServiceImpl();
+        var generatedText = string.Concat(
+            solution,
+            project,
+            sharedProject,
+            sharedAssemblyInfo,
+            sharedProtocols,
+            sharedMessages,
+            hotfixProject,
+            hotfixChatSystem,
+            appSettings,
+            program,
+            chatRoom,
+            chatServiceImpl);
+
+        Assert.Contains(@"<Project Path=""Hotfix/Server.Hotfix.csproj"" />", solution, StringComparison.Ordinal);
+        Assert.Contains(@"<ProjectReference Include=""..\Hotfix\Server.Hotfix.csproj"" ReferenceOutputAssembly=""false"" />", project, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix""", project, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Generators""", project, StringComparison.Ordinal);
+        Assert.Contains(@"PrivateAssets=""all"" OutputItemType=""Analyzer""", project, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
+        Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(2, Callback = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);
+        Assert.Contains("ChatMessage", sharedMessages, StringComparison.Ordinal);
+        Assert.Contains(@"ProjectReference Include=""..\..\Shared\Shared.csproj""", hotfixProject, StringComparison.Ordinal);
+        Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", hotfixProject, StringComparison.Ordinal);
+        Assert.Contains("class ChatSystem", hotfixChatSystem, StringComparison.Ordinal);
+        Assert.Contains("SanitizeMessage", hotfixChatSystem, StringComparison.Ordinal);
+        Assert.Contains("ConcurrentDictionary", chatRoom, StringComparison.Ordinal);
+        Assert.Contains("class ChatRoom", chatRoom, StringComparison.Ordinal);
+        Assert.Contains("class ChatServiceImpl", chatServiceImpl, StringComparison.Ordinal);
+        Assert.Contains("IChatService", chatServiceImpl, StringComparison.Ordinal);
+        Assert.Contains("AddULinkGameHotfix", program, StringComparison.Ordinal);
+        Assert.Contains("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
+        Assert.Contains("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderSharedChatProtocols_DefinesRpcServiceAndCallback()
+    {
+        var source = ToolTemplates.RenderSharedChatProtocols();
+
+        Assert.Contains("[RpcService(2", source, StringComparison.Ordinal);
+        Assert.Contains("typeof(IChatCallback)", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(1)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(2)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(3)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcPush(1)]", source, StringComparison.Ordinal);
+        Assert.Contains("OnMessageReceived", source, StringComparison.Ordinal);
+        Assert.Contains("OnUserJoined", source, StringComparison.Ordinal);
+        Assert.Contains("OnUserLeft", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderServerChatRoom_UsesConcurrentDictionaryAndBroadcast()
+    {
+        var source = ToolTemplates.RenderServerChatRoom();
+
+        Assert.Contains("ConcurrentDictionary", source, StringComparison.Ordinal);
+        Assert.Contains("MaxRecentMessages = 100", source, StringComparison.Ordinal);
+        Assert.Contains("Broadcast(cb => cb.OnUserJoined", source, StringComparison.Ordinal);
+        Assert.Contains("Broadcast(cb => cb.OnMessageReceived", source, StringComparison.Ordinal);
+        Assert.Contains("Broadcast(cb => cb.OnUserLeft", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderServerChatServiceImpl_WrapsChatRoom()
+    {
+        var source = ToolTemplates.RenderServerChatServiceImpl();
+
+        Assert.Contains("class ChatServiceImpl : IChatService", source, StringComparison.Ordinal);
+        Assert.Contains("_room.Join", source, StringComparison.Ordinal);
+        Assert.Contains("_room.Send", source, StringComparison.Ordinal);
+        Assert.Contains("_room.Leave", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderClientChatClient_ImplementsIChatCallback()
+    {
+        var source = ToolTemplates.RenderClientChatClient();
+
+        Assert.Contains("class ChatClient : IChatCallback", source, StringComparison.Ordinal);
+        Assert.Contains("CreateService<IChatService>", source, StringComparison.Ordinal);
+        Assert.Contains("OnMessageReceived?.Invoke", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderClientChatUi_RequiresUiDocument()
+    {
+        var source = ToolTemplates.RenderClientChatUI();
+
+        Assert.Contains("RequireComponent(typeof(UIDocument))", source, StringComparison.Ordinal);
+        Assert.Contains("chat-input", source, StringComparison.Ordinal);
+        Assert.Contains("message-list", source, StringComparison.Ordinal);
+        Assert.Contains("send-button", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderClientChatUxml_UsesUiNamespacePrefix()
+    {
+        var source = ToolTemplates.RenderClientChatUxml();
+
+        Assert.Contains("<ui:UXML", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"chat-input\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"message-list\"", source, StringComparison.Ordinal);
+    }
 }
