@@ -43,10 +43,10 @@
 
 ## Phase 3: Generated `Get/Local/Remote`
 
-- [ ] Collapse generated local/remote ref shape into a single actor ref type where practical, or introduce `Get` first if full collapse is too large.
-- [ ] Implement `Get(id)` local-first resolution: local runtime, actor directory cache, directory resolve, remote call.
-- [ ] Ensure `Get` never creates actors and never auto-retries business actor calls.
-- [ ] Add generator and runtime tests for local-first, directory cache, cache invalidation on location failures, and local-only semantics.
+- [x] Collapse generated local/remote ref shape into a single actor ref type where practical, or introduce `Get` first if full collapse is too large.
+- [x] Implement `Get(id)` local-first resolution: local runtime, actor directory cache, directory resolve, remote call.
+- [x] Ensure `Get` never creates actors and never auto-retries business actor calls.
+- [x] Add generator and DI tests for local-first, directory cache, cache invalidation on location failures, and local-only generated shape.
 - [ ] Commit `Add distributed actor Get accessors`.
 
 ## Phase 4: Local-Only Managed Lifecycle

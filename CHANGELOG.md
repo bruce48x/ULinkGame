@@ -9,7 +9,9 @@
 - `ULinkGame.Server` `0.1.17`
 - `ULinkGame.Server` `0.1.18`
 - `ULinkGame.Server` `0.1.19`
+- `ULinkGame.Server` `0.1.20`
 - `ULinkGame.Server.Generators` `0.1.1`
+- `ULinkGame.Server.Generators` `0.1.2`
 
 ### Added
 
@@ -18,6 +20,7 @@
 - Added server-side actor directory contracts and an in-memory actor directory implementation.
 - Added an in-memory actor directory cache for actor id to node id lookups.
 - Added a feature-discovery based actor directory client abstraction that caches the directory host node and rediscovers once after host failure.
+- Added generated distributed `Get(id)` actor accessors that resolve local-first, then actor directory cache/directory, before remote actor invocation.
 
 ### Changed
 

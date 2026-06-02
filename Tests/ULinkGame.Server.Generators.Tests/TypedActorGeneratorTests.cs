@@ -46,9 +46,13 @@ public sealed class TypedActorGeneratorTests
 
         Assert.Empty(result.ErrorDiagnostics);
         Assert.Contains("public sealed class RoomActors", result.GeneratedSource);
+        Assert.Contains("public RoomRef Get(RoomId id)", result.GeneratedSource);
         Assert.Contains("public RoomLocalRef Local(RoomId id)", result.GeneratedSource);
         Assert.Contains("public RoomRemoteRef Remote(global::ULinkGame.Cluster.NodeId nodeId, RoomId id)", result.GeneratedSource);
+        Assert.Contains("return new RoomRef(_runtime, _remote, _serializer, _options, _directory, _directoryCache, id);", result.GeneratedSource);
         Assert.Contains("return new RoomRemoteRef(_remote, _serializer, _options, nodeId, id);", result.GeneratedSource);
+        Assert.Contains("private readonly global::ULinkGame.Server.Actors.IActorDirectory _directory;", result.GeneratedSource);
+        Assert.Contains("private readonly global::ULinkGame.Server.Actors.IActorDirectoryCache _directoryCache;", result.GeneratedSource);
         Assert.Contains("global::ULinkGame.Cluster.NodeId nodeId,", result.GeneratedSource);
         Assert.Contains("public global::System.Threading.Tasks.ValueTask<JoinRoomReply> JoinAsync", result.GeneratedSource);
         Assert.Contains("private readonly global::ULinkGame.Server.Actors.IActorRuntime _runtime;", result.GeneratedSource);
@@ -60,6 +64,11 @@ public sealed class TypedActorGeneratorTests
         Assert.Contains("var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
         Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorCall.EnsureReplied(result, actorId, \"room\", \"join\", _node, correlationId);", result.GeneratedSource);
         Assert.Contains("global::ULinkGame.Server.Actors.RemoteActorCall.EnsureAccepted(result, actorId, \"room\", \"leave\", _node, correlationId);", result.GeneratedSource);
+        Assert.Contains("if (_runtime.GetState(actorId) != global::ULinkGame.Server.Actors.ActorState.Dead)", result.GeneratedSource);
+        Assert.Contains("if (!_directoryCache.TryGet(actorId, out var node))", result.GeneratedSource);
+        Assert.Contains("var record = await _directory.ResolveAsync(actorId, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("_directoryCache.Set(actorId, node);", result.GeneratedSource);
+        Assert.Contains("_directoryCache.Remove(actorId);", result.GeneratedSource);
         Assert.DoesNotContain("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Replied)", result.GeneratedSource);
         Assert.DoesNotContain("if (result.Status != global::ULinkGame.Server.Actors.RemoteActorStatus.Accepted)", result.GeneratedSource);
         Assert.DoesNotContain("RemoteActorStatus", result.GeneratedSource);
@@ -248,6 +257,7 @@ public sealed class TypedActorGeneratorTests
         var result = GeneratorTestHost.Run(source);
 
         Assert.Empty(result.ErrorDiagnostics);
+        Assert.DoesNotContain("public MetricsRef Get(MetricsId id)", result.GeneratedSource);
         Assert.Contains("public MetricsLocalRef Local(MetricsId id)", result.GeneratedSource);
         Assert.DoesNotContain("MetricsRemoteRef", result.GeneratedSource);
         Assert.DoesNotContain("Remote(global::ULinkGame.Cluster.NodeId nodeId", result.GeneratedSource);

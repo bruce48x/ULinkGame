@@ -33,6 +33,17 @@ public sealed class ActorRuntimeTests
     }
 
     [Fact]
+    public void AddULinkGameServerActors_registers_actor_directory_defaults()
+    {
+        using var provider = new ServiceCollection()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+
+        Assert.IsType<InMemoryActorDirectory>(provider.GetRequiredService<IActorDirectory>());
+        Assert.IsType<InMemoryActorDirectoryCache>(provider.GetRequiredService<IActorDirectoryCache>());
+    }
+
+    [Fact]
     public async Task AskAsync_runs_messages_serially_for_same_actor()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

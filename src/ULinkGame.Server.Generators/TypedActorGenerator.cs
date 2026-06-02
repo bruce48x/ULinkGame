@@ -182,6 +182,7 @@ namespace ULinkGame.Server.Generators
             var prefix = GetActorPrefix(actor.Symbol.Name);
             var keyType = DisplayType(actor.KeyType, actor.Symbol.ContainingNamespace);
             var actorsType = prefix + "Actors";
+            var distributedRefType = prefix + "Ref";
             var localRefType = prefix + "LocalRef";
             var remoteRefType = prefix + "RemoteRef";
 
@@ -196,7 +197,13 @@ namespace ULinkGame.Server.Generators
             }
 
             var indentLevel = namespaceName != null ? 1 : 0;
-            AppendActorsClass(builder, actor, actorsType, localRefType, remoteRefType, keyType, indentLevel);
+            AppendActorsClass(builder, actor, actorsType, distributedRefType, localRefType, remoteRefType, keyType, indentLevel);
+            if (!actor.IsLocalOnly)
+            {
+                builder.AppendLine();
+                AppendDistributedRef(builder, actor, distributedRefType, keyType, actor.ActorName, indentLevel);
+            }
+
             builder.AppendLine();
             AppendLocalRef(builder, actor, localRefType, keyType, actor.ActorName, indentLevel);
             if (!actor.IsLocalOnly)
@@ -222,6 +229,7 @@ namespace ULinkGame.Server.Generators
             StringBuilder builder,
             ActorInfo actor,
             string actorsType,
+            string distributedRefType,
             string localRefType,
             string remoteRefType,
             string keyType,
@@ -236,6 +244,8 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IRemoteActorInvoker _remote;");
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IRemoteActorSerializer _serializer;");
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.RemoteActorOptions _options;");
+                builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectory _directory;");
+                builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectoryCache _directoryCache;");
             }
 
             builder.AppendLine();
@@ -250,7 +260,9 @@ namespace ULinkGame.Server.Generators
                 builder.AppendLine(",");
                 builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorInvoker remote,");
                 builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorSerializer serializer,");
-                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.RemoteActorOptions options)");
+                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.RemoteActorOptions options,");
+                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectory directory,");
+                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectoryCache directoryCache)");
             }
 
             builder.Append(indent).AppendLine("    {");
@@ -260,9 +272,20 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("        _remote = remote;");
                 builder.Append(indent).AppendLine("        _serializer = serializer;");
                 builder.Append(indent).AppendLine("        _options = options;");
+                builder.Append(indent).AppendLine("        _directory = directory;");
+                builder.Append(indent).AppendLine("        _directoryCache = directoryCache;");
             }
 
             builder.Append(indent).AppendLine("    }");
+            if (!actor.IsLocalOnly)
+            {
+                builder.AppendLine();
+                builder.Append(indent).Append("    public ").Append(distributedRefType).Append(" Get(").Append(keyType).AppendLine(" id)");
+                builder.Append(indent).AppendLine("    {");
+                builder.Append(indent).Append("        return new ").Append(distributedRefType).AppendLine("(_runtime, _remote, _serializer, _options, _directory, _directoryCache, id);");
+                builder.Append(indent).AppendLine("    }");
+            }
+
             builder.AppendLine();
             builder.Append(indent).Append("    public ").Append(localRefType).Append(" Local(").Append(keyType).AppendLine(" id)");
             builder.Append(indent).AppendLine("    {");
@@ -277,6 +300,206 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("    }");
             }
 
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendDistributedRef(
+            StringBuilder builder,
+            ActorInfo actor,
+            string distributedRefType,
+            string keyType,
+            string routePrefix,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            builder.Append(indent).Append("public readonly struct ").Append(distributedRefType).AppendLine();
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorRuntime _runtime;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IRemoteActorInvoker _remote;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IRemoteActorSerializer _serializer;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.RemoteActorOptions _options;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectory _directory;");
+            builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectoryCache _directoryCache;");
+            builder.Append(indent).Append("    private readonly ").Append(keyType).AppendLine(" _id;");
+            builder.AppendLine();
+            builder.Append(indent).Append("    public ").Append(distributedRefType).Append("(").AppendLine();
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorRuntime runtime,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorInvoker remote,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorSerializer serializer,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.RemoteActorOptions options,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectory directory,");
+            builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectoryCache directoryCache,");
+            builder.Append(indent).Append("        ").Append(keyType).AppendLine(" id)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        _runtime = runtime;");
+            builder.Append(indent).AppendLine("        _remote = remote;");
+            builder.Append(indent).AppendLine("        _serializer = serializer;");
+            builder.Append(indent).AppendLine("        _options = options;");
+            builder.Append(indent).AppendLine("        _directory = directory;");
+            builder.Append(indent).AppendLine("        _directoryCache = directoryCache;");
+            builder.Append(indent).AppendLine("        _id = id;");
+            builder.Append(indent).AppendLine("    }");
+
+            foreach (var method in actor.Methods)
+            {
+                builder.AppendLine();
+                AppendDistributedMethod(builder, actor, method, routePrefix, indentLevel + 1);
+            }
+
+            builder.AppendLine();
+            AppendResolveNodeMethod(builder, routePrefix, indentLevel + 1);
+            builder.AppendLine();
+            AppendIsLocationFailureMethod(builder, indentLevel + 1);
+
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendDistributedMethod(
+            StringBuilder builder,
+            ActorInfo actor,
+            MethodInfo method,
+            string routePrefix,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var returnType = DisplayReturnType(actor, method);
+            var requestType = DisplayType(method.RequestType, actor.Symbol.ContainingNamespace);
+            var actorType = actor.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var actorName = actor.ActorName;
+            var methodName = method.ActorMethodName;
+
+            builder.Append(indent)
+                .Append("public async ")
+                .Append(returnType)
+                .Append(' ')
+                .Append(method.Name)
+                .Append('(')
+                .Append(requestType)
+                .Append(" request, global::System.Threading.CancellationToken cancellationToken = default)")
+                .AppendLine();
+            builder.Append(indent).AppendLine("{");
+            AppendActorIdSetup(builder, actor, routePrefix, indentLevel + 1);
+            builder.Append(indent).AppendLine("    if (_runtime.GetState(actorId) != global::ULinkGame.Server.Actors.ActorState.Dead)");
+            builder.Append(indent).AppendLine("    {");
+
+            if (method.ResultType == null)
+            {
+                builder.Append(indent)
+                    .Append("        await _runtime.TellAsync<")
+                    .Append(actorType)
+                    .Append(">(actorId, (actor, ct) => actor.")
+                    .Append(method.Name)
+                    .Append("(request");
+                if (method.HasCancellationToken)
+                {
+                    builder.Append(", ct");
+                }
+
+                builder.AppendLine("), cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("        return;");
+            }
+            else
+            {
+                builder.Append(indent)
+                    .Append("        return await _runtime.AskAsync<")
+                    .Append(actorType)
+                    .Append(", ")
+                    .Append(DisplayType(method.ResultType, actor.Symbol.ContainingNamespace))
+                    .Append(">(actorId, (actor, ct) => actor.")
+                    .Append(method.Name)
+                    .Append("(request");
+                if (method.HasCancellationToken)
+                {
+                    builder.Append(", ct");
+                }
+
+                builder.AppendLine("), cancellationToken).ConfigureAwait(false);");
+            }
+
+            builder.Append(indent).AppendLine("    }");
+            builder.AppendLine();
+            builder.Append(indent)
+                .Append("    var node = await ResolveNodeAsync(actorId, \"")
+                .Append(methodName)
+                .AppendLine("\", cancellationToken).ConfigureAwait(false);");
+            AppendRemoteInvocationSetup(builder, actor, routePrefix, actorName, methodName, "node", indentLevel + 1, includeActorId: false);
+            builder.Append(indent).AppendLine("    try");
+            builder.Append(indent).AppendLine("    {");
+
+            if (method.ResultType == null)
+            {
+                builder.Append(indent).AppendLine("        var result = await _remote.TellAsync(invocation, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent)
+                    .Append("        global::ULinkGame.Server.Actors.RemoteActorCall.EnsureAccepted(result, actorId, \"")
+                    .Append(actorName)
+                    .Append("\", \"")
+                    .Append(methodName)
+                    .AppendLine("\", node, correlationId);");
+            }
+            else
+            {
+                builder.Append(indent).AppendLine("        var result = await _remote.AskAsync(invocation, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent)
+                    .Append("        global::ULinkGame.Server.Actors.RemoteActorCall.EnsureReplied(result, actorId, \"")
+                    .Append(actorName)
+                    .Append("\", \"")
+                    .Append(methodName)
+                    .AppendLine("\", node, correlationId);");
+                builder.Append(indent)
+                    .Append("        return _serializer.Deserialize<")
+                    .Append(DisplayType(method.ResultType, actor.Symbol.ContainingNamespace))
+                    .AppendLine(">(result.Payload);");
+            }
+
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("    catch (global::ULinkGame.Server.Actors.ActorCallException exception) when (IsLocationFailure(exception))");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        _directoryCache.Remove(actorId);");
+            builder.Append(indent).AppendLine("        throw;");
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendResolveNodeMethod(
+            StringBuilder builder,
+            string actorName,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            builder.Append(indent).AppendLine("private async global::System.Threading.Tasks.ValueTask<global::ULinkGame.Cluster.NodeId> ResolveNodeAsync(");
+            builder.Append(indent).AppendLine("    global::ULinkGame.Server.Actors.ActorId actorId,");
+            builder.Append(indent).AppendLine("    string methodName,");
+            builder.Append(indent).AppendLine("    global::System.Threading.CancellationToken cancellationToken)");
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).AppendLine("    if (!_directoryCache.TryGet(actorId, out var node))");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        var record = await _directory.ResolveAsync(actorId, cancellationToken).ConfigureAwait(false);");
+            builder.Append(indent).AppendLine("        if (record is null)");
+            builder.Append(indent).AppendLine("        {");
+            builder.Append(indent).AppendLine("            throw new global::ULinkGame.Server.Actors.ActorNotFoundException(");
+            builder.Append(indent).AppendLine("                actorId,");
+            builder.Append(indent).Append("                \"").Append(actorName).AppendLine("\",");
+            builder.Append(indent).AppendLine("                methodName,");
+            builder.Append(indent).AppendLine("                \"Actor was not found in actor directory.\");");
+            builder.Append(indent).AppendLine("        }");
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("        node = record.Node;");
+            builder.Append(indent).AppendLine("        _directoryCache.Set(actorId, node);");
+            builder.Append(indent).AppendLine("    }");
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("    return node;");
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendIsLocationFailureMethod(
+            StringBuilder builder,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            builder.Append(indent).AppendLine("private static bool IsLocationFailure(global::ULinkGame.Server.Actors.ActorCallException exception)");
+            builder.Append(indent).AppendLine("{");
+            builder.Append(indent).AppendLine("    return exception.Status == global::ULinkGame.Server.Actors.ActorCallStatus.ActorNotFound");
+            builder.Append(indent).AppendLine("        || exception.Status == global::ULinkGame.Server.Actors.ActorCallStatus.NodeUnavailable;");
             builder.Append(indent).AppendLine("}");
         }
 
@@ -331,13 +554,7 @@ namespace ULinkGame.Server.Generators
                 .Append(" request, global::System.Threading.CancellationToken cancellationToken = default)")
                 .AppendLine();
             builder.Append(indent).AppendLine("{");
-            builder.Append(indent)
-                .Append("    var actorId = global::ULinkGame.Server.Actors.ActorId.From(\"")
-                .Append(routePrefix)
-                .Append("/\" + ")
-                .Append(CreateKeyValueExpression(actor.KeyType))
-                .Append(");")
-                .AppendLine();
+            AppendActorIdSetup(builder, actor, routePrefix, indentLevel + 1);
 
             if (method.ResultType == null)
             {
@@ -438,7 +655,7 @@ namespace ULinkGame.Server.Generators
                 .Append(" request, global::System.Threading.CancellationToken cancellationToken = default)")
                 .AppendLine();
             builder.Append(indent).AppendLine("{");
-            AppendRemoteInvocationSetup(builder, actor, routePrefix, actorName, methodName, indentLevel + 1);
+            AppendRemoteInvocationSetup(builder, actor, routePrefix, actorName, methodName, "_node", indentLevel + 1);
 
             if (method.ResultType == null)
             {
@@ -622,6 +839,33 @@ namespace ULinkGame.Server.Generators
             string routePrefix,
             string actorName,
             string methodName,
+            string nodeExpression,
+            int indentLevel,
+            bool includeActorId = true)
+        {
+            var indent = Indent(indentLevel);
+            if (includeActorId)
+            {
+                AppendActorIdSetup(builder, actor, routePrefix, indentLevel);
+            }
+
+            builder.Append(indent).AppendLine("var payload = _serializer.Serialize(request);");
+            builder.Append(indent).AppendLine("var correlationId = global::System.Guid.NewGuid().ToString(\"N\");");
+            builder.Append(indent).AppendLine("var deadline = global::System.DateTimeOffset.UtcNow.Add(_options.DefaultTimeout);");
+            builder.Append(indent)
+                .Append("var invocation = new global::ULinkGame.Server.Actors.RemoteActorInvocation(")
+                .Append(nodeExpression)
+                .Append(", actorId, \"")
+                .Append(actorName)
+                .Append("\", \"")
+                .Append(methodName)
+                .AppendLine("\", payload, deadline, correlationId);");
+        }
+
+        private static void AppendActorIdSetup(
+            StringBuilder builder,
+            ActorInfo actor,
+            string routePrefix,
             int indentLevel)
         {
             var indent = Indent(indentLevel);
@@ -631,15 +875,6 @@ namespace ULinkGame.Server.Generators
                 .Append("/\" + ")
                 .Append(CreateKeyValueExpression(actor.KeyType))
                 .AppendLine(");");
-            builder.Append(indent).AppendLine("var payload = _serializer.Serialize(request);");
-            builder.Append(indent).AppendLine("var correlationId = global::System.Guid.NewGuid().ToString(\"N\");");
-            builder.Append(indent).AppendLine("var deadline = global::System.DateTimeOffset.UtcNow.Add(_options.DefaultTimeout);");
-            builder.Append(indent)
-                .Append("var invocation = new global::ULinkGame.Server.Actors.RemoteActorInvocation(_node, actorId, \"")
-                .Append(actorName)
-                .Append("\", \"")
-                .Append(methodName)
-                .AppendLine("\", payload, deadline, correlationId);");
         }
 
         private static string DisplayReturnType(ActorInfo actor, MethodInfo method)

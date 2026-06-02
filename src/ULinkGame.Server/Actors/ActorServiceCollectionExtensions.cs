@@ -16,6 +16,8 @@ public static class ActorServiceCollectionExtensions
         services.TryAddSingleton<RemoteActorGateway>();
         services.TryAddSingleton<RemoteActorOptions>();
         services.TryAddSingleton<IActorRuntime, ULinkActorRuntime>();
+        services.TryAddSingleton<IActorDirectory, InMemoryActorDirectory>();
+        services.TryAddSingleton<IActorDirectoryCache, InMemoryActorDirectoryCache>();
         return services;
     }
 }
