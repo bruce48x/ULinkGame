@@ -13,6 +13,7 @@ public static class ActorServiceCollectionExtensions
         configure?.Invoke(options);
 
         services.TryAddSingleton(options);
+        services.TryAddSingleton(new LocalActorNodeIdentity("local"));
         services.TryAddSingleton<RemoteActorGateway>();
         services.TryAddSingleton<RemoteActorOptions>();
         services.TryAddSingleton<IActorRuntime, ULinkActorRuntime>();

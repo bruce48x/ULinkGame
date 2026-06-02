@@ -11,9 +11,11 @@ namespace ULinkGame.Server.Generators
     public sealed class TypedActorGenerator : IIncrementalGenerator
     {
         private const string ActorIgnoreAttributeName = "ULinkGame.Server.Actors.ActorIgnoreAttribute";
+        private const string ActorDestroyAttributeName = "ULinkGame.Server.Actors.ActorDestroyAttribute";
         private const string ActorLocalOnlyAttributeName = "ULinkGame.Server.Actors.ActorLocalOnlyAttribute";
         private const string ActorMethodAttributeName = "ULinkGame.Server.Actors.ActorMethodAttribute";
         private const string ActorNameAttributeName = "ULinkGame.Server.Actors.ActorNameAttribute";
+        private const string ActorSpawnAttributeName = "ULinkGame.Server.Actors.ActorSpawnAttribute";
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -50,20 +52,46 @@ namespace ULinkGame.Server.Generators
                 .Where(IsPublicInstanceOrdinaryMethod)
                 .Where(static method => !HasAttribute(method, ActorIgnoreAttributeName))
                 .ToArray();
-            var methods = candidateMethods
+            var spawnHook = candidateMethods
+                .Where(static method => HasAttribute(method, ActorSpawnAttributeName))
+                .Where(static method => IsEligibleLifecycleMethod(method, allowRequest: true))
+                .Select(static method => LifecycleMethodInfo.Create(method, true))
+                .FirstOrDefault();
+            var destroyHook = candidateMethods
+                .Where(static method => HasAttribute(method, ActorDestroyAttributeName))
+                .Where(static method => IsEligibleLifecycleMethod(method, allowRequest: false))
+                .Select(static method => LifecycleMethodInfo.Create(method, false))
+                .FirstOrDefault();
+            var businessMethods = candidateMethods
+                .Where(static method => !HasAttribute(method, ActorSpawnAttributeName))
+                .Where(static method => !HasAttribute(method, ActorDestroyAttributeName))
+                .ToArray();
+            var methods = businessMethods
                 .Where(IsEligibleMethod)
                 .Select(method => MethodInfo.Create(method))
                 .ToArray();
-            var unsupportedMethods = candidateMethods
+            var unsupportedMethods = businessMethods
                 .Where(static method => !IsEligibleMethod(method))
                 .Select(static method => new UnsupportedMethodInfo(
                     method.Name,
                     method.Locations.Length == 0 ? Location.None : method.Locations[0]))
+                .Concat(candidateMethods
+                    .Where(static method => HasAttribute(method, ActorSpawnAttributeName))
+                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: false))
+                    .Select(static method => new UnsupportedMethodInfo(
+                        method.Name,
+                        method.Locations.Length == 0 ? Location.None : method.Locations[0])))
+                .Concat(candidateMethods
+                    .Where(static method => HasAttribute(method, ActorDestroyAttributeName))
+                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: true))
+                    .Select(static method => new UnsupportedMethodInfo(
+                        method.Name,
+                        method.Locations.Length == 0 ? Location.None : method.Locations[0])))
                 .ToArray();
             var actorName = GetAttributeString(symbol, ActorNameAttributeName) ?? LowerFirst(GetActorPrefix(symbol.Name));
             var isLocalOnly = HasAttribute(symbol, ActorLocalOnlyAttributeName);
 
-            return new ActorInfo(symbol, keyType, actorName, isLocalOnly, methods, unsupportedMethods);
+            return new ActorInfo(symbol, keyType, actorName, isLocalOnly, methods, spawnHook, destroyHook, unsupportedMethods);
         }
 
         private static bool IsNotNull(ActorInfo? actor)
@@ -99,6 +127,28 @@ namespace ULinkGame.Server.Generators
             }
 
             return method.Parameters.Length == 2 &&
+                IsCancellationToken(method.Parameters[1].Type);
+        }
+
+        private static bool IsEligibleLifecycleMethod(IMethodSymbol method, bool allowRequest)
+        {
+            if (!IsValueTask(method.ReturnType, out var resultType) || resultType != null)
+            {
+                return false;
+            }
+
+            if (method.Parameters.Length == 0)
+            {
+                return true;
+            }
+
+            if (method.Parameters.Length == 1)
+            {
+                return IsCancellationToken(method.Parameters[0].Type) || allowRequest;
+            }
+
+            return allowRequest &&
+                method.Parameters.Length == 2 &&
                 IsCancellationToken(method.Parameters[1].Type);
         }
 
@@ -246,6 +296,7 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.RemoteActorOptions _options;");
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectory _directory;");
                 builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.IActorDirectoryCache _directoryCache;");
+                builder.Append(indent).AppendLine("    private readonly global::ULinkGame.Server.Actors.LocalActorNodeIdentity _localNode;");
             }
 
             builder.AppendLine();
@@ -262,7 +313,8 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IRemoteActorSerializer serializer,");
                 builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.RemoteActorOptions options,");
                 builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectory directory,");
-                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectoryCache directoryCache)");
+                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.IActorDirectoryCache directoryCache,");
+                builder.Append(indent).AppendLine("        global::ULinkGame.Server.Actors.LocalActorNodeIdentity localNode)");
             }
 
             builder.Append(indent).AppendLine("    {");
@@ -274,6 +326,7 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("        _options = options;");
                 builder.Append(indent).AppendLine("        _directory = directory;");
                 builder.Append(indent).AppendLine("        _directoryCache = directoryCache;");
+                builder.Append(indent).AppendLine("        _localNode = localNode;");
             }
 
             builder.Append(indent).AppendLine("    }");
@@ -291,6 +344,7 @@ namespace ULinkGame.Server.Generators
             builder.Append(indent).AppendLine("    {");
             builder.Append(indent).Append("        return new ").Append(localRefType).AppendLine("(_runtime, id);");
             builder.Append(indent).AppendLine("    }");
+
             if (!actor.IsLocalOnly)
             {
                 builder.AppendLine();
@@ -300,7 +354,150 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("    }");
             }
 
+            builder.AppendLine();
+            AppendSpawnMethod(builder, actor, keyType, actor.ActorName, indentLevel + 1);
+            builder.AppendLine();
+            AppendDestroyMethod(builder, actor, keyType, actor.ActorName, indentLevel + 1);
+
             builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendSpawnMethod(
+            StringBuilder builder,
+            ActorInfo actor,
+            string keyType,
+            string routePrefix,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var actorType = actor.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var requestParameter = actor.SpawnHook != null && actor.SpawnHook.RequestType != null
+                ? DisplayType(actor.SpawnHook.RequestType, actor.Symbol.ContainingNamespace) + " request, "
+                : string.Empty;
+
+            builder.Append(indent)
+                .Append("public async global::System.Threading.Tasks.ValueTask SpawnAsync(")
+                .Append(keyType)
+                .Append(" id, ")
+                .Append(requestParameter)
+                .AppendLine("global::System.Threading.CancellationToken cancellationToken = default)");
+            builder.Append(indent).AppendLine("{");
+            AppendCollectionActorIdSetup(builder, actor, routePrefix, indentLevel + 1);
+            builder.Append(indent).AppendLine("    if (_runtime.GetState(actorId) != global::ULinkGame.Server.Actors.ActorState.Dead)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        throw new global::ULinkGame.Server.Actors.ActorAlreadyExistsException(");
+            builder.Append(indent).AppendLine("            actorId,");
+            builder.Append(indent).Append("            \"").Append(actor.ActorName).AppendLine("\",");
+            builder.Append(indent).AppendLine("            \"spawn\",");
+            builder.Append(indent).AppendLine("            \"Actor already exists locally.\");");
+            builder.Append(indent).AppendLine("    }");
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("    try");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent)
+                .Append("        await _runtime.GetOrCreateAsync<")
+                .Append(actorType)
+                .AppendLine(">(actorId, cancellationToken).ConfigureAwait(false);");
+            if (actor.SpawnHook != null)
+            {
+                AppendLifecycleHookCall(builder, actor, actor.SpawnHook, indentLevel + 2);
+            }
+
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("        var registerStatus = await _directory.RegisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("        if (registerStatus == global::ULinkGame.Server.Actors.ActorDirectoryRegisterStatus.Conflict)");
+                builder.Append(indent).AppendLine("        {");
+                builder.Append(indent).AppendLine("            throw new global::ULinkGame.Server.Actors.ActorAlreadyExistsException(");
+                builder.Append(indent).AppendLine("                actorId,");
+                builder.Append(indent).Append("                \"").Append(actor.ActorName).AppendLine("\",");
+                builder.Append(indent).AppendLine("                \"spawn\",");
+                builder.Append(indent).AppendLine("                \"Actor is already registered on another node.\",");
+                builder.Append(indent).AppendLine("                _localNode.NodeId);");
+                builder.Append(indent).AppendLine("        }");
+                builder.AppendLine();
+                builder.Append(indent).AppendLine("        _directoryCache.Set(actorId, _localNode.NodeId);");
+            }
+
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("    catch");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        await _runtime.StopAsync(actorId).ConfigureAwait(false);");
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("        _directoryCache.Remove(actorId);");
+            }
+
+            builder.Append(indent).AppendLine("        throw;");
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendDestroyMethod(
+            StringBuilder builder,
+            ActorInfo actor,
+            string keyType,
+            string routePrefix,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+
+            builder.Append(indent)
+                .Append("public async global::System.Threading.Tasks.ValueTask DestroyAsync(")
+                .Append(keyType)
+                .Append(" id");
+            AppendLifecycleRequestParameter(builder, actor, actor.DestroyHook);
+            builder.AppendLine(")");
+            builder.Append(indent).AppendLine("{");
+            AppendCollectionActorIdSetup(builder, actor, routePrefix, indentLevel + 1);
+            builder.Append(indent).AppendLine("    if (_runtime.GetState(actorId) == global::ULinkGame.Server.Actors.ActorState.Dead)");
+            builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).AppendLine("        throw new global::ULinkGame.Server.Actors.ActorNotFoundException(");
+            builder.Append(indent).AppendLine("            actorId,");
+            builder.Append(indent).Append("            \"").Append(actor.ActorName).AppendLine("\",");
+            builder.Append(indent).AppendLine("            \"destroy\",");
+            builder.Append(indent).AppendLine("            \"Actor was not found locally.\");");
+            builder.Append(indent).AppendLine("    }");
+            if (actor.DestroyHook != null)
+            {
+                builder.AppendLine();
+                AppendLifecycleHookCall(builder, actor, actor.DestroyHook, indentLevel + 1);
+            }
+
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("    await _runtime.StopAsync(actorId).ConfigureAwait(false);");
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("    var unregisterStatus = await _directory.UnregisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("    _directoryCache.Remove(actorId);");
+                builder.Append(indent).AppendLine("    if (unregisterStatus == global::ULinkGame.Server.Actors.ActorDirectoryUnregisterStatus.OwnershipMismatch)");
+                builder.Append(indent).AppendLine("    {");
+                builder.Append(indent).AppendLine("        throw new global::ULinkGame.Server.Actors.ActorOwnershipMismatchException(");
+                builder.Append(indent).AppendLine("            actorId,");
+                builder.Append(indent).Append("            \"").Append(actor.ActorName).AppendLine("\",");
+                builder.Append(indent).AppendLine("            \"destroy\",");
+                builder.Append(indent).AppendLine("            \"Actor directory ownership belongs to another node.\",");
+                builder.Append(indent).AppendLine("            _localNode.NodeId);");
+                builder.Append(indent).AppendLine("    }");
+            }
+
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendLifecycleRequestParameter(
+            StringBuilder builder,
+            ActorInfo actor,
+            LifecycleMethodInfo? hook,
+            bool includeRequest = true)
+        {
+            if (includeRequest && hook?.RequestType != null)
+            {
+                builder.Append(", ")
+                    .Append(DisplayType(hook.RequestType, actor.Symbol.ContainingNamespace))
+                    .Append(" request");
+            }
+
+            builder.Append(", global::System.Threading.CancellationToken cancellationToken = default");
         }
 
         private static void AppendDistributedRef(
@@ -352,6 +549,41 @@ namespace ULinkGame.Server.Generators
             AppendIsLocationFailureMethod(builder, indentLevel + 1);
 
             builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendLifecycleHookCall(
+            StringBuilder builder,
+            ActorInfo actor,
+            LifecycleMethodInfo hook,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            var actorType = actor.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            builder.Append(indent)
+                .Append("await _runtime.TellAsync<")
+                .Append(actorType)
+                .Append(">(actorId, (actor, ct) => actor.")
+                .Append(hook.Name)
+                .Append('(');
+
+            var appendedArgument = false;
+            if (hook.RequestType != null)
+            {
+                builder.Append("request");
+                appendedArgument = true;
+            }
+
+            if (hook.HasCancellationToken)
+            {
+                if (appendedArgument)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append("ct");
+            }
+
+            builder.AppendLine("), cancellationToken).ConfigureAwait(false);");
         }
 
         private static void AppendDistributedMethod(
@@ -877,6 +1109,21 @@ namespace ULinkGame.Server.Generators
                 .AppendLine(");");
         }
 
+        private static void AppendCollectionActorIdSetup(
+            StringBuilder builder,
+            ActorInfo actor,
+            string routePrefix,
+            int indentLevel)
+        {
+            var indent = Indent(indentLevel);
+            builder.Append(indent)
+                .Append("var actorId = global::ULinkGame.Server.Actors.ActorId.From(\"")
+                .Append(routePrefix)
+                .Append("/\" + ")
+                .Append(CreateKeyValueExpression(actor.KeyType, "id"))
+                .AppendLine(");");
+        }
+
         private static string DisplayReturnType(ActorInfo actor, MethodInfo method)
         {
             if (method.ResultType == null)
@@ -899,17 +1146,22 @@ namespace ULinkGame.Server.Generators
 
         private static string CreateKeyValueExpression(ITypeSymbol keyType)
         {
+            return CreateKeyValueExpression(keyType, "_id");
+        }
+
+        private static string CreateKeyValueExpression(ITypeSymbol keyType, string idExpression)
+        {
             if (keyType.SpecialType == SpecialType.System_String)
             {
-                return "_id";
+                return idExpression;
             }
 
             if (HasAccessibleValueProperty(keyType))
             {
-                return "_id.Value";
+                return idExpression + ".Value";
             }
 
-            return "_id.ToString()";
+            return idExpression + ".ToString()";
         }
 
         private static bool HasAccessibleValueProperty(ITypeSymbol keyType)
@@ -979,6 +1231,8 @@ namespace ULinkGame.Server.Generators
                 string actorName,
                 bool isLocalOnly,
                 MethodInfo[] methods,
+                LifecycleMethodInfo? spawnHook,
+                LifecycleMethodInfo? destroyHook,
                 UnsupportedMethodInfo[] unsupportedMethods)
             {
                 Symbol = symbol;
@@ -986,6 +1240,8 @@ namespace ULinkGame.Server.Generators
                 ActorName = actorName;
                 IsLocalOnly = isLocalOnly;
                 Methods = methods;
+                SpawnHook = spawnHook;
+                DestroyHook = destroyHook;
                 UnsupportedMethods = unsupportedMethods;
             }
 
@@ -999,7 +1255,54 @@ namespace ULinkGame.Server.Generators
 
             public MethodInfo[] Methods { get; }
 
+            public LifecycleMethodInfo? SpawnHook { get; }
+
+            public LifecycleMethodInfo? DestroyHook { get; }
+
             public UnsupportedMethodInfo[] UnsupportedMethods { get; }
+        }
+
+        private sealed class LifecycleMethodInfo
+        {
+            private LifecycleMethodInfo(
+                string name,
+                ITypeSymbol? requestType,
+                bool hasCancellationToken)
+            {
+                Name = name;
+                RequestType = requestType;
+                HasCancellationToken = hasCancellationToken;
+            }
+
+            public string Name { get; }
+
+            public ITypeSymbol? RequestType { get; }
+
+            public bool HasCancellationToken { get; }
+
+            public static LifecycleMethodInfo Create(IMethodSymbol method, bool allowRequest)
+            {
+                ITypeSymbol? requestType = null;
+                var hasCancellationToken = false;
+                if (method.Parameters.Length == 1)
+                {
+                    if (IsCancellationToken(method.Parameters[0].Type))
+                    {
+                        hasCancellationToken = true;
+                    }
+                    else if (allowRequest)
+                    {
+                        requestType = method.Parameters[0].Type;
+                    }
+                }
+                else if (method.Parameters.Length == 2)
+                {
+                    requestType = method.Parameters[0].Type;
+                    hasCancellationToken = true;
+                }
+
+                return new LifecycleMethodInfo(method.Name, requestType, hasCancellationToken);
+            }
         }
 
         private sealed class MethodInfo

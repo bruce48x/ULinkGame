@@ -7,14 +7,16 @@
 **Architecture Decisions:**
 
 - All `[Actor]` actors are framework-managed in the first version.
+- Do not add a `UserManaged`/`ActorLifetime` split in the first version.
 - Actor implementations must implement the actor contract shape used by the generator/runtime. Hotfix is for bug fixes, not contract changes.
-- Generated business calls return business results directly. Remote failure throws typed actor call exceptions instead of exposing `RemoteActorInvocationResult` or `RemoteAskResult<T>` to users.
-- `Get(id)` is the default distributed actor reference: local first, then actor directory, never creates.
-- `Local(id)` only targets the current process.
-- `Remote(nodeId, id)` only targets the specified node and does not query actor directory.
+- Generated business calls return business results directly. Remote failure throws typed actor call exceptions instead of exposing `RemoteActorInvocationResult`, `RemoteAskResult<T>`, `TryXxxAsync`, or status switches to ordinary business code.
+- `Get(id)` is the default distributed actor reference: local first, then actor directory, never creates. Example: `rooms.Get(roomId).JoinAsync(req)`.
+- `Local(id)` only targets the current process. Example: `rooms.Local(roomId).JoinAsync(req)`.
+- `Remote(nodeId, id)` only targets the specified node and does not query actor directory. Example: `rooms.Remote(nodeId, roomId).JoinAsync(req)`.
 - `SpawnAsync` and `DestroyAsync` are local-only lifecycle operations. ULinkGame does not provide `SpawnRemoteAsync` or `DestroyRemoteAsync`.
 - Cross-node creation/destruction is a business command to a manager actor/service on the target node.
-- `ActorDirectory` lives in `ULinkGame.Server`; the distributed first version finds its host through cluster feature discovery.
+- `ActorDirectory` lives in `ULinkGame.Server`; the distributed first version finds its host through cluster feature discovery and caches both directory host and actor placement.
+- Business layer code should not know endpoint addresses, `clusterName`, `endpointName`, route-directory endpoints, or actor-directory host endpoints.
 
 **Tech Stack:** C# 13 / .NET 10, ULinkGame.Server, ULinkGame.Cluster, source generator tests, xUnit v3.
 
@@ -70,4 +72,4 @@
 ## Verification
 
 - [ ] Run `dotnet test Tests\tests.slnx --no-restore -m:1`.
-- [ ] Update contributor/design docs to reflect the new accepted model and remove stale "do not generate remote actor client" language.
+- [ ] Update contributor/design docs to reflect the new accepted model and remove stale "do not generate remote actor client" and status-result business API language.

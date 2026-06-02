@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using ULinkGame.Cluster;
 using ULinkGame.Server.Actors;
 using ULinkGame.Server.Diagnostics;
 using Xunit;
@@ -41,6 +42,29 @@ public sealed class ActorRuntimeTests
 
         Assert.IsType<InMemoryActorDirectory>(provider.GetRequiredService<IActorDirectory>());
         Assert.IsType<InMemoryActorDirectoryCache>(provider.GetRequiredService<IActorDirectoryCache>());
+    }
+
+    [Fact]
+    public void AddULinkGameServerActors_registers_local_actor_node_identity_default()
+    {
+        using var provider = new ServiceCollection()
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+
+        Assert.Equal(new NodeId("local"), provider.GetRequiredService<LocalActorNodeIdentity>().NodeId);
+    }
+
+    [Fact]
+    public void AddULinkGameServerActors_preserves_preconfigured_local_actor_node_identity()
+    {
+        var node = new NodeId("node-a");
+
+        using var provider = new ServiceCollection()
+            .AddSingleton(new LocalActorNodeIdentity(node))
+            .AddULinkGameServerActors()
+            .BuildServiceProvider();
+
+        Assert.Equal(node, provider.GetRequiredService<LocalActorNodeIdentity>().NodeId);
     }
 
     [Fact]

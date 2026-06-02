@@ -1,5 +1,7 @@
 # Typed Remote Actor API Implementation Plan
 
+> **Status:** Superseded by [2026-06-02 Managed Distributed Actor API](2026-06-02-managed-distributed-actor-api.md). This plan is retained as historical implementation context for the lower-level remote invoker work. Current architecture guidance is `Get(id)` by default, explicit `Local(id)` and `Remote(nodeId, id)` selectors, typed actor call exceptions for generated business calls, Server-owned `ActorDirectory`, and local-only generated `SpawnAsync`/`DestroyAsync`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the skynet-style typed actor access API where generated `Local(id)` and `Remote(nodeId, id)` refs expose the same actor business methods.

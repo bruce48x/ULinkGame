@@ -232,6 +232,99 @@ public sealed class TypedActorGeneratorTests
     }
 
     [Fact]
+    public void Generator_emits_local_lifecycle_methods_and_excludes_hooks_from_business_methods()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct RoomId(string Value);
+            public sealed record SpawnRoomRequest(string OwnerId);
+            public sealed record PingRequest;
+
+            public sealed class RoomActor : Actor<RoomId>
+            {
+                [ActorSpawn]
+                public ValueTask OpenAsync(SpawnRoomRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+
+                [ActorDestroy]
+                public ValueTask CloseAsync(CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+
+                public ValueTask PingAsync(PingRequest request, CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask SpawnAsync(RoomId id, SpawnRoomRequest request, global::System.Threading.CancellationToken cancellationToken = default)", result.GeneratedSource);
+        Assert.Contains("await _runtime.GetOrCreateAsync<global::Game.Server.RoomActor>(actorId, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("await _runtime.TellAsync<global::Game.Server.RoomActor>(actorId, (actor, ct) => actor.OpenAsync(request, ct), cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("var registerStatus = await _directory.RegisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("_directoryCache.Set(actorId, _localNode.NodeId);", result.GeneratedSource);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask DestroyAsync(RoomId id, global::System.Threading.CancellationToken cancellationToken = default)", result.GeneratedSource);
+        Assert.Contains("await _runtime.TellAsync<global::Game.Server.RoomActor>(actorId, (actor, ct) => actor.CloseAsync(ct), cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("await _runtime.StopAsync(actorId).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("var unregisterStatus = await _directory.UnregisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("public global::System.Threading.Tasks.ValueTask PingAsync(PingRequest request, global::System.Threading.CancellationToken cancellationToken = default)", result.GeneratedSource);
+        Assert.DoesNotContain("public global::System.Threading.Tasks.ValueTask OpenAsync", result.GeneratedSource);
+        Assert.DoesNotContain("public global::System.Threading.Tasks.ValueTask CloseAsync", result.GeneratedSource);
+        Assert.DoesNotContain("case \"open\":", result.GeneratedSource);
+        Assert.DoesNotContain("case \"close\":", result.GeneratedSource);
+        Assert.DoesNotContain("\"room\", \"open\"", result.GeneratedSource);
+        Assert.DoesNotContain("\"room\", \"close\"", result.GeneratedSource);
+    }
+
+    [Fact]
+    public void Generator_emits_lifecycle_methods_without_hook_request_when_hook_has_no_request()
+    {
+        var source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ULinkGame.Server.Actors;
+
+            namespace Game.Server;
+
+            public readonly record struct RoomId(string Value);
+
+            public sealed class RoomActor : Actor<RoomId>
+            {
+                [ActorSpawn]
+                public ValueTask OpenAsync(CancellationToken cancellationToken = default)
+                {
+                    return ValueTask.CompletedTask;
+                }
+
+                [ActorDestroy]
+                public ValueTask CloseAsync()
+                {
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """;
+
+        var result = GeneratorTestHost.Run(source);
+
+        Assert.Empty(result.ErrorDiagnostics);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask SpawnAsync(RoomId id, global::System.Threading.CancellationToken cancellationToken = default)", result.GeneratedSource);
+        Assert.Contains("await _runtime.TellAsync<global::Game.Server.RoomActor>(actorId, (actor, ct) => actor.OpenAsync(ct), cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+        Assert.Contains("public async global::System.Threading.Tasks.ValueTask DestroyAsync(RoomId id, global::System.Threading.CancellationToken cancellationToken = default)", result.GeneratedSource);
+        Assert.Contains("await _runtime.TellAsync<global::Game.Server.RoomActor>(actorId, (actor, ct) => actor.CloseAsync(), cancellationToken).ConfigureAwait(false);", result.GeneratedSource);
+    }
+
+    [Fact]
     public void Generator_skips_remote_ref_for_local_only_actor()
     {
         var source = """

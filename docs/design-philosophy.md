@@ -30,7 +30,7 @@ Every design decision is evaluated against this question: **"Would skynet's auth
 
 If a feature from ET, Fantasy, or GeekServer conflicts with skynet's philosophy, skynet wins. Specifically:
 
-- **Visible remote boundaries over transparent distribution.** Cross-node communication uses different APIs than local actor calls. The developer always knows when they are crossing a network boundary.
+- **Visible target selection over unqualified transparency.** Actor business calls use generated selectors: `Get(id)` for default distributed access, `Local(id)` for current-process access, and `Remote(nodeId, id)` for specified-node access.
 - **Fail fast over silent recovery.** Design errors (circular calls, lost state) throw immediately rather than retrying or degrading.
 - **Bounded resources over unbounded queues.** Every queue, cache, and timeout has an explicit limit.
 - **Independent sandboxes over shared fate.** One actor's failure must not cascade.
@@ -84,7 +84,7 @@ These belong to game projects. The framework provides infrastructure; the game p
 | Session lifecycle + reconnect | skynet (gate/watchdog/agent) | Done (ULinkGame.Server) | Connection management |
 | Component-based assembly (N→1, 1→N) | ET | Planned | Single-process dev, multi-process prod |
 | Cross-server event bus | Fantasy (SphereEvent) | Planned | Pub-sub for announcements, leaderboards |
-| Location-aware actor messaging | ET | Done | Typed `Local(id)` / `Remote(nodeId, id)` actor refs with visible remote boundary |
+| Managed distributed actor messaging | ET | Done | Typed `Get(id)` / `Local(id)` / `Remote(nodeId, id)` actor refs with typed exception failures |
 | Gate auto-routing (Roaming) | Fantasy | Planned | Client-transparent backend routing |
 | Service discovery + leader election | ET | Planned | Automatic failover |
 | Deadlock detection → immediate failure | GeekServer (adapted) | Done (ULinkActor 0.3.0) | Circular calls throw synchronously |
@@ -96,7 +96,7 @@ These belong to game projects. The framework provides infrastructure; the game p
 
 | Feature | Source | Why rejected |
 |---------|--------|-------------|
-| Fully transparent distributed actors | ET | Hides network latency and failure modes behind local-looking APIs |
+| Unqualified transparent distributed actors | ET | Hides target selection, placement, and failure modes behind local-looking APIs |
 | Actor = Entity (ECS merged with Actor) | ET, Fantasy | Conflates concurrency unit with data container, leads to overly fine-grained remote calls |
 | One-click network calls (network disguised as local method) | Fantasy | Makes remote cost invisible; violates "remote boundaries are visible" |
 | Kestrel as network layer | GeekServer | ULinkRPC already provides transport abstraction |
@@ -122,9 +122,17 @@ ULinkActor uses `long` for process-local actor identity (fast, monotonic, non-re
 
 This mirrors skynet's 32-bit address scheme (8-bit node + 24-bit local) but with more flexibility for game-specific naming.
 
-### Why explicit cluster API instead of transparent routing?
+### Why generated actor selectors instead of transparent routing?
 
-skynet's harbor system requires explicit cross-node addressing. ULinkGame follows the same model: generated actor accessors expose `Local(id)` and `Remote(nodeId, id)` as different call objects. The business method names stay the same, but the network boundary remains visible at the call site.
+skynet's harbor system keeps cross-node addressing explicit. ULinkGame follows the same principle with generated actor selectors:
+
+```csharp
+await rooms.Get(roomId).JoinAsync(request, cancellationToken);
+await rooms.Local(roomId).JoinAsync(request, cancellationToken);
+await rooms.Remote(nodeId, roomId).JoinAsync(request, cancellationToken);
+```
+
+`Get(id)` is the default business path and resolves local-first through `ActorDirectory` placement. `Local(id)` is current-process only. `Remote(nodeId, id)` is explicitly pinned to a node. The business method names stay the same, failures throw typed actor call exceptions, and business code does not switch over transport result objects or know endpoint names.
 
 The lower-level `AskRemoteAsync` and `TellRemoteAsync` helpers remain plumbing APIs for cluster actor envelopes and reply correlation, not the preferred day-to-day business API.
 
@@ -151,7 +159,7 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 ### Phase 2: Developer experience (complete)
 
 - [x] Feature/Role component-based assembly (`IFeature` / `INodeRole`, single-process dev / multi-process prod)
-- [x] Location-aware actor messaging (typed `Local(id)` / `Remote(nodeId, id)` refs + `RemoteActorGateway`)
+- [x] Managed distributed actor messaging (typed `Get(id)` / `Local(id)` / `Remote(nodeId, id)` refs + typed actor call exceptions)
 - [x] Gate/Watchdog/Agent pattern documented (see `docs/gate-watchdog-agent.md`)
 
 ### Phase 3: Deferred
@@ -159,7 +167,7 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 These are not currently needed. Existing infrastructure or external tools handle them:
 
 - Cross-server event bus — Redis pub-sub is sufficient for most deployments
-- Gate auto-routing — explicit `Remote(nodeId, id)` routing works; automatic route lookup can be added later
+- Gate auto-routing — actor placement uses `ActorDirectory`; client-transparent backend routing can be added later
 - Service discovery with leader election — static config + `INodeDirectory` suffices for most topologies
 - Full-link test framework — no pressing need; revisit when concrete requirements emerge
 - Soft routing anti-DDoS — can use an external reverse proxy / load balancer

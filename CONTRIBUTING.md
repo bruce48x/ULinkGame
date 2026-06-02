@@ -219,9 +219,9 @@ It must stay small. User-owned contracts still belong in a game `Shared` project
 
 `ULinkGame.Cluster` is the optional cluster routing package. It owns explicit node identity, node directory abstractions, route identity, route locations, message envelopes, route directory abstractions, router abstractions, and in-memory implementations for tests or local validation.
 
-It must stay transport-neutral and actor-boundary-aware. The package must not provide transparent remote actor references, actor migration, durable route storage, Redis-specific state, external platform discovery bindings, production transport, or gameplay concepts. Production adapters should be added only after the in-memory contract proves route lookup, expiration, local dispatch, remote dispatch, backpressure, and trace propagation.
+It must stay transport-neutral and actor-boundary-aware. The package must not own generated business actor accessors, actor lifecycle APIs, actor migration, durable route storage, Redis-specific state, external platform discovery bindings, production transport, or gameplay concepts. Production adapters should be added only after the in-memory contract proves route lookup, expiration, local dispatch, remote dispatch, backpressure, and trace propagation.
 
-`ULinkGame.Cluster.ULinkRPC` is the first transport adapter package. It owns the ULinkRPC method contract, client-side node messenger, client cache over ULinkRPC transports, endpoint parsing, TCP transport factory, server-side binder for internal node traffic, and ULinkRPC-managed remote node-directory and route-directory clients/binders. It must not own durable route storage, external platform discovery bindings, durable queues, gameplay DTOs, actor migration, or transparent remote actor clients. Additional concrete transports must come with cross-process smoke tests.
+`ULinkGame.Cluster.ULinkRPC` is the first transport adapter package. It owns the ULinkRPC method contract, client-side node messenger, client cache over ULinkRPC transports, endpoint parsing, TCP transport factory, server-side binder for internal node traffic, and ULinkRPC-managed remote node-directory and route-directory clients/binders. It must not own durable route storage, external platform discovery bindings, durable queues, gameplay DTOs, actor migration, generated business actor accessors, or managed actor lifecycle policy. Additional concrete transports must come with cross-process smoke tests.
 
 ### ULinkGame.Tool
 
@@ -385,13 +385,25 @@ ULinkGame is responsible for:
 - session lifecycle and endpoint callback binding
 - reliable business push
 - route location and node-to-node messaging integration
-- explicit cross-node failure results
+- generated managed actor accessors over local runtime and cluster routing
+- typed actor call exceptions for business-level distributed failures
+- `ActorDirectory` contracts, host discovery, and actor placement cache
 - tool templates and operational glue
 - message recording/replay (using ULinkActor interceptor hooks)
 - actor state observation and cluster-aware lifecycle
 - execution timeout configuration exposed through `ActorRuntimeOptions`
 
-ULinkGame must not provide transparent remote objects. Cross-node work should stay explicit: send a message, call with a timeout, or return a structured failure such as route not found, stale route, timeout, overloaded, or failed. The API shape must make the node boundary visible so callers cannot accidentally write local-looking code that hides serialization, network latency, retry behavior, queueing, or remote backpressure.
+ULinkGame's managed actor API is the default business-facing model:
+
+```csharp
+await rooms.Get(roomId).JoinAsync(request, cancellationToken);
+await rooms.Local(roomId).JoinAsync(request, cancellationToken);
+await rooms.Remote(nodeId, roomId).JoinAsync(request, cancellationToken);
+```
+
+`Get(id)` is distributed by default: it checks the local runtime first, then uses `ActorDirectory` placement. `Local(id)` targets only the current process. `Remote(nodeId, id)` targets only the specified node and does not query placement. Business code should not handle endpoint addresses, `clusterName`, `endpointName`, route-directory endpoints, or switch over `RemoteAskResult`-style transport results. Generated business calls return business replies directly and throw typed actor call exceptions for distributed failures such as route not found, stale placement, timeout, overload, handler unavailable, or node unavailable.
+
+Actor creation and destruction are local lifecycle operations generated as `SpawnAsync` and `DestroyAsync`. Cross-node create or destroy requests should be explicit business commands to a manager actor or service on the target node. The first managed actor version treats every `[Actor]` actor as framework-managed; do not introduce a `UserManaged`/`ActorLifetime` split until a concrete repeated need exists.
 
 #### ULinkActor Facade Principles
 
@@ -399,8 +411,9 @@ ULinkGame should expose its own narrow `ULinkGame.Server.Actors` facade instead 
 
 ULinkGame-owned actor facade capabilities should follow these rules:
 
-- Explicit local overload should be a normal result. Try-send APIs should map full or unavailable local actor mailboxes to ULinkGame-owned results, and one-way cluster-to-actor dispatch should translate local overload into `ClusterSendStatus.Backpressure`.
-- Actor stop and drain should be explicit. Stop APIs should remove local actors, optionally wait for mailbox drain, and return ULinkGame-owned outcomes that support room shutdown, matchmaking teardown, session actor cleanup, and node draining without exposing ULinkActor lifecycle enums directly.
+- Default business calls should return business results directly or throw typed actor exceptions. Do not generate `TryXxxAsync` methods by default and do not push `RemoteAskResult`/status-switch handling into ordinary game code.
+- Explicit local overload should be represented by ULinkGame-owned local actor exceptions or lifecycle results. One-way cluster-to-actor dispatch should translate local overload into `ClusterSendStatus.Backpressure`.
+- Actor stop and drain should be explicit. Generated `DestroyAsync` is local-only; cross-node destroy is a manager command. Stop APIs should remove local actors, optionally wait for mailbox drain, and return or throw ULinkGame-owned outcomes that support room shutdown, matchmaking teardown, session actor cleanup, and node draining without exposing ULinkActor lifecycle enums directly.
 - Mailbox metrics should use ULinkGame-owned snapshots. Operators need capacity, queued count, processed count, rejected count, and completion state to diagnose hot rooms, overloaded queues, and stuck state services, but public APIs should not expose ULinkActor runtime types.
 - Timeout diagnostics should preserve root-cause distinctions (queue timeout, response timeout). Circular wait is no longer a timeout reason — it throws immediately as `InvalidOperationException`. Publish these through logging, metrics, or tracing with low-cardinality fields.
 - Dead-letter and slow-message diagnostics should stay configurable through `ActorRuntimeOptions`, preserving low-cardinality metric and log fields.
@@ -642,7 +655,7 @@ Suggested node concepts:
 
 Actor execution remains process-local first. Cross-thread or cross-node communication should use message delivery, not shared mutable objects. Actor location is separate from actor identity: stable actor ids should not encode node id, ports, endpoints, business category, or local runtime scheduling details.
 
-Cross-node actor communication should be route-based, not proxy-based. A local actor runtime may expose `TellAsync` or `AskAsync` for process-local actor calls, but remote actor communication should go through an explicitly named cluster API such as `IClusterActorRouter`. That API should require route lookup, timeout, expiration, and result handling at the call site. Do not make a remote actor look like a local actor reference.
+Cross-node actor communication is placement-based, not endpoint-based. The generated `Get(id)` accessor uses `ActorDirectory` placement for the default business path. The generated `Remote(nodeId, id)` accessor is the explicit node-targeted path. Lower-level cluster APIs still expose route lookup, timeout, expiration, and delivery results for infrastructure code, but ordinary actor business code should call generated refs and receive typed exceptions on failure.
 
 Cluster state should route only to `NodeId` and `RouteLocation`; the receiving node then hands the message to its local actor runtime, which owns mailbox dispatch and scheduling. Cluster code must not store, expose, or target local actor runtime scheduler identifiers.
 
@@ -680,7 +693,7 @@ Decision:
 - Preferred first adapter: ULinkRPC internal transport.
 - Package shape: keep it outside `ULinkGame.Cluster` as `ULinkGame.Cluster.ULinkRPC`, so the core cluster contracts remain transport-neutral and do not force ULinkRPC server/client packages into every cluster consumer.
 - ULinkRPC adapter scope: node-to-node `ClusterMessage` delivery, remote `IRouteDirectory` calls, adapter-owned authentication/TLS/compression/wire format, trace propagation, timeout mapping, and explicit `ClusterSendStatus` results.
-- ULinkRPC adapter non-goals: durable route storage, external platform discovery bindings, gameplay DTOs, durable queues, remote actor proxies, generated remote actor clients, or transparent local-looking actor references.
+- ULinkRPC adapter non-goals: durable route storage, external platform discovery bindings, gameplay DTOs, durable queues, actor lifecycle policy, or generated business actor accessors.
 - Direction for gRPC: keep as the second candidate when a project needs a conventional service-to-service protocol or polyglot operations story.
 - Direction for Redis pub/sub or streams: use only for fanout or brokered delivery after ordering, backpressure, expiry, and observability semantics are explicit; do not serialize live RPC callbacks or actor references into Redis.
 - Direction for custom message buses: keep as an adapter pattern, not a framework default.
@@ -698,7 +711,7 @@ Implementation gates before making `ULinkGame.Cluster.ULinkRPC` a recommended ge
 Skynet-derived cluster principles:
 
 - Keep cluster support as infrastructure, not a full distributed actor platform. Provide node identity, route location, message delivery, diagnostics, and explicit failure results first.
-- Make remote boundaries visible in API names and return types. Local calls and remote sends must not share the same surface.
+- Make target selection visible in API names. `Get(id)`, `Local(id)`, and `Remote(nodeId, id)` are distinct selectors even though business methods return business replies directly.
 - Treat overload as a normal result, not an exceptional surprise. Route lookup success does not guarantee delivery; node messenger, remote inbox, and target actor mailbox can all reject work with backpressure.
 - Keep trace context in the message envelope. Cluster messages should carry correlation data that lets tools reconstruct route lookup, remote send, receive, local dispatch, and actor handling time.
 - Do not use `ClusterMessage` as a generic large-state sync protocol. Large snapshots, fanout target sets, and repeated state should use application-owned versioning, caching, or diff protocols.
@@ -707,9 +720,9 @@ Skynet and ET framework comparison:
 
 - Skynet cluster RPC is closest to explicit node-to-node message delivery. Callers address a node plus service name or address, the local cluster sender writes a request over TCP, the remote cluster agent dispatches to the target service, and call responses are correlated back to the waiting coroutine by session id. This is useful prior art for a future `INodeMessenger`: keep node messaging simple, expose send versus call semantics clearly, and do not pretend the cluster is a complete deployment, discovery, or failover system.
 - ET's ActorLocation model is closer to location-transparent actor messaging. A stable entity id is resolved through a Location Server to a current actor instance id; senders cache the resolved location, retry after actor-not-found or migration failures, and use location locks during migration so concurrent sends can wait for a new location. This is useful prior art for route directory behavior: generation-aware locations, cache invalidation, bounded retry, and migration or rebinding locks.
-- ULinkGame should borrow ET's location-directory mechanics without adopting ET's transparent remote actor surface. A future route location layer may support stable route keys, node epochs, location generations, stale-location detection, and bounded re-resolution after `RouteNotFound`, `HandlerUnavailable`, timeout, or state-moved results. The public API should still require callers to use explicit route or cluster APIs and handle remote failure outcomes.
-- Do not add a generated remote actor client that has the same method shape as a process-local actor reference. If request/reply is added above `IClusterRouter`, name it as remote work, require timeout and expiration, and return a structured delivery or call result.
-- Do not turn route lookup into a hidden global singleton. If the framework adds cached route senders, cache lifetime, invalidation, node epoch mismatch, and retry count must be visible in options and diagnostics.
+- ULinkGame borrows ET's location-directory mechanics without adopting an unqualified transparent actor surface. The default `Get(id)` selector is distributed and placement-aware; `Local(id)` and `Remote(nodeId, id)` remain explicit selectors for local-only and specified-node calls.
+- Generated actor refs may use the same business method shape across selectors, but failure is typed exception-first. Do not expose `RemoteAskResult` or switch-heavy transport status handling as the default business API.
+- Do not turn actor placement into an invisible global singleton. `ActorDirectory` lives in `ULinkGame.Server`, is found through cluster feature discovery, and caches directory host and actor placement with explicit invalidation, retry, and diagnostic behavior.
 - Do not make migration a default framework promise. ULinkGame may support rebinding route locations and rejecting stale generations; application-owned room transfer, snapshot handoff, and authoritative state repair remain game protocols unless repeated projects prove a reusable infrastructure shape.
 
 ### Cluster Management
@@ -760,7 +773,7 @@ Keep Consul, etcd, Kubernetes API, Redis, or Raft-backed discovery as optional f
 Do not implement these as default framework behavior in the first cluster module:
 
 - automatic actor migration
-- transparent remote actor calls
+- unqualified transparent remote actor calls that hide target selection
 - distributed transactions
 - exactly-once cross-node delivery
 - battle live migration
