@@ -36,9 +36,9 @@
 - [x] Add Server-layer actor directory contracts: record, register/unregister statuses, and in-memory implementation for tests.
 - [x] Add tests for register conflict, unregister ownership mismatch, resolve, and basic in-memory directory behavior.
 - [x] Add actor directory cache abstraction.
-- [ ] Add distributed client shape that can discover the actor-directory host by feature, cache host node id, and retry directory calls once after host failure.
-- [ ] Keep actor directory out of `Shared`/`Abstractions`.
-- [ ] Add tests for cache hit/miss and host rediscovery.
+- [x] Add distributed client shape that can discover the actor-directory host by feature, cache host node id, and retry directory calls once after host failure.
+- [x] Keep actor directory out of `Shared`/`Abstractions`.
+- [x] Add tests for cache hit/miss and host rediscovery.
 - [ ] Commit `Add distributed actor directory contracts`.
 
 ## Phase 3: Generated `Get/Local/Remote`
@@ -63,7 +63,7 @@
 
 - [x] Add `IClusterNodeDiscovery` API with `ListAsync(feature)` and `AnyAsync(feature)`.
 - [x] Return `NodeId`/node descriptors, never endpoints, from business-facing discovery.
-- [ ] Use the API internally for actor-directory host discovery.
+- [x] Use the API internally for actor-directory host discovery.
 - [x] Add tests for ready node filtering, missing feature, and default selection.
 - [ ] Commit `Add cluster feature node discovery`.
 
