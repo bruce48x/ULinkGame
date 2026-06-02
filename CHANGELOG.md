@@ -5,11 +5,13 @@
 ### Released
 
 - `ULinkGame.Server` `0.1.16`
+- `ULinkGame.Server` `0.1.17`
 - `ULinkGame.Server.Generators` `0.1.1`
 
 ### Added
 
 - Added actor call exception types and a remote actor call helper for generated actor APIs.
+- Added server-side actor directory contracts and an in-memory actor directory implementation.
 
 ### Changed
 

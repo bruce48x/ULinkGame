@@ -33,10 +33,12 @@
 
 ## Phase 2: Actor Directory Contracts
 
-- [ ] Add Server-layer actor directory contracts: record, register/unregister statuses, cache abstraction, and in-memory store/host implementation for tests.
+- [x] Add Server-layer actor directory contracts: record, register/unregister statuses, and in-memory implementation for tests.
+- [x] Add tests for register conflict, unregister ownership mismatch, resolve, and basic in-memory directory behavior.
+- [ ] Add actor directory cache abstraction.
 - [ ] Add distributed client shape that can discover the actor-directory host by feature, cache host node id, and retry directory calls once after host failure.
 - [ ] Keep actor directory out of `Shared`/`Abstractions`.
-- [ ] Add tests for register conflict, unregister ownership mismatch, resolve, cache hit/miss, and host rediscovery.
+- [ ] Add tests for cache hit/miss and host rediscovery.
 - [ ] Commit `Add distributed actor directory contracts`.
 
 ## Phase 3: Generated `Get/Local/Remote`
