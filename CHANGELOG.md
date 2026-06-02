@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-06-02
+
+### Released
+
+- `ULinkGame.Cluster` `0.1.4`
+- `ULinkGame.Server` `0.1.16`
+- `ULinkGame.Server` `0.1.17`
+- `ULinkGame.Server` `0.1.18`
+- `ULinkGame.Server` `0.1.19`
+- `ULinkGame.Server` `0.1.20`
+- `ULinkGame.Server` `0.1.21`
+- `ULinkGame.Server.Generators` `0.1.1`
+- `ULinkGame.Server.Generators` `0.1.2`
+- `ULinkGame.Server.Generators` `0.1.3`
+- `ULinkGame.Server.Generators` `0.1.4`
+
+### Added
+
+- Added actor call exception types and a remote actor call helper for generated actor APIs.
+- Added cluster feature node discovery APIs for listing or selecting ready nodes by service feature without exposing endpoints.
+- Added server-side actor directory contracts and an in-memory actor directory implementation.
+- Added an in-memory actor directory cache for actor id to node id lookups.
+- Added a feature-discovery based actor directory client abstraction that caches the directory host node and rediscovers once after host failure.
+- Added generated distributed `Get(id)` actor accessors that resolve local-first, then actor directory cache/directory, before remote actor invocation.
+- Added actor lifecycle hook attributes and a local actor node identity service for generated managed actor lifecycle.
+- Added generated local-only `SpawnAsync` and `DestroyAsync` actor lifecycle APIs with actor directory registration, cache updates, and rollback on spawn failure.
+
+### Changed
+
+- Updated generated remote actor methods to throw actor call exceptions on remote failure instead of emitting status checks and constructing `RemoteActorException` inline.
+- Updated generated actor lifecycle ordering to claim actor directory ownership before spawn hooks and unregister ownership before destroy hooks.
+
+### Fixed
+
+- Fixed lifecycle hook diagnostics so spawn hooks may take a request and destroy hooks may not.
+
 ## 2026-06-01
 
 ### Released

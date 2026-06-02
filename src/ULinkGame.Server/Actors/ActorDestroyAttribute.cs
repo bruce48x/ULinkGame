@@ -1,0 +1,6 @@
+namespace ULinkGame.Server.Actors;
+
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class ActorDestroyAttribute : Attribute
+{
+}
