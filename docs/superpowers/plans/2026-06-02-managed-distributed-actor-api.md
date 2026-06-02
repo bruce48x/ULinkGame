@@ -55,8 +55,8 @@
 
 - [ ] Add `[ActorSpawn]` and `[ActorDestroy]` markers.
 - [ ] Generate local-only `SpawnAsync` and `DestroyAsync` for all actors.
-- [ ] Spawn flow: create local actor, invoke spawn hook if present, register actor directory, rollback local actor on failure.
-- [ ] Destroy flow: invoke destroy hook if present, remove local actor, unregister actor directory.
+- [ ] Spawn flow: register actor directory ownership, create local actor, invoke spawn hook if present, unregister and rollback local actor on failure.
+- [ ] Destroy flow: unregister actor directory ownership, invoke destroy hook if present, remove local actor, and re-register ownership if local teardown fails.
 - [ ] Do not generate or implement remote spawn/destroy.
 - [ ] Add tests for spawn hook, destroy hook, directory register/unregister, rollback, and conflicts.
 - [ ] Commit `Add local managed actor lifecycle`.

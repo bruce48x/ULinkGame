@@ -189,7 +189,7 @@ await _rooms.SpawnAsync(roomId, request, cancellationToken);
 await _rooms.DestroyAsync(roomId, cancellationToken);
 ```
 
-Spawn creates the actor locally, invokes the spawn hook if present, and registers placement in `ActorDirectory`. Destroy invokes the destroy hook if present, removes the local actor, and unregisters placement. ULinkGame does not provide `SpawnRemoteAsync` or `DestroyRemoteAsync`; cross-node creation or destruction should be explicit business commands to a manager actor or service on the target node.
+Spawn claims placement in `ActorDirectory`, creates the actor locally, and invokes the spawn hook if present; hook or local creation failure unregisters placement and rolls back the local actor. Destroy unregisters placement first, then invokes the destroy hook if present and removes the local actor; hook or stop failure attempts to re-register placement for the still-local actor. ULinkGame does not provide `SpawnRemoteAsync` or `DestroyRemoteAsync`; cross-node creation or destruction should be explicit business commands to a manager actor or service on the target node.
 
 ## Server-Side Boundary
 

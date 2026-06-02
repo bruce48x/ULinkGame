@@ -77,13 +77,13 @@ namespace ULinkGame.Server.Generators
                     method.Locations.Length == 0 ? Location.None : method.Locations[0]))
                 .Concat(candidateMethods
                     .Where(static method => HasAttribute(method, ActorSpawnAttributeName))
-                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: false))
+                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: true))
                     .Select(static method => new UnsupportedMethodInfo(
                         method.Name,
                         method.Locations.Length == 0 ? Location.None : method.Locations[0])))
                 .Concat(candidateMethods
                     .Where(static method => HasAttribute(method, ActorDestroyAttributeName))
-                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: true))
+                    .Where(static method => !IsEligibleLifecycleMethod(method, allowRequest: false))
                     .Select(static method => new UnsupportedMethodInfo(
                         method.Name,
                         method.Locations.Length == 0 ? Location.None : method.Locations[0])))
@@ -392,6 +392,21 @@ namespace ULinkGame.Server.Generators
             builder.Append(indent).AppendLine("            \"Actor already exists locally.\");");
             builder.Append(indent).AppendLine("    }");
             builder.AppendLine();
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("    var registerStatus = await _directory.RegisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("    if (registerStatus == global::ULinkGame.Server.Actors.ActorDirectoryRegisterStatus.Conflict)");
+                builder.Append(indent).AppendLine("    {");
+                builder.Append(indent).AppendLine("        throw new global::ULinkGame.Server.Actors.ActorAlreadyExistsException(");
+                builder.Append(indent).AppendLine("            actorId,");
+                builder.Append(indent).Append("            \"").Append(actor.ActorName).AppendLine("\",");
+                builder.Append(indent).AppendLine("            \"spawn\",");
+                builder.Append(indent).AppendLine("            \"Actor is already registered on another node.\",");
+                builder.Append(indent).AppendLine("            _localNode.NodeId);");
+                builder.Append(indent).AppendLine("    }");
+                builder.AppendLine();
+            }
+
             builder.Append(indent).AppendLine("    try");
             builder.Append(indent).AppendLine("    {");
             builder.Append(indent)
@@ -405,17 +420,6 @@ namespace ULinkGame.Server.Generators
 
             if (!actor.IsLocalOnly)
             {
-                builder.Append(indent).AppendLine("        var registerStatus = await _directory.RegisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
-                builder.Append(indent).AppendLine("        if (registerStatus == global::ULinkGame.Server.Actors.ActorDirectoryRegisterStatus.Conflict)");
-                builder.Append(indent).AppendLine("        {");
-                builder.Append(indent).AppendLine("            throw new global::ULinkGame.Server.Actors.ActorAlreadyExistsException(");
-                builder.Append(indent).AppendLine("                actorId,");
-                builder.Append(indent).Append("                \"").Append(actor.ActorName).AppendLine("\",");
-                builder.Append(indent).AppendLine("                \"spawn\",");
-                builder.Append(indent).AppendLine("                \"Actor is already registered on another node.\",");
-                builder.Append(indent).AppendLine("                _localNode.NodeId);");
-                builder.Append(indent).AppendLine("        }");
-                builder.AppendLine();
                 builder.Append(indent).AppendLine("        _directoryCache.Set(actorId, _localNode.NodeId);");
             }
 
@@ -425,6 +429,7 @@ namespace ULinkGame.Server.Generators
             builder.Append(indent).AppendLine("        await _runtime.StopAsync(actorId).ConfigureAwait(false);");
             if (!actor.IsLocalOnly)
             {
+                builder.Append(indent).AppendLine("        await _directory.UnregisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
                 builder.Append(indent).AppendLine("        _directoryCache.Remove(actorId);");
             }
 
@@ -446,7 +451,7 @@ namespace ULinkGame.Server.Generators
                 .Append("public async global::System.Threading.Tasks.ValueTask DestroyAsync(")
                 .Append(keyType)
                 .Append(" id");
-            AppendLifecycleRequestParameter(builder, actor, actor.DestroyHook);
+            AppendLifecycleRequestParameter(builder, actor, actor.DestroyHook, includeRequest: false);
             builder.AppendLine(")");
             builder.Append(indent).AppendLine("{");
             AppendCollectionActorIdSetup(builder, actor, routePrefix, indentLevel + 1);
@@ -458,18 +463,10 @@ namespace ULinkGame.Server.Generators
             builder.Append(indent).AppendLine("            \"destroy\",");
             builder.Append(indent).AppendLine("            \"Actor was not found locally.\");");
             builder.Append(indent).AppendLine("    }");
-            if (actor.DestroyHook != null)
-            {
-                builder.AppendLine();
-                AppendLifecycleHookCall(builder, actor, actor.DestroyHook, indentLevel + 1);
-            }
-
-            builder.AppendLine();
-            builder.Append(indent).AppendLine("    await _runtime.StopAsync(actorId).ConfigureAwait(false);");
             if (!actor.IsLocalOnly)
             {
+                builder.AppendLine();
                 builder.Append(indent).AppendLine("    var unregisterStatus = await _directory.UnregisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
-                builder.Append(indent).AppendLine("    _directoryCache.Remove(actorId);");
                 builder.Append(indent).AppendLine("    if (unregisterStatus == global::ULinkGame.Server.Actors.ActorDirectoryUnregisterStatus.OwnershipMismatch)");
                 builder.Append(indent).AppendLine("    {");
                 builder.Append(indent).AppendLine("        throw new global::ULinkGame.Server.Actors.ActorOwnershipMismatchException(");
@@ -479,8 +476,30 @@ namespace ULinkGame.Server.Generators
                 builder.Append(indent).AppendLine("            \"Actor directory ownership belongs to another node.\",");
                 builder.Append(indent).AppendLine("            _localNode.NodeId);");
                 builder.Append(indent).AppendLine("    }");
+                builder.AppendLine();
+                builder.Append(indent).AppendLine("    _directoryCache.Remove(actorId);");
             }
 
+            builder.AppendLine();
+            builder.Append(indent).AppendLine("    try");
+            builder.Append(indent).AppendLine("    {");
+            if (actor.DestroyHook != null)
+            {
+                AppendLifecycleHookCall(builder, actor, actor.DestroyHook, indentLevel + 2);
+            }
+
+            builder.Append(indent).AppendLine("        await _runtime.StopAsync(actorId).ConfigureAwait(false);");
+            builder.Append(indent).AppendLine("    }");
+            builder.Append(indent).AppendLine("    catch");
+            builder.Append(indent).AppendLine("    {");
+            if (!actor.IsLocalOnly)
+            {
+                builder.Append(indent).AppendLine("        await _directory.RegisterAsync(actorId, _localNode.NodeId, cancellationToken).ConfigureAwait(false);");
+                builder.Append(indent).AppendLine("        _directoryCache.Set(actorId, _localNode.NodeId);");
+            }
+
+            builder.Append(indent).AppendLine("        throw;");
+            builder.Append(indent).AppendLine("    }");
             builder.Append(indent).AppendLine("}");
         }
 

@@ -14,6 +14,7 @@
 - `ULinkGame.Server.Generators` `0.1.1`
 - `ULinkGame.Server.Generators` `0.1.2`
 - `ULinkGame.Server.Generators` `0.1.3`
+- `ULinkGame.Server.Generators` `0.1.4`
 
 ### Added
 
@@ -29,6 +30,11 @@
 ### Changed
 
 - Updated generated remote actor methods to throw actor call exceptions on remote failure instead of emitting status checks and constructing `RemoteActorException` inline.
+- Updated generated actor lifecycle ordering to claim actor directory ownership before spawn hooks and unregister ownership before destroy hooks.
+
+### Fixed
+
+- Fixed lifecycle hook diagnostics so spawn hooks may take a request and destroy hooks may not.
 
 ## 2026-06-01
 
