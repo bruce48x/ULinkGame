@@ -220,7 +220,6 @@ Full multiplayer game samples (agar.io-style):
 
 - [`samples/Agar.Unity`](samples/Agar.Unity) — Unity client with dual-channel (WebSocket + KCP)
 - [`samples/Agar.Godot`](samples/Agar.Godot) — Godot client, same server
-- [`samples/Cluster.Loopback`](samples/Cluster.Loopback) — Single-process cluster demo
 - [`samples/Cluster.TwoNode`](samples/Cluster.TwoNode) — Multi-process cluster with directory
 
 ## Further Reading

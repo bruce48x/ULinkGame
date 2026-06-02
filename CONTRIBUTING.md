@@ -42,7 +42,6 @@ src/
     Scaffolding/           Project scaffolder, templates, and tool models
 
 samples/
-  Cluster.Loopback/        Minimal in-memory cluster route and failure-mode sample
   Cluster.TwoNode/         Multi-process ULinkRPC route-directory and node-messenger smoke sample
   Agar.Unity/             Unity + .NET multiplayer sample
     docs/                 Sample gameplay design and development plan
@@ -64,11 +63,9 @@ User-facing articles live in the Hugo site under root `blog/`. Do not put intern
 
 ### Samples
 
-The repository currently contains two cluster infrastructure samples and two game client samples:
+The repository currently contains one cluster infrastructure sample and two game client samples:
 
 ```txt
-samples/Cluster.Loopback/
-  Single-process in-memory cluster route and failure-mode sample
 
 samples/Cluster.TwoNode/
   Multi-process ULinkRPC route-directory and node-messenger smoke sample
@@ -81,8 +78,6 @@ samples/Agar.Unity/
 samples/Agar.Godot/
   Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
 ```
-
-`samples/Cluster.Loopback` demonstrates local cluster routing without network infrastructure.
 
 `samples/Cluster.TwoNode` starts a directory process and worker process, then verifies ULinkRPC-based node registration, route registration, local dispatch, remote dispatch, route not found, expired message rejection, timeout, handler unavailable, backpressure, stale registration rejection, clear-by-node-epoch, and node restart with a new directory-assigned epoch.
 
