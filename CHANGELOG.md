@@ -21,6 +21,7 @@
 - `ULinkGame.Tool` `0.4.1`
 - `ULinkGame.Tool` `0.4.2`
 - `ULinkGame.Tool` `0.4.3`
+- `ULinkGame.Tool` `0.4.4`
 
 ### Added
 
@@ -45,6 +46,7 @@
 - Fixed `ulinkgame-tool new` chat templates to emit C# 9-compatible block-scoped namespaces instead of file-scoped namespaces for Unity-created projects.
 - Fixed `ulinkgame-tool new` Unity chat templates to use the generated `Rpc.Generated.RpcClient` API and emit the missing task namespace import.
 - Fixed `ulinkgame-tool new` server templates to use the ULinkRPC callback-service constructor shape and copy the generated hotfix assembly into the server runtime output.
+- Fixed `ulinkgame-tool new` Unity chat UI templates to avoid null-conditional event subscription syntax on `Button.clicked`.
 
 ## 2026-06-01
 

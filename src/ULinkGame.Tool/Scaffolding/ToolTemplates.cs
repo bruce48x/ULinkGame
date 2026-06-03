@@ -618,7 +618,10 @@ internal static class ToolTemplates
                     _onlineCount = root.Q<Label>("online-count");
 
                     var sendButton = root.Q<Button>("send-button");
-                    sendButton?.clicked += OnSendClicked;
+                    if (sendButton != null)
+                    {
+                        sendButton.clicked += OnSendClicked;
+                    }
 
                     _inputField?.RegisterCallback<KeyDownEvent>(evt =>
                     {
@@ -631,33 +634,36 @@ internal static class ToolTemplates
                     var nameField = root.Q<TextField>("name-field");
                     var joinButton = root.Q<Button>("join-button");
 
-                    joinButton?.clicked += async () =>
+                    if (joinButton != null)
                     {
-                        var name = nameField?.value?.Trim();
-                        if (string.IsNullOrWhiteSpace(name)) return;
-
-                        _client = new ChatClient(CreateRpcClientOptions());
-                        _client.OnMessageReceived += AppendMessage;
-                        _client.OnUserJoined += OnUserJoinedHandler;
-                        _client.OnUserLeft += OnUserLeftHandler;
-                        _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
-
-                        try
+                        joinButton.clicked += async () =>
                         {
-                            await _client.ConnectAsync(_cts.Token);
-                            var reply = await _client.JoinAsync(name);
-                            AppendSystemMessage($"Connected. {reply.Members.Count} online.");
+                            var name = nameField?.value?.Trim();
+                            if (string.IsNullOrWhiteSpace(name)) return;
 
-                            foreach (var msg in reply.RecentMessages)
+                            _client = new ChatClient(CreateRpcClientOptions());
+                            _client.OnMessageReceived += AppendMessage;
+                            _client.OnUserJoined += OnUserJoinedHandler;
+                            _client.OnUserLeft += OnUserLeftHandler;
+                            _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
+
+                            try
                             {
-                                AppendMessage(msg);
+                                await _client.ConnectAsync(_cts.Token);
+                                var reply = await _client.JoinAsync(name);
+                                AppendSystemMessage($"Connected. {reply.Members.Count} online.");
+
+                                foreach (var msg in reply.RecentMessages)
+                                {
+                                    AppendMessage(msg);
+                                }
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            AppendSystemMessage($"Connection failed: {ex.Message}");
-                        }
-                    };
+                            catch (Exception ex)
+                            {
+                                AppendSystemMessage($"Connection failed: {ex.Message}");
+                            }
+                        };
+                    }
                 }
 
                 private async void OnSendClicked()

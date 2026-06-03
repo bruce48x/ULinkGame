@@ -395,6 +395,7 @@ public sealed class ToolTemplateTests
         Assert.Contains("RequireComponent(typeof(UIDocument))", source, StringComparison.Ordinal);
         Assert.Contains("new KcpTransport(_serverHost, _serverPort)", source, StringComparison.Ordinal);
         Assert.Contains("new MemoryPackRpcSerializer()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("?.clicked +=", source, StringComparison.Ordinal);
         Assert.Contains("chat-input", source, StringComparison.Ordinal);
         Assert.Contains("message-list", source, StringComparison.Ordinal);
         Assert.Contains("send-button", source, StringComparison.Ordinal);
