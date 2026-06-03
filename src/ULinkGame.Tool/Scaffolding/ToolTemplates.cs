@@ -470,33 +470,45 @@ internal static class ToolTemplates
     {
         return """
         using System;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Rpc.Generated;
         using Shared.Chat;
         using ULinkRPC.Client;
 
         namespace Client.Chat
         {
-            public sealed class ChatClient : IChatCallback
+            public sealed class ChatClient : IChatCallback, IAsyncDisposable
             {
                 private readonly RpcClient _rpcClient;
                 private IChatService? _chatService;
+                private bool _isConnected;
 
                 public event Action<ChatMessage>? OnMessageReceived;
                 public event Action<ChatMember>? OnUserJoined;
                 public event Action<string>? OnUserLeft;
                 public event Action? OnDisconnected;
 
-                public bool IsConnected => _rpcClient.IsConnected;
+                public bool IsConnected => _isConnected;
 
-                public ChatClient(RpcClient rpcClient)
+                public ChatClient(RpcClientOptions options)
                 {
-                    _rpcClient = rpcClient;
-                    _rpcClient.OnDisconnected += () => OnDisconnected?.Invoke();
+                    var callbacks = new RpcClient.RpcCallbackBindings();
+                    callbacks.Add(this);
+
+                    _rpcClient = new RpcClient(options, callbacks);
+                    _rpcClient.Disconnected += _ =>
+                    {
+                        _isConnected = false;
+                        OnDisconnected?.Invoke();
+                    };
                 }
 
-                public async Task ConnectAsync(string serverAddress, int port)
+                public async Task ConnectAsync(CancellationToken cancellationToken = default)
                 {
-                    await _rpcClient.ConnectAsync(serverAddress, port);
-                    _chatService = _rpcClient.CreateService<IChatService>(this);
+                    await _rpcClient.ConnectAsync(cancellationToken);
+                    _chatService = _rpcClient.Api.Shared.Chat;
+                    _isConnected = true;
                 }
 
                 public async Task<ChatJoinReply> JoinAsync(string playerName)
@@ -514,12 +526,13 @@ internal static class ToolTemplates
                 public async Task LeaveAsync()
                 {
                     if (_chatService == null) return;
-                    await _chatService.LeaveAsync();
+                    await _chatService.LeaveAsync(new ChatLeaveRequest());
                 }
 
-                public void Disconnect()
+                public async ValueTask DisposeAsync()
                 {
-                    _rpcClient.Disconnect();
+                    _isConnected = false;
+                    await _rpcClient.DisposeAsync();
                 }
 
                 void IChatCallback.OnMessageReceived(ChatMessage msg)
@@ -541,12 +554,41 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderClientChatUI()
+    public static string RenderClientChatUI(NewCommandOptions options)
     {
-        return """
+        var defaultPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var serializerUsing = options.Serializer switch
+        {
+            "json" => "using ULinkRPC.Serializer.Json;",
+            _ => "using ULinkRPC.Serializer.MemoryPack;"
+        };
+        var transportUsing = options.Transport switch
+        {
+            "tcp" => "using ULinkRPC.Transport.Tcp;",
+            "websocket" => "using ULinkRPC.Transport.WebSocket;",
+            _ => "using ULinkRPC.Transport.Kcp;"
+        };
+        var serializerConstructor = options.Serializer switch
+        {
+            "json" => "new JsonRpcSerializer()",
+            _ => "new MemoryPackRpcSerializer()"
+        };
+        var transportConstructor = options.Transport switch
+        {
+            "tcp" => "new TcpTransport(_serverHost, _serverPort)",
+            "websocket" => "new WsTransport($\"ws://{_serverHost}:{_serverPort}{NormalizePath(_serverPath)}\")",
+            _ => "new KcpTransport(_serverHost, _serverPort)"
+        };
+
+        return $$"""
         using System;
+        using System.Threading;
+        using System.Threading.Tasks;
         using Shared.Chat;
         using ULinkRPC.Client;
+        using ULinkRPC.Core;
+        {{serializerUsing}}
+        {{transportUsing}}
         using UnityEngine;
         using UnityEngine.UIElements;
 
@@ -557,7 +599,9 @@ internal static class ToolTemplates
             {
                 [SerializeField] private string _serverHost = "127.0.0.1";
                 [SerializeField] private int _serverPort = 20000;
+                [SerializeField] private string _serverPath = "{{TemplateText.SanitizeStringLiteral(defaultPath)}}";
 
+                private readonly CancellationTokenSource _cts = new();
                 private ChatClient? _client;
                 private TextField? _inputField;
                 private ScrollView? _messageList;
@@ -590,8 +634,7 @@ internal static class ToolTemplates
                         var name = nameField?.value?.Trim();
                         if (string.IsNullOrWhiteSpace(name)) return;
 
-                        var rpcClient = new RpcClient();
-                        _client = new ChatClient(rpcClient);
+                        _client = new ChatClient(CreateRpcClientOptions());
                         _client.OnMessageReceived += AppendMessage;
                         _client.OnUserJoined += OnUserJoinedHandler;
                         _client.OnUserLeft += OnUserLeftHandler;
@@ -599,7 +642,7 @@ internal static class ToolTemplates
 
                         try
                         {
-                            await _client.ConnectAsync(_serverHost, _serverPort);
+                            await _client.ConnectAsync(_cts.Token);
                             var reply = await _client.JoinAsync(name);
                             AppendSystemMessage($"Connected. {reply.Members.Count} online.");
 
@@ -641,6 +684,32 @@ internal static class ToolTemplates
                     _messageList?.ScrollTo(label);
                 }
 
+                private RpcClientOptions CreateRpcClientOptions()
+                {
+                    return new RpcClientOptions(
+                        {{transportConstructor}},
+                        {{serializerConstructor}})
+                        .UseSecurity(ConfigureTransportSecurity);
+                }
+
+                private static string NormalizePath(string path)
+                {
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        return string.Empty;
+                    }
+
+                    return path.StartsWith("/", StringComparison.Ordinal) ? path : "/" + path;
+                }
+
+                private static void ConfigureTransportSecurity(TransportSecurityConfig security)
+                {
+                    security.EnableCompression = false;
+                    security.CompressionThresholdBytes = 1024;
+                    security.EnableEncryption = false;
+                    security.EncryptionKeyBase64 = null;
+                }
+
                 private void OnUserJoinedHandler(ChatMember member)
                 {
                     AppendSystemMessage($"{member.Name} joined.");
@@ -653,7 +722,12 @@ internal static class ToolTemplates
 
                 private void OnDestroy()
                 {
-                    _client?.Disconnect();
+                    _cts.Cancel();
+                    if (_client is not null)
+                    {
+                        _ = _client.DisposeAsync();
+                    }
+                    _cts.Dispose();
                 }
             }
         }

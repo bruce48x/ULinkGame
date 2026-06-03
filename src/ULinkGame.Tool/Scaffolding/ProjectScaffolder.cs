@@ -119,7 +119,7 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderClientChatClient()),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatUI.cs"),
-                ToolTemplates.RenderClientChatUI()),
+                ToolTemplates.RenderClientChatUI(options)),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml"),
                 ToolTemplates.RenderClientChatUxml()),

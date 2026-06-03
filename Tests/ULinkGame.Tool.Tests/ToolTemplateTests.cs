@@ -286,7 +286,7 @@ public sealed class ToolTemplateTests
             ("Shared/Chat/ChatProtocols.cs", ToolTemplates.RenderSharedChatProtocols()),
             ("Shared/Chat/ChatMessages.cs", ToolTemplates.RenderSharedChatMessages()),
             ("Client/Assets/Scripts/Chat/ChatClient.cs", ToolTemplates.RenderClientChatClient()),
-            ("Client/Assets/Scripts/Chat/ChatUI.cs", ToolTemplates.RenderClientChatUI())
+            ("Client/Assets/Scripts/Chat/ChatUI.cs", ToolTemplates.RenderClientChatUI(CliParser.ParseNewOptions([])))
         };
 
         AssertGeneratedSourcesParseAsCSharp9(sources);
@@ -338,19 +338,45 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderClientChatClient();
 
         Assert.Contains("class ChatClient : IChatCallback", source, StringComparison.Ordinal);
-        Assert.Contains("CreateService<IChatService>", source, StringComparison.Ordinal);
+        Assert.Contains("using System.Threading.Tasks;", source, StringComparison.Ordinal);
+        Assert.Contains("using Rpc.Generated;", source, StringComparison.Ordinal);
+        Assert.Contains("new RpcClient(options, callbacks)", source, StringComparison.Ordinal);
+        Assert.Contains("_rpcClient.Api.Shared.Chat", source, StringComparison.Ordinal);
         Assert.Contains("OnMessageReceived?.Invoke", source, StringComparison.Ordinal);
     }
 
     [Fact]
     public void RenderClientChatUi_RequiresUiDocument()
     {
-        var source = ToolTemplates.RenderClientChatUI();
+        var source = ToolTemplates.RenderClientChatUI(CliParser.ParseNewOptions([]));
 
         Assert.Contains("RequireComponent(typeof(UIDocument))", source, StringComparison.Ordinal);
+        Assert.Contains("new KcpTransport(_serverHost, _serverPort)", source, StringComparison.Ordinal);
+        Assert.Contains("new MemoryPackRpcSerializer()", source, StringComparison.Ordinal);
         Assert.Contains("chat-input", source, StringComparison.Ordinal);
         Assert.Contains("message-list", source, StringComparison.Ordinal);
         Assert.Contains("send-button", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderClientChatUi_UsesSelectedTransportAndSerializer()
+    {
+        var source = ToolTemplates.RenderClientChatUI(new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: "unity",
+            Transport: "websocket",
+            NetworkProfile: "cluster",
+            Serializer: "json",
+            Persistence: "none",
+            NuGetForUnitySource: "embedded",
+            DeployProfile: "none"));
+
+        Assert.Contains("using ULinkRPC.Transport.WebSocket;", source, StringComparison.Ordinal);
+        Assert.Contains("using ULinkRPC.Serializer.Json;", source, StringComparison.Ordinal);
+        Assert.Contains("new WsTransport($\"ws://{_serverHost}:{_serverPort}{NormalizePath(_serverPath)}\")", source, StringComparison.Ordinal);
+        Assert.Contains("new JsonRpcSerializer()", source, StringComparison.Ordinal);
+        Assert.Contains("[SerializeField] private string _serverPath = \"/ws\";", source, StringComparison.Ordinal);
     }
 
     [Fact]
