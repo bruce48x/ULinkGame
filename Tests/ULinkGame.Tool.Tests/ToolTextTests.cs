@@ -241,6 +241,29 @@ public sealed class ToolTextTests
         {
             Directory.CreateDirectory(Path.Combine(projectRoot, "Server", "Server"));
             Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Client", "Assets", "Scenes"));
+            var scenePath = Path.Combine(projectRoot, "Client", "Assets", "Scenes", "ConnectionTest.unity");
+            await File.WriteAllTextAsync(
+                scenePath,
+                """
+                %YAML 1.1
+                %TAG !u! tag:unity3d.com,2011:
+                --- !u!1 &1
+                GameObject:
+                  m_Component:
+                  - component: {fileID: 2}
+                  m_Name: Main Camera
+                --- !u!4 &2
+                Transform:
+                  m_GameObject: {fileID: 1}
+                  m_Father: {fileID: 0}
+                --- !u!1660057539 &9223372036854775807
+                SceneRoots:
+                  m_ObjectHideFlags: 0
+                  m_Roots:
+                  - {fileID: 2}
+                """,
+                TestContext.Current.CancellationToken);
 
             await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
 
@@ -250,9 +273,7 @@ public sealed class ToolTextTests
             var importGuard = await File.ReadAllTextAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameNuGetPackageImportGuard.cs"),
                 TestContext.Current.CancellationToken);
-            var sceneInstaller = await File.ReadAllTextAsync(
-                Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameChatSceneInstaller.cs"),
-                TestContext.Current.CancellationToken);
+            var scene = await File.ReadAllTextAsync(scenePath, TestContext.Current.CancellationToken);
 
             Assert.Contains("id=\"ULinkGame.Client\"", packagesConfig, StringComparison.Ordinal);
             Assert.Contains("id=\"ULinkGame.Abstractions\"", packagesConfig, StringComparison.Ordinal);
@@ -261,10 +282,15 @@ public sealed class ToolTextTests
             Assert.Contains("/analyzers/", importGuard, StringComparison.Ordinal);
             Assert.Contains("SetCompatibleWithAnyPlatform(false)", importGuard, StringComparison.Ordinal);
             Assert.Contains("SetCompatibleWithEditor(false)", importGuard, StringComparison.Ordinal);
-            Assert.Contains("Assets/Scenes/ConnectionTest.unity", sceneInstaller, StringComparison.Ordinal);
-            Assert.Contains("Assets/UI/ChatScene.uxml", sceneInstaller, StringComparison.Ordinal);
-            Assert.Contains("AddComponent<UIDocument>()", sceneInstaller, StringComparison.Ordinal);
-            Assert.Contains("AddComponent<ChatUI>()", sceneInstaller, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameChatSceneInstaller.cs")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatUI.cs.meta")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml.meta")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset.meta")));
+            Assert.Contains("m_Name: ULinkGame Chat UI", scene, StringComparison.Ordinal);
+            Assert.Contains("guid: 462a8730535800d4a801000623f4450e, type: 3", scene, StringComparison.Ordinal);
+            Assert.Contains("guid: d8e055cb54604094cb41badb6b3866f6, type: 3", scene, StringComparison.Ordinal);
+            Assert.Contains("m_PanelSettings: {fileID: 11400000, guid: 0c8089bab5856fe4d8f88e6f526fd306, type: 2}", scene, StringComparison.Ordinal);
         }
         finally
         {

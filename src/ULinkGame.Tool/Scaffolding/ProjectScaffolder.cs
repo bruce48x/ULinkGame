@@ -1,5 +1,10 @@
 internal sealed class ProjectScaffolder
 {
+    private const string UnityChatUiScriptGuid = "462a8730535800d4a801000623f4450e";
+    private const string UnityChatSceneUxmlGuid = "d8e055cb54604094cb41badb6b3866f6";
+    private const string UnityChatSceneUssGuid = "f7e09962267bcef45a558136fb62bb68";
+    private const string UnityChatPanelSettingsGuid = "0c8089bab5856fe4d8f88e6f526fd306";
+
     public async Task AugmentProjectWithULinkGameAsync(string projectRoot, NewCommandOptions options)
     {
         EnsureStarterServerProjectDirectory(projectRoot);
@@ -104,31 +109,158 @@ internal sealed class ProjectScaffolder
             ToolTemplates.RenderUnityNuGetPackageImportGuard());
     }
 
-    private static Task WriteClientChatFilesAsync(string projectRoot, NewCommandOptions options)
+    private static async Task WriteClientChatFilesAsync(string projectRoot, NewCommandOptions options)
     {
         if (ProjectConventions.IsGodot(options.ClientEngine))
         {
-            return WriteIfMissingAsync(
+            await WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatClient.cs"),
-                ToolTemplates.RenderClientChatClient());
+                ToolTemplates.RenderClientChatClient()).ConfigureAwait(false);
+            return;
         }
 
-        return Task.WhenAll(
+        var chatUiPath = Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatUI.cs");
+        var uxmlPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml");
+        var ussPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uss");
+        var panelSettingsPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset");
+
+        await Task.WhenAll(
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatClient.cs"),
                 ToolTemplates.RenderClientChatClient()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Client", "Assets", "Scripts", "Chat", "ChatUI.cs"),
+                chatUiPath,
                 ToolTemplates.RenderClientChatUI(options)),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml"),
+                uxmlPath,
                 ToolTemplates.RenderClientChatUxml()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uss"),
+                ussPath,
                 ToolTemplates.RenderClientChatUss()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameChatSceneInstaller.cs"),
-                ToolTemplates.RenderUnityChatSceneInstaller()));
+                chatUiPath + ".meta",
+                ToolTemplates.RenderUnityMonoScriptMeta(UnityChatUiScriptGuid)),
+            WriteIfMissingAsync(
+                uxmlPath + ".meta",
+                ToolTemplates.RenderUnityUxmlMeta(UnityChatSceneUxmlGuid)),
+            WriteIfMissingAsync(
+                ussPath + ".meta",
+                ToolTemplates.RenderUnityUssMeta(UnityChatSceneUssGuid)),
+            WriteIfMissingAsync(
+                panelSettingsPath,
+                ToolTemplates.RenderUnityPanelSettingsAsset()),
+            WriteIfMissingAsync(
+                panelSettingsPath + ".meta",
+                ToolTemplates.RenderUnityNativeAssetMeta(UnityChatPanelSettingsGuid))).ConfigureAwait(false);
+
+        await InstallUnityChatSceneAsync(projectRoot, chatUiPath, uxmlPath, panelSettingsPath).ConfigureAwait(false);
+    }
+
+    private static async Task InstallUnityChatSceneAsync(
+        string projectRoot,
+        string chatUiPath,
+        string uxmlPath,
+        string panelSettingsPath)
+    {
+        var scenePath = Path.Combine(projectRoot, "Client", "Assets", "Scenes", "ConnectionTest.unity");
+        if (!File.Exists(scenePath))
+        {
+            return;
+        }
+
+        var chatUiGuid = await ReadUnityMetaGuidAsync(chatUiPath + ".meta", UnityChatUiScriptGuid).ConfigureAwait(false);
+        var uxmlGuid = await ReadUnityMetaGuidAsync(uxmlPath + ".meta", UnityChatSceneUxmlGuid).ConfigureAwait(false);
+        var panelSettingsGuid = await ReadUnityMetaGuidAsync(
+            panelSettingsPath + ".meta",
+            UnityChatPanelSettingsGuid).ConfigureAwait(false);
+
+        var scene = await File.ReadAllTextAsync(scenePath).ConfigureAwait(false);
+        var panelSettingsReference =
+            $"m_PanelSettings: {{fileID: 11400000, guid: {panelSettingsGuid}, type: 2}}";
+
+        if (scene.Contains("m_Name: ULinkGame Chat UI", StringComparison.Ordinal))
+        {
+            var patchedExisting = scene.Replace("m_PanelSettings: {fileID: 0}", panelSettingsReference, StringComparison.Ordinal);
+            if (!string.Equals(patchedExisting, scene, StringComparison.Ordinal))
+            {
+                await File.WriteAllTextAsync(scenePath, patchedExisting).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        var gameObjectId = NextAvailableFileId(scene, 217337972);
+        var chatUiComponentId = NextAvailableFileId(scene, gameObjectId + 1);
+        var uiDocumentComponentId = NextAvailableFileId(scene, chatUiComponentId + 1);
+        var transformId = NextAvailableFileId(scene, uiDocumentComponentId + 1);
+        var chatSceneObjects = ToolTemplates.RenderUnityChatSceneObjects(
+            gameObjectId,
+            chatUiComponentId,
+            uiDocumentComponentId,
+            transformId,
+            chatUiGuid,
+            uxmlGuid,
+            panelSettingsGuid);
+
+        var sceneRootsMarker = "--- !u!1660057539 &9223372036854775807";
+        var sceneRootsIndex = scene.LastIndexOf(sceneRootsMarker, StringComparison.Ordinal);
+        var patched = sceneRootsIndex >= 0
+            ? scene.Insert(sceneRootsIndex, chatSceneObjects + Environment.NewLine)
+            : scene + Environment.NewLine + chatSceneObjects + Environment.NewLine;
+        patched = AddUnitySceneRoot(patched, transformId);
+
+        await File.WriteAllTextAsync(scenePath, patched).ConfigureAwait(false);
+    }
+
+    private static async Task<string> ReadUnityMetaGuidAsync(string path, string fallback)
+    {
+        if (!File.Exists(path))
+        {
+            return fallback;
+        }
+
+        var lines = await File.ReadAllLinesAsync(path).ConfigureAwait(false);
+        foreach (var line in lines)
+        {
+            const string prefix = "guid: ";
+            if (line.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return line[prefix.Length..].Trim();
+            }
+        }
+
+        return fallback;
+    }
+
+    private static long NextAvailableFileId(string scene, long preferred)
+    {
+        var current = preferred;
+        while (System.Text.RegularExpressions.Regex.IsMatch(scene, $@"&{current}\b"))
+        {
+            current++;
+        }
+
+        return current;
+    }
+
+    private static string AddUnitySceneRoot(string scene, long transformId)
+    {
+        var rootLine = $"  - {{fileID: {transformId}}}";
+        if (scene.Contains(rootLine, StringComparison.Ordinal))
+        {
+            return scene;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            scene,
+            @"(?m)^  m_Roots:\r?\n(?<roots>(?:  - \{fileID: \d+\}\r?\n)*)");
+        if (!match.Success)
+        {
+            return scene;
+        }
+
+        var replacement = match.Value + rootLine + Environment.NewLine;
+        return scene.Remove(match.Index, match.Length).Insert(match.Index, replacement);
     }
 
     private static Task WriteServerChatFilesAsync(string projectRoot)

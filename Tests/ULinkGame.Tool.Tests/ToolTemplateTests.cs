@@ -423,18 +423,33 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
-    public void RenderUnityChatSceneInstaller_WiresUiDocumentAndChatUi()
+    public void RenderUnityChatSceneObjects_WiresUiDocumentAndChatUi()
     {
-        var source = ToolTemplates.RenderUnityChatSceneInstaller();
+        var source = ToolTemplates.RenderUnityChatSceneObjects(
+            100,
+            101,
+            102,
+            103,
+            "chatuiscriptguid",
+            "uxmlguid",
+            "panelsettingsguid");
 
-        Assert.Contains("Assets/Scenes/ConnectionTest.unity", source, StringComparison.Ordinal);
-        Assert.Contains("Assets/UI/ChatScene.uxml", source, StringComparison.Ordinal);
-        Assert.Contains("Assets/UI/ULinkGameChatPanelSettings.asset", source, StringComparison.Ordinal);
-        Assert.Contains("AddComponent<UIDocument>()", source, StringComparison.Ordinal);
-        Assert.Contains("AddComponent<ChatUI>()", source, StringComparison.Ordinal);
-        Assert.Contains("document.visualTreeAsset = visualTree", source, StringComparison.Ordinal);
-        Assert.Contains("document.panelSettings = panelSettings", source, StringComparison.Ordinal);
-        Assert.Contains("EditorSceneManager.SaveScene(scene)", source, StringComparison.Ordinal);
+        Assert.Contains("m_Name: ULinkGame Chat UI", source, StringComparison.Ordinal);
+        Assert.Contains("m_Script: {fileID: 11500000, guid: chatuiscriptguid, type: 3}", source, StringComparison.Ordinal);
+        Assert.Contains("m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}", source, StringComparison.Ordinal);
+        Assert.Contains("m_PanelSettings: {fileID: 11400000, guid: panelsettingsguid, type: 2}", source, StringComparison.Ordinal);
+        Assert.Contains("sourceAsset: {fileID: 9197481963319205126, guid: uxmlguid, type: 3}", source, StringComparison.Ordinal);
+        Assert.Contains("--- !u!4 &103", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderUnityPanelSettingsAsset_UsesPanelSettingsScript()
+    {
+        var source = ToolTemplates.RenderUnityPanelSettingsAsset();
+
+        Assert.Contains("m_Script: {fileID: 19101, guid: 0000000000000000e000000000000000, type: 0}", source, StringComparison.Ordinal);
+        Assert.Contains("m_Name: ULinkGameChatPanelSettings", source, StringComparison.Ordinal);
+        Assert.Contains("m_ReferenceResolution: {x: 1200, y: 800}", source, StringComparison.Ordinal);
     }
 
     [Fact]
