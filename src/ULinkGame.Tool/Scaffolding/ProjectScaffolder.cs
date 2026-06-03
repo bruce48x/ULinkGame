@@ -125,7 +125,10 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderClientChatUxml()),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uss"),
-                ToolTemplates.RenderClientChatUss()));
+                ToolTemplates.RenderClientChatUss()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameChatSceneInstaller.cs"),
+                ToolTemplates.RenderUnityChatSceneInstaller()));
     }
 
     private static Task WriteServerChatFilesAsync(string projectRoot)

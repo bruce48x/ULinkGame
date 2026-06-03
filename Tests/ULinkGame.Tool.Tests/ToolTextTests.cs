@@ -250,6 +250,9 @@ public sealed class ToolTextTests
             var importGuard = await File.ReadAllTextAsync(
                 Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameNuGetPackageImportGuard.cs"),
                 TestContext.Current.CancellationToken);
+            var sceneInstaller = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Assets", "Editor", "ULinkGameChatSceneInstaller.cs"),
+                TestContext.Current.CancellationToken);
 
             Assert.Contains("id=\"ULinkGame.Client\"", packagesConfig, StringComparison.Ordinal);
             Assert.Contains("id=\"ULinkGame.Abstractions\"", packagesConfig, StringComparison.Ordinal);
@@ -258,6 +261,10 @@ public sealed class ToolTextTests
             Assert.Contains("/analyzers/", importGuard, StringComparison.Ordinal);
             Assert.Contains("SetCompatibleWithAnyPlatform(false)", importGuard, StringComparison.Ordinal);
             Assert.Contains("SetCompatibleWithEditor(false)", importGuard, StringComparison.Ordinal);
+            Assert.Contains("Assets/Scenes/ConnectionTest.unity", sceneInstaller, StringComparison.Ordinal);
+            Assert.Contains("Assets/UI/ChatScene.uxml", sceneInstaller, StringComparison.Ordinal);
+            Assert.Contains("AddComponent<UIDocument>()", sceneInstaller, StringComparison.Ordinal);
+            Assert.Contains("AddComponent<ChatUI>()", sceneInstaller, StringComparison.Ordinal);
         }
         finally
         {

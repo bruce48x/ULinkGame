@@ -423,6 +423,21 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public void RenderUnityChatSceneInstaller_WiresUiDocumentAndChatUi()
+    {
+        var source = ToolTemplates.RenderUnityChatSceneInstaller();
+
+        Assert.Contains("Assets/Scenes/ConnectionTest.unity", source, StringComparison.Ordinal);
+        Assert.Contains("Assets/UI/ChatScene.uxml", source, StringComparison.Ordinal);
+        Assert.Contains("Assets/UI/ULinkGameChatPanelSettings.asset", source, StringComparison.Ordinal);
+        Assert.Contains("AddComponent<UIDocument>()", source, StringComparison.Ordinal);
+        Assert.Contains("AddComponent<ChatUI>()", source, StringComparison.Ordinal);
+        Assert.Contains("document.visualTreeAsset = visualTree", source, StringComparison.Ordinal);
+        Assert.Contains("document.panelSettings = panelSettings", source, StringComparison.Ordinal);
+        Assert.Contains("EditorSceneManager.SaveScene(scene)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RenderClientChatUxml_UsesUiNamespacePrefix()
     {
         var source = ToolTemplates.RenderClientChatUxml();

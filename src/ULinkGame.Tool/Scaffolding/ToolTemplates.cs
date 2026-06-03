@@ -829,6 +829,110 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderUnityChatSceneInstaller()
+    {
+        return """
+        #if UNITY_EDITOR
+        using System.IO;
+        using Client.Chat;
+        using UnityEditor;
+        using UnityEditor.SceneManagement;
+        using UnityEngine;
+        using UnityEngine.SceneManagement;
+        using UnityEngine.UIElements;
+
+        [InitializeOnLoad]
+        internal static class ULinkGameChatSceneInstaller
+        {
+            private const string SessionStateKey = "ULinkGame.ChatSceneInstalled";
+            private const string ScenePath = "Assets/Scenes/ConnectionTest.unity";
+            private const string VisualTreePath = "Assets/UI/ChatScene.uxml";
+            private const string PanelSettingsPath = "Assets/UI/ULinkGameChatPanelSettings.asset";
+            private const string GameObjectName = "ULinkGame Chat UI";
+
+            static ULinkGameChatSceneInstaller()
+            {
+                EditorApplication.delayCall += TryInstall;
+            }
+
+            private static void TryInstall()
+            {
+                if (SessionState.GetBool(SessionStateKey, false))
+                {
+                    return;
+                }
+
+                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    return;
+                }
+
+                if (!File.Exists(ScenePath) || !File.Exists(VisualTreePath))
+                {
+                    return;
+                }
+
+                var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(VisualTreePath);
+                if (visualTree == null)
+                {
+                    return;
+                }
+
+                var panelSettings = EnsurePanelSettings();
+                if (panelSettings == null)
+                {
+                    return;
+                }
+
+                var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                var root = FindOrCreateRoot(scene);
+                var document = root.GetComponent<UIDocument>() ?? root.AddComponent<UIDocument>();
+                if (root.GetComponent<ChatUI>() == null)
+                {
+                    root.AddComponent<ChatUI>();
+                }
+
+                document.visualTreeAsset = visualTree;
+                document.panelSettings = panelSettings;
+
+                EditorUtility.SetDirty(root);
+                EditorUtility.SetDirty(document);
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+                SessionState.SetBool(SessionStateKey, true);
+            }
+
+            private static PanelSettings EnsurePanelSettings()
+            {
+                var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(PanelSettingsPath);
+                if (panelSettings != null)
+                {
+                    return panelSettings;
+                }
+
+                panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+                AssetDatabase.CreateAsset(panelSettings, PanelSettingsPath);
+                AssetDatabase.SaveAssets();
+                return panelSettings;
+            }
+
+            private static GameObject FindOrCreateRoot(Scene scene)
+            {
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    if (root.name == GameObjectName)
+                    {
+                        return root;
+                    }
+                }
+
+                return new GameObject(GameObjectName);
+            }
+        }
+        #endif
+        """;
+    }
+
     public static string RenderUnityNuGetPackageImportGuard()
     {
         return """
