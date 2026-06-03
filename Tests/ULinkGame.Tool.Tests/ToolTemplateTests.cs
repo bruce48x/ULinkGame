@@ -263,6 +263,45 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public async Task AugmentExistingStarterServerProjectAddsHotfixCopyTarget()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var serverDirectory = Path.Combine(projectRoot, "Server", "Server");
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            await File.WriteAllTextAsync(
+                Path.Combine(serverDirectory, "Server.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            var project = await File.ReadAllTextAsync(
+                Path.Combine(serverDirectory, "Server.csproj"),
+                TestContext.Current.CancellationToken);
+
+            Assert.Contains(@"<Target Name=""CopyHotfixOutput"" AfterTargets=""Build"">", project, StringComparison.Ordinal);
+            Assert.Contains(@"DestinationFolder=""$(OutDir)hotfix\""", project, StringComparison.Ordinal);
+            Assert.Contains("Server.Hotfix.dll", project, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void RenderSharedChatProtocols_DefinesRpcServiceAndCallback()
     {
         var source = ToolTemplates.RenderSharedChatProtocols();
@@ -327,6 +366,9 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderServerChatServiceImpl();
 
         Assert.Contains("class ChatServiceImpl : IChatService", source, StringComparison.Ordinal);
+        Assert.Contains("private static readonly ChatRoom SharedRoom = new();", source, StringComparison.Ordinal);
+        Assert.Contains("public ChatServiceImpl(IChatCallback callback)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("public ChatServiceImpl(IChatCallback callback, ChatRoom room)", source, StringComparison.Ordinal);
         Assert.Contains("_room.Join", source, StringComparison.Ordinal);
         Assert.Contains("_room.Send", source, StringComparison.Ordinal);
         Assert.Contains("_room.Leave", source, StringComparison.Ordinal);

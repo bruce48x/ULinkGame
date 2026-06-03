@@ -224,6 +224,7 @@ internal sealed class ProjectScaffolder
         EnsureClusterPackageReferences(project, options);
         EnsurePersistenceProviderReference(project, options.Persistence, includeDapper: true);
         EnsureNoneUpdate(project, "appsettings.json", "PreserveNewest");
+        EnsureHotfixCopyTarget(project);
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
@@ -508,6 +509,29 @@ internal sealed class ProjectScaffolder
         {
             copy.Value = copyToOutputDirectory;
         }
+    }
+
+    private static void EnsureHotfixCopyTarget(System.Xml.Linq.XElement project)
+    {
+        const string targetName = "CopyHotfixOutput";
+        foreach (var target in project
+            .Elements("Target")
+            .Where(element => string.Equals(element.Attribute("Name")?.Value, targetName, StringComparison.Ordinal))
+            .ToArray())
+        {
+            target.Remove();
+        }
+
+        project.Add(
+            new System.Xml.Linq.XElement(
+                "Target",
+                new System.Xml.Linq.XAttribute("Name", targetName),
+                new System.Xml.Linq.XAttribute("AfterTargets", "Build"),
+                new System.Xml.Linq.XElement(
+                    "Copy",
+                    new System.Xml.Linq.XAttribute("SourceFiles", @"$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Server.Hotfix.dll"),
+                    new System.Xml.Linq.XAttribute("DestinationFolder", @"$(OutDir)hotfix\"),
+                    new System.Xml.Linq.XAttribute("Condition", @"Exists('$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Server.Hotfix.dll')"))));
     }
 
     private static System.Xml.Linq.XElement FindOrAddItemGroup(System.Xml.Linq.XElement project)

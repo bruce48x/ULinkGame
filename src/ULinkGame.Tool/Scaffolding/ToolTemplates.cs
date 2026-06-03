@@ -407,14 +407,16 @@ internal static class ToolTemplates
         {
             internal sealed class ChatServiceImpl : IChatService
             {
+                private static readonly ChatRoom SharedRoom = new();
+
                 private readonly IChatCallback _callback;
                 private readonly ChatRoom _room;
                 private readonly string _connectionId;
 
-                public ChatServiceImpl(IChatCallback callback, ChatRoom room)
+                public ChatServiceImpl(IChatCallback callback)
                 {
                     _callback = callback;
-                    _room = room;
+                    _room = SharedRoom;
                     _connectionId = Guid.NewGuid().ToString("N");
                 }
 
