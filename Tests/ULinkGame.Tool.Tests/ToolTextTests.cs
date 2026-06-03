@@ -302,6 +302,47 @@ public sealed class ToolTextTests
     }
 
     [Fact]
+    public async Task JsonSerializerScaffoldDoesNotEmitMemoryPackChatContracts()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Server", "Server"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+
+            var options = new NewCommandOptions(
+                Name: "MyGame",
+                OutputPath: null,
+                ClientEngine: "unity",
+                Transport: "websocket",
+                NetworkProfile: "single",
+                Serializer: "json",
+                Persistence: "none",
+                NuGetForUnitySource: "embedded",
+                DeployProfile: "none");
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, options);
+
+            var chatMessages = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs"),
+                TestContext.Current.CancellationToken);
+
+            Assert.DoesNotContain("MemoryPack", chatMessages, StringComparison.Ordinal);
+            Assert.DoesNotContain("MemoryPackable", chatMessages, StringComparison.Ordinal);
+            Assert.DoesNotContain("MemoryPackOrder", chatMessages, StringComparison.Ordinal);
+            Assert.Contains("public partial class ChatJoinRequest", chatMessages, StringComparison.Ordinal);
+            Assert.Contains("public string PlayerName { get; set; }", chatMessages, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ClusterEnvExampleUsesSelectedTransportForAdvertisedClientEndpoint()
     {
         var websocketOptions = new NewCommandOptions(

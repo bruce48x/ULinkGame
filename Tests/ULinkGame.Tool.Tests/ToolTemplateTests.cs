@@ -318,6 +318,30 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public void RenderSharedChatMessages_UsesSelectedSerializerAnnotations()
+    {
+        var jsonOptions = new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: "unity",
+            Transport: "websocket",
+            NetworkProfile: "single",
+            Serializer: "json",
+            Persistence: "none",
+            NuGetForUnitySource: "embedded",
+            DeployProfile: "none");
+
+        var jsonSource = ToolTemplates.RenderSharedChatMessages(jsonOptions);
+        var memoryPackSource = ToolTemplates.RenderSharedChatMessages();
+
+        Assert.DoesNotContain("MemoryPack", jsonSource, StringComparison.Ordinal);
+        Assert.Contains("public partial class ChatMessage", jsonSource, StringComparison.Ordinal);
+        Assert.Contains("using MemoryPack;", memoryPackSource, StringComparison.Ordinal);
+        Assert.Contains("[MemoryPackable(GenerateType.VersionTolerant)]", memoryPackSource, StringComparison.Ordinal);
+        Assert.Contains("[MemoryPackOrder(2)] public long Timestamp", memoryPackSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RenderUnityFacingChatTemplates_ParseAsCSharpNine()
     {
         var sources = new[]

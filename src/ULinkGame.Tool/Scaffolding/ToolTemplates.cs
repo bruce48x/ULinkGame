@@ -248,54 +248,62 @@ internal static class ToolTemplates
 
     public static string RenderSharedChatMessages()
     {
-        return """
+        return RenderSharedChatMessages(CliParser.ParseNewOptions([]));
+    }
+
+    public static string RenderSharedChatMessages(NewCommandOptions options)
+    {
+        var memoryPackUsing = string.Equals(options.Serializer, "memorypack", StringComparison.Ordinal)
+            ? "using MemoryPack;\n"
+            : "";
+        var memoryPackable = string.Equals(options.Serializer, "memorypack", StringComparison.Ordinal)
+            ? "[MemoryPackable(GenerateType.VersionTolerant)]\n    "
+            : "";
+        var order0 = string.Equals(options.Serializer, "memorypack", StringComparison.Ordinal) ? "[MemoryPackOrder(0)] " : "";
+        var order1 = string.Equals(options.Serializer, "memorypack", StringComparison.Ordinal) ? "[MemoryPackOrder(1)] " : "";
+        var order2 = string.Equals(options.Serializer, "memorypack", StringComparison.Ordinal) ? "[MemoryPackOrder(2)] " : "";
+
+        return $$"""
         using System.Collections.Generic;
-        using MemoryPack;
+        {{memoryPackUsing}}
 
         namespace Shared.Chat
         {
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatJoinRequest
+            {{memoryPackable}}public partial class ChatJoinRequest
             {
-                [MemoryPackOrder(0)] public string PlayerName { get; set; } = "";
+                {{order0}}public string PlayerName { get; set; } = "";
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatJoinReply
+            {{memoryPackable}}public partial class ChatJoinReply
             {
-                [MemoryPackOrder(0)] public List<ChatMember> Members { get; set; } = new();
-                [MemoryPackOrder(1)] public List<ChatMessage> RecentMessages { get; set; } = new();
+                {{order0}}public List<ChatMember> Members { get; set; } = new();
+                {{order1}}public List<ChatMessage> RecentMessages { get; set; } = new();
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatSendRequest
+            {{memoryPackable}}public partial class ChatSendRequest
             {
-                [MemoryPackOrder(0)] public string Text { get; set; } = "";
+                {{order0}}public string Text { get; set; } = "";
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatLeaveRequest
+            {{memoryPackable}}public partial class ChatLeaveRequest
             {
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatUserLeft
+            {{memoryPackable}}public partial class ChatUserLeft
             {
-                [MemoryPackOrder(0)] public string Name { get; set; } = "";
+                {{order0}}public string Name { get; set; } = "";
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatMember
+            {{memoryPackable}}public partial class ChatMember
             {
-                [MemoryPackOrder(0)] public string Name { get; set; } = "";
+                {{order0}}public string Name { get; set; } = "";
             }
 
-            [MemoryPackable(GenerateType.VersionTolerant)]
-            public partial class ChatMessage
+            {{memoryPackable}}public partial class ChatMessage
             {
-                [MemoryPackOrder(0)] public string SenderName { get; set; } = "";
-                [MemoryPackOrder(1)] public string Text { get; set; } = "";
-                [MemoryPackOrder(2)] public long Timestamp { get; set; }
+                {{order0}}public string SenderName { get; set; } = "";
+                {{order1}}public string Text { get; set; } = "";
+                {{order2}}public long Timestamp { get; set; }
             }
         }
         """;

@@ -24,6 +24,7 @@
 - `ULinkGame.Tool` `0.4.4`
 - `ULinkGame.Tool` `0.4.5`
 - `ULinkGame.Tool` `0.4.6`
+- `ULinkGame.Tool` `0.4.7`
 
 ### Added
 
@@ -50,6 +51,7 @@
 - Fixed `ulinkgame-tool new` server templates to use the ULinkRPC callback-service constructor shape and copy the generated hotfix assembly into the server runtime output.
 - Fixed `ulinkgame-tool new` Unity chat UI templates to avoid null-conditional event subscription syntax on `Button.clicked`.
 - Fixed `ulinkgame-tool new` Unity chat projects to statically wire the UI Toolkit chat document and panel settings into the starter scene without emitting an editor installer script.
+- Fixed `ulinkgame-tool new --serializer json` shared chat contracts to omit MemoryPack attributes and imports.
 
 ## 2026-06-01
 

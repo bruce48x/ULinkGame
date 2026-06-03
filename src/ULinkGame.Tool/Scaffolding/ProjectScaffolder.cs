@@ -11,7 +11,7 @@ internal sealed class ProjectScaffolder
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
         await WriteClientChatFilesAsync(projectRoot, options).ConfigureAwait(false);
         await WriteSharedHotfixReferencesAsync(projectRoot).ConfigureAwait(false);
-        await WriteSharedHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
+        await WriteSharedHotfixBoundaryFilesAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteServerProgramAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerProjectAsync(projectRoot, options).ConfigureAwait(false);
@@ -58,7 +58,7 @@ internal sealed class ProjectScaffolder
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
     }
 
-    private static Task WriteSharedHotfixBoundaryFilesAsync(string projectRoot)
+    private static Task WriteSharedHotfixBoundaryFilesAsync(string projectRoot, NewCommandOptions options)
     {
         return Task.WhenAll(
             WriteIfMissingAsync(
@@ -69,7 +69,7 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderSharedChatProtocols()),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs"),
-                ToolTemplates.RenderSharedChatMessages()));
+                ToolTemplates.RenderSharedChatMessages(options)));
     }
 
     private static async Task WriteUnityClientPackageReferenceAsync(string projectRoot)
