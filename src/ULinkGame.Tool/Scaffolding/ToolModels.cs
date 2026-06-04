@@ -48,7 +48,7 @@ internal static class ProjectConventions
 
 internal static partial class ToolPackageVersions
 {
-    public const string ULinkRpcStarter = "0.3.4";
+    public const string ULinkRpcStarter = "0.3.5";
     public const string MicrosoftExtensionsHosting = "10.0.0";
     public const string Dapper = "2.1.72";
     public const string MySqlConnector = "2.5.0";
