@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-06-04
+
+### Released
+
+- `ULinkGame.Tool` `0.4.8`
+- `ULinkGame.Tool` `0.4.9`
+
+### Fixed
+
+- Fixed generated Unity projects to rescan existing NuGet analyzer DLLs and disable them as Unity plugins after the import guard compiles.
+- Fixed generated Unity chat UI rendering by linking the chat stylesheet, generating the default runtime theme, and writing transport-specific scene path values.
+
+## 2026-06-03
+
+### Released
+
+- `ULinkGame.Tool` `0.4.2`
+- `ULinkGame.Tool` `0.4.3`
+- `ULinkGame.Tool` `0.4.4`
+- `ULinkGame.Tool` `0.4.5`
+- `ULinkGame.Tool` `0.4.6`
+- `ULinkGame.Tool` `0.4.7`
+
+### Fixed
+
+- Fixed `ulinkgame-tool new` Unity chat templates to use the generated `Rpc.Generated.RpcClient` API and emit the missing task namespace import.
+- Fixed `ulinkgame-tool new` server templates to use the ULinkRPC callback-service constructor shape and copy the generated hotfix assembly into the server runtime output.
+- Fixed `ulinkgame-tool new` Unity chat UI templates to avoid null-conditional event subscription syntax on `Button.clicked`.
+- Fixed `ulinkgame-tool new` Unity chat projects to statically wire the UI Toolkit chat document and panel settings into the starter scene without emitting an editor installer script.
+- Fixed `ulinkgame-tool new --serializer json` shared chat contracts to omit MemoryPack attributes and imports.
+
 ## 2026-06-02
 
 ### Released
@@ -19,14 +50,6 @@
 - `ULinkGame.Server.Generators` `0.1.4`
 - `ULinkGame.Tool` `0.3.4`
 - `ULinkGame.Tool` `0.4.1`
-- `ULinkGame.Tool` `0.4.2`
-- `ULinkGame.Tool` `0.4.3`
-- `ULinkGame.Tool` `0.4.4`
-- `ULinkGame.Tool` `0.4.5`
-- `ULinkGame.Tool` `0.4.6`
-- `ULinkGame.Tool` `0.4.7`
-- `ULinkGame.Tool` `0.4.8`
-- `ULinkGame.Tool` `0.4.9`
 
 ### Added
 
@@ -49,13 +72,6 @@
 
 - Fixed lifecycle hook diagnostics so spawn hooks may take a request and destroy hooks may not.
 - Fixed `ulinkgame-tool new` chat templates to emit C# 9-compatible block-scoped namespaces instead of file-scoped namespaces for Unity-created projects.
-- Fixed `ulinkgame-tool new` Unity chat templates to use the generated `Rpc.Generated.RpcClient` API and emit the missing task namespace import.
-- Fixed `ulinkgame-tool new` server templates to use the ULinkRPC callback-service constructor shape and copy the generated hotfix assembly into the server runtime output.
-- Fixed `ulinkgame-tool new` Unity chat UI templates to avoid null-conditional event subscription syntax on `Button.clicked`.
-- Fixed `ulinkgame-tool new` Unity chat projects to statically wire the UI Toolkit chat document and panel settings into the starter scene without emitting an editor installer script.
-- Fixed `ulinkgame-tool new --serializer json` shared chat contracts to omit MemoryPack attributes and imports.
-- Fixed generated Unity projects to rescan existing NuGet analyzer DLLs and disable them as Unity plugins after the import guard compiles.
-- Fixed generated Unity chat UI rendering by linking the chat stylesheet, generating the default runtime theme, and writing transport-specific scene path values.
 
 ## 2026-06-01
 
