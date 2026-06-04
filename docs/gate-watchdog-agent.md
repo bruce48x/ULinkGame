@@ -42,6 +42,48 @@ ULinkGame provides all the mechanisms. The pattern is just composition:
 | Reconnect to another Gate | `GameSessionResumeService` with resume token |
 | Realtime channel | `IULinkRpcServerConfigurator` with KCP transport, separate endpoint |
 | Reliable delivery | `IReliablePushOutbox` + `IReliablePushInbox` |
+| Server-initiated disconnect | `IULinkGameServer.TerminateSessionAsync` + `IULinkGameSessionCallback` |
+
+## Server-initiated session termination
+
+When the server must remove a player from an active session, treat it as a terminal session lifecycle transition, not as a raw transport close. The recommended flow is:
+
+1. The Agent or server policy decides the current session must end.
+2. Server code calls `IULinkGameServer.TerminateSessionAsync`.
+3. ULinkGame marks the session terminal before notifying the client, so new business work for that session is rejected deterministically.
+4. ULinkGame sends a fixed `SessionTerminationNotice` through `IULinkGameSessionCallback.OnSessionTerminatedAsync` on `GameEndpointName.Control` by default.
+5. ULinkGame waits only up to `SessionTerminationOptions.NotifyTimeout`, then asks the configured endpoint closer to close the stored connection id.
+6. Later resume attempts return the terminal outcome when `KeepTerminalStateForResume` is enabled.
+
+The common server call should stay short:
+
+```csharp
+await gameServer.TerminateSessionAsync(
+    session,
+    SessionTerminationReason.ReplacedByNewLogin,
+    message: "This account logged in elsewhere.");
+```
+
+Games with multiple client-facing endpoints may use the overload that accepts `GameEndpointName`. Most games should keep termination notices on the control endpoint; realtime channels should be closed as a consequence of session termination rather than defining their own kick protocol.
+
+The client callback endpoint implements the fixed framework callback:
+
+```csharp
+public sealed class ClientCallback : IULinkGameSessionCallback
+{
+    public ValueTask OnSessionTerminatedAsync(
+        SessionTerminationNotice notice,
+        CancellationToken cancellationToken = default)
+    {
+        client.ApplySessionTerminationNotice(notice);
+        return ValueTask.CompletedTask;
+    }
+}
+```
+
+`SessionTerminationReason` is the only machine-readable reason. `SessionTerminationNotice.Message` is optional display context and should not become a second product-specific reason catalog.
+
+The notice is best-effort. No framework can guarantee that a final packet is delivered before the network disappears. Correct clients must still handle the fallback path where they only observe a disconnect and then receive `SessionResumeStatus.Terminated` or another terminal outcome during resume/login.
 
 ## When to use which variant
 

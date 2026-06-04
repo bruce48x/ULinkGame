@@ -20,6 +20,7 @@ src/**/*.meta
 /_verify/
 /.buildtmp/
 /.superpowers/
+/docs/superpowers/
 /.worktrees/
 
 # NuGetForUnity restored packages
