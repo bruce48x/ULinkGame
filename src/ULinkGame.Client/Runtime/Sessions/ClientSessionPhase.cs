@@ -7,7 +7,7 @@ namespace ULinkGame.Client.Sessions
         Active,
         Reconnecting,
         RefreshRequired,
-        StateLost
+        StateLost,
+        Terminated
     }
 }
-

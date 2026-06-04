@@ -5,11 +5,13 @@ namespace ULinkGame.Abstractions
         public SessionResumeDecision(
             SessionResumeStatus status,
             GameSessionKey? session,
-            string? reason = null)
+            string? reason = null,
+            SessionTerminationNotice? termination = null)
         {
             Status = status;
             Session = session;
             Reason = reason;
+            Termination = termination;
         }
 
         public SessionResumeStatus Status { get; }
@@ -17,6 +19,8 @@ namespace ULinkGame.Abstractions
         public GameSessionKey? Session { get; }
 
         public string? Reason { get; }
+
+        public SessionTerminationNotice? Termination { get; }
 
         public static SessionResumeDecision Resumed(GameSessionKey session)
         {
@@ -38,6 +42,20 @@ namespace ULinkGame.Abstractions
         public static SessionResumeDecision Unauthorized(string? reason = null)
         {
             return new SessionResumeDecision(SessionResumeStatus.Unauthorized, null, reason);
+        }
+
+        public static SessionResumeDecision Terminated(SessionTerminationNotice notice)
+        {
+            if (notice is null)
+            {
+                throw new System.ArgumentNullException(nameof(notice));
+            }
+
+            return new SessionResumeDecision(
+                SessionResumeStatus.Terminated,
+                notice.Session,
+                notice.Message,
+                notice);
         }
     }
 }

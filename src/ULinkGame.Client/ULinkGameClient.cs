@@ -51,6 +51,11 @@ namespace ULinkGame.Client
             _sessions.ApplyAckOutcome(outcome);
         }
 
+        public void ApplySessionTerminationNotice(SessionTerminationNotice notice)
+        {
+            _sessions.ApplySessionTerminationNotice(notice);
+        }
+
         public void MarkStateLost()
         {
             _sessions.MarkStateLost();

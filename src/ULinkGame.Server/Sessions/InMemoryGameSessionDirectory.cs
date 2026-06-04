@@ -41,6 +41,13 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
                 return ValueTask.FromResult(SessionResumeDecision.StateLost("Session was not found or generation changed."));
             }
 
+            if (state.IsTerminated)
+            {
+                return ValueTask.FromResult(state.Termination is null
+                    ? SessionResumeDecision.StateLost("Session was terminated.")
+                    : SessionResumeDecision.Terminated(state.Termination));
+            }
+
             state.LastSeenAt = DateTimeOffset.UtcNow;
             return ValueTask.FromResult(SessionResumeDecision.Resumed(state.Session));
         }
@@ -61,11 +68,37 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         lock (_gate)
         {
             var state = GetCurrentSessionState(endpoint.Session);
+            if (state.IsTerminated)
+            {
+                throw new InvalidOperationException("Session is terminated.");
+            }
+
             state.Endpoints[endpoint.EndpointName.Value] = new EndpointBinding(
                 connectionId,
                 callback,
                 typeof(TCallback),
                 DateTimeOffset.UtcNow);
+            state.LastSeenAt = DateTimeOffset.UtcNow;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask MarkSessionTerminatedAsync(
+        GameSessionKey session,
+        SessionTerminationNotice notice,
+        bool keepForResume,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateSession(session);
+        ArgumentNullException.ThrowIfNull(notice);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var state = GetCurrentSessionState(session);
+            state.IsTerminated = true;
+            state.Termination = keepForResume ? notice : null;
             state.LastSeenAt = DateTimeOffset.UtcNow;
         }
 
@@ -121,6 +154,33 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
             }
 
             return ValueTask.FromResult(binding.Callback as TCallback);
+        }
+    }
+
+    public ValueTask<GameSessionEndpointBinding<TCallback>?> GetEndpointBindingAsync<TCallback>(
+        SessionEndpointKey endpoint,
+        CancellationToken cancellationToken = default)
+        where TCallback : class
+    {
+        ValidateEndpoint(endpoint);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            if (!_owners.TryGetValue(endpoint.Session.OwnerKey, out var state) ||
+                !state.Session.Equals(endpoint.Session) ||
+                !state.Endpoints.TryGetValue(endpoint.EndpointName.Value, out var binding) ||
+                binding.DisconnectedAt is not null ||
+                binding.Callback is not TCallback callback)
+            {
+                return ValueTask.FromResult<GameSessionEndpointBinding<TCallback>?>(null);
+            }
+
+            return ValueTask.FromResult<GameSessionEndpointBinding<TCallback>?>(
+                new GameSessionEndpointBinding<TCallback>(
+                    endpoint,
+                    binding.ConnectionId,
+                    callback));
         }
     }
 
@@ -199,6 +259,10 @@ public sealed class InMemoryGameSessionDirectory : IGameSessionDirectory
         public GameSessionKey Session { get; }
 
         public DateTimeOffset LastSeenAt { get; set; }
+
+        public bool IsTerminated { get; set; }
+
+        public SessionTerminationNotice? Termination { get; set; }
 
         public Dictionary<string, EndpointBinding> Endpoints { get; } = new(StringComparer.Ordinal);
     }

@@ -57,4 +57,23 @@ public sealed class ULinkGameClientTests
         Assert.Equal(ClientSessionPhase.Active, client.Snapshot.Phase);
         Assert.Equal(next, client.Snapshot.Session);
     }
+
+    [Fact]
+    public void MainEntryAppliesSessionTerminationNotice()
+    {
+        var client = new ULinkGameClient();
+        var session = new GameSessionKey("player-a", "session-a", 1);
+        var notice = new SessionTerminationNotice(
+            session,
+            SessionTerminationReason.Policy,
+            "Removed.");
+        client.StartSession(session, lastReliableSequence: 7);
+
+        client.ApplySessionTerminationNotice(notice);
+
+        Assert.Equal(ClientSessionPhase.Terminated, client.Snapshot.Phase);
+        Assert.Null(client.Snapshot.Session);
+        Assert.Equal(0, client.Snapshot.LastReliableSequence);
+        Assert.Same(notice, client.Snapshot.Termination);
+    }
 }

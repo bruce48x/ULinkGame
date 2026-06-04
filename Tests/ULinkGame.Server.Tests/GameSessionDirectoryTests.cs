@@ -73,6 +73,47 @@ public sealed class GameSessionDirectoryTests
     }
 
     [Fact]
+    public async Task TerminatedSessionResumesAsTerminated()
+    {
+        var directory = new InMemoryGameSessionDirectory();
+        var session = await directory.StartNewSessionAsync("player-a", TestContext.Current.CancellationToken);
+        var notice = new SessionTerminationNotice(session, SessionTerminationReason.Policy, "Removed.");
+
+        await directory.MarkSessionTerminatedAsync(
+            session,
+            notice,
+            keepForResume: true,
+            TestContext.Current.CancellationToken);
+
+        var decision = await directory.TryResumeAsync(session, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SessionResumeStatus.Terminated, decision.Status);
+        Assert.Same(notice, decision.Termination);
+    }
+
+    [Fact]
+    public async Task BindingEndpointAfterTerminationIsRejected()
+    {
+        var directory = new InMemoryGameSessionDirectory();
+        var session = await directory.StartNewSessionAsync("player-a", TestContext.Current.CancellationToken);
+        var notice = new SessionTerminationNotice(session, SessionTerminationReason.Policy);
+
+        await directory.MarkSessionTerminatedAsync(
+            session,
+            notice,
+            keepForResume: true,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory
+            .BindEndpointAsync(
+                new SessionEndpointKey(session, "control"),
+                "connection-a",
+                new Callback("control"),
+                TestContext.Current.CancellationToken)
+            .AsTask());
+    }
+
+    [Fact]
     public void AddSessionsRegistersDirectory()
     {
         var services = new ServiceCollection();

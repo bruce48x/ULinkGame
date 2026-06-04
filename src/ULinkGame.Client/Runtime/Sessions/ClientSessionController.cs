@@ -1,3 +1,4 @@
+using System;
 using ULinkGame.Abstractions;
 using ULinkGame.Client.ReliablePush;
 
@@ -17,7 +18,7 @@ namespace ULinkGame.Client.Sessions
 
         public void MarkConnecting()
         {
-            if (Snapshot.Phase != ClientSessionPhase.StateLost)
+            if (!IsTerminalPhase(Snapshot.Phase))
             {
                 SetPhase(ClientSessionPhase.Connecting);
             }
@@ -34,7 +35,7 @@ namespace ULinkGame.Client.Sessions
 
         public void MarkReconnecting()
         {
-            if (Snapshot.Phase != ClientSessionPhase.StateLost)
+            if (!IsTerminalPhase(Snapshot.Phase))
             {
                 SetPhase(ClientSessionPhase.Reconnecting);
             }
@@ -42,7 +43,7 @@ namespace ULinkGame.Client.Sessions
 
         public void ApplyAckOutcome(ReliablePushAckOutcome outcome)
         {
-            if (Snapshot.Phase == ClientSessionPhase.StateLost)
+            if (IsTerminalPhase(Snapshot.Phase))
             {
                 return;
             }
@@ -62,6 +63,23 @@ namespace ULinkGame.Client.Sessions
             }
         }
 
+        public void ApplySessionTerminationNotice(SessionTerminationNotice notice)
+        {
+            if (notice is null)
+            {
+                throw new ArgumentNullException(nameof(notice));
+            }
+
+            if (Snapshot.Session is not { } session ||
+                !session.Equals(notice.Session))
+            {
+                return;
+            }
+
+            _reliablePushInbox.Reset();
+            Snapshot = new ClientSessionSnapshot(ClientSessionPhase.Terminated, null, 0, notice);
+        }
+
         public void MarkStateLost()
         {
             _reliablePushInbox.Reset();
@@ -79,7 +97,13 @@ namespace ULinkGame.Client.Sessions
             Snapshot = new ClientSessionSnapshot(
                 phase,
                 Snapshot.Session,
-                _reliablePushInbox.LastAppliedSequence);
+                _reliablePushInbox.LastAppliedSequence,
+                Snapshot.Termination);
+        }
+
+        private static bool IsTerminalPhase(ClientSessionPhase phase)
+        {
+            return phase is ClientSessionPhase.StateLost or ClientSessionPhase.Terminated;
         }
     }
 }

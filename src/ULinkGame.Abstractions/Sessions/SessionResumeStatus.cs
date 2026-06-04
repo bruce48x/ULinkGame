@@ -5,6 +5,7 @@ namespace ULinkGame.Abstractions
         Resumed,
         StateRefreshRequired,
         StateLost,
-        Unauthorized
+        Unauthorized,
+        Terminated
     }
 }

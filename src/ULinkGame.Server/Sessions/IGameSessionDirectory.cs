@@ -24,7 +24,18 @@ public interface IGameSessionDirectory
         string? connectionId = null,
         CancellationToken cancellationToken = default);
 
+    ValueTask MarkSessionTerminatedAsync(
+        GameSessionKey session,
+        SessionTerminationNotice notice,
+        bool keepForResume,
+        CancellationToken cancellationToken = default);
+
     ValueTask<TCallback?> GetCallbackAsync<TCallback>(
+        SessionEndpointKey endpoint,
+        CancellationToken cancellationToken = default)
+        where TCallback : class;
+
+    ValueTask<GameSessionEndpointBinding<TCallback>?> GetEndpointBindingAsync<TCallback>(
         SessionEndpointKey endpoint,
         CancellationToken cancellationToken = default)
         where TCallback : class;

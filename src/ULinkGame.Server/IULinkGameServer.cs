@@ -46,6 +46,21 @@ public interface IULinkGameServer
         CancellationToken cancellationToken = default)
         where TCallback : class;
 
+    ValueTask TerminateSessionAsync(
+        GameSessionKey session,
+        SessionTerminationReason reason,
+        string? message = null,
+        SessionTerminationOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    ValueTask TerminateSessionAsync(
+        GameSessionKey session,
+        GameEndpointName endpointName,
+        SessionTerminationReason reason,
+        string? message = null,
+        SessionTerminationOptions? options = null,
+        CancellationToken cancellationToken = default);
+
     ValueTask<long> PublishReliablePushAsync<TCallback, TPayload>(
         GameSessionKey session,
         GameEndpointName endpointName,

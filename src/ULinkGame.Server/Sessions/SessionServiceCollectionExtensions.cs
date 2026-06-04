@@ -9,6 +9,7 @@ public static class SessionServiceCollectionExtensions
     {
         services.TryAddSingleton<IGameSessionDirectory, InMemoryGameSessionDirectory>();
         services.TryAddSingleton<IGameSessionResumeService, GameSessionResumeService>();
+        services.TryAddSingleton<IGameSessionEndpointCloser, NoopGameSessionEndpointCloser>();
         return services;
     }
 
