@@ -592,6 +592,7 @@ internal static class ToolTemplates
 
         return $$"""
         using System;
+        using System.Collections.Concurrent;
         using System.Threading;
         using System.Threading.Tasks;
         using Shared.Chat;
@@ -612,23 +613,31 @@ internal static class ToolTemplates
                 [SerializeField] private string _serverPath = "{{TemplateText.SanitizeStringLiteral(defaultPath)}}";
 
                 private readonly CancellationTokenSource _cts = new();
+                private readonly ConcurrentQueue<Action> _mainThreadActions = new();
                 private ChatClient? _client;
                 private TextField? _inputField;
+                private TextField? _nameField;
                 private ScrollView? _messageList;
                 private Label? _onlineCount;
+                private Button? _sendButton;
+                private Button? _joinButton;
+                private bool _isJoining;
+                private bool _isSending;
 
                 private async void Start()
                 {
                     var root = GetComponent<UIDocument>().rootVisualElement;
 
                     _inputField = root.Q<TextField>("chat-input");
+                    _nameField = root.Q<TextField>("name-field");
                     _messageList = root.Q<ScrollView>("message-list");
                     _onlineCount = root.Q<Label>("online-count");
+                    _sendButton = root.Q<Button>("send-button");
+                    _joinButton = root.Q<Button>("join-button");
 
-                    var sendButton = root.Q<Button>("send-button");
-                    if (sendButton != null)
+                    if (_sendButton != null)
                     {
-                        sendButton.clicked += OnSendClicked;
+                        _sendButton.clicked += OnSendClicked;
                     }
 
                     _inputField?.RegisterCallback<KeyDownEvent>(evt =>
@@ -639,49 +648,123 @@ internal static class ToolTemplates
                         }
                     });
 
-                    var nameField = root.Q<TextField>("name-field");
-                    var joinButton = root.Q<Button>("join-button");
-
-                    if (joinButton != null)
+                    if (_joinButton != null)
                     {
-                        joinButton.clicked += async () =>
+                        _joinButton.clicked += OnJoinClicked;
+                    }
+
+                    SetSendBusy(false);
+                    SetJoinBusy(false);
+                    AppendSystemMessage("Enter a name, click Join, then send a message.");
+                }
+
+                private async void OnJoinClicked()
+                {
+                    if (_isJoining)
+                    {
+                        return;
+                    }
+
+                    if (_client != null && _client.IsConnected)
+                    {
+                        AppendSystemMessage("Already connected.");
+                        return;
+                    }
+
+                    var name = _nameField?.value?.Trim();
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        AppendSystemMessage("Enter a name before joining.");
+                        _nameField?.Focus();
+                        return;
+                    }
+
+                    SetJoinBusy(true);
+                    AppendSystemMessage("Connecting...");
+
+                    var client = new ChatClient(CreateRpcClientOptions());
+                    client.OnMessageReceived += msg => EnqueueMainThread(() => AppendMessage(msg));
+                    client.OnUserJoined += member => EnqueueMainThread(() => OnUserJoinedHandler(member));
+                    client.OnUserLeft += memberName => EnqueueMainThread(() => OnUserLeftHandler(memberName));
+                    client.OnDisconnected += () => EnqueueMainThread(() => AppendSystemMessage("Disconnected from server."));
+
+                    try
+                    {
+                        await client.ConnectAsync(_cts.Token);
+                        var reply = await client.JoinAsync(name);
+                        _client = client;
+                        AppendSystemMessage($"Connected. {reply.Members.Count} online.");
+                        SetOnlineCount(reply.Members.Count);
+
+                        foreach (var msg in reply.RecentMessages)
                         {
-                            var name = nameField?.value?.Trim();
-                            if (string.IsNullOrWhiteSpace(name)) return;
-
-                            _client = new ChatClient(CreateRpcClientOptions());
-                            _client.OnMessageReceived += AppendMessage;
-                            _client.OnUserJoined += OnUserJoinedHandler;
-                            _client.OnUserLeft += OnUserLeftHandler;
-                            _client.OnDisconnected += () => AppendSystemMessage("Disconnected from server.");
-
-                            try
-                            {
-                                await _client.ConnectAsync(_cts.Token);
-                                var reply = await _client.JoinAsync(name);
-                                AppendSystemMessage($"Connected. {reply.Members.Count} online.");
-
-                                foreach (var msg in reply.RecentMessages)
-                                {
-                                    AppendMessage(msg);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                AppendSystemMessage($"Connection failed: {ex.Message}");
-                            }
-                        };
+                            AppendMessage(msg);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendSystemMessage($"Connection failed: {ex.Message}");
+                        await client.DisposeAsync();
+                    }
+                    finally
+                    {
+                        SetJoinBusy(false);
                     }
                 }
 
                 private async void OnSendClicked()
                 {
-                    if (_client == null || !_client.IsConnected) return;
-                    var text = _inputField?.value?.Trim();
-                    if (string.IsNullOrWhiteSpace(text)) return;
+                    if (_isSending)
+                    {
+                        return;
+                    }
 
-                    await _client.SendAsync(text);
-                    _inputField!.value = "";
+                    if (_client == null || !_client.IsConnected)
+                    {
+                        AppendSystemMessage("Join the chat before sending.");
+                        return;
+                    }
+
+                    var text = _inputField?.value?.Trim();
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        return;
+                    }
+
+                    SetSendBusy(true);
+                    try
+                    {
+                        await _client.SendAsync(text);
+                        _inputField!.value = "";
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendSystemMessage($"Send failed: {ex.Message}");
+                    }
+                    finally
+                    {
+                        SetSendBusy(false);
+                    }
+                }
+
+                private void Update()
+                {
+                    while (_mainThreadActions.TryDequeue(out var action))
+                    {
+                        try
+                        {
+                            action();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogException(ex);
+                        }
+                    }
+                }
+
+                private void EnqueueMainThread(Action action)
+                {
+                    _mainThreadActions.Enqueue(action);
                 }
 
                 private void AppendMessage(ChatMessage msg)
@@ -698,6 +781,34 @@ internal static class ToolTemplates
                     label.AddToClassList("chat-system");
                     _messageList?.Add(label);
                     _messageList?.ScrollTo(label);
+                }
+
+                private void SetOnlineCount(int count)
+                {
+                    if (_onlineCount != null)
+                    {
+                        _onlineCount.text = $"Online: {count}";
+                    }
+                }
+
+                private void SetJoinBusy(bool isBusy)
+                {
+                    _isJoining = isBusy;
+                    if (_joinButton != null)
+                    {
+                        _joinButton.SetEnabled(!isBusy);
+                        _joinButton.text = isBusy ? "Joining..." : "Join";
+                    }
+                }
+
+                private void SetSendBusy(bool isBusy)
+                {
+                    _isSending = isBusy;
+                    if (_sendButton != null)
+                    {
+                        _sendButton.SetEnabled(!isBusy);
+                        _sendButton.text = isBusy ? "Sending..." : "Send";
+                    }
                 }
 
                 private RpcClientOptions CreateRpcClientOptions()
@@ -782,6 +893,7 @@ internal static class ToolTemplates
             height: 100%;
             flex-grow: 1;
             background-color: rgb(30, 30, 30);
+            color: rgb(230, 230, 230);
         }
         .chat-header {
             flex-direction: row;
@@ -802,6 +914,9 @@ internal static class ToolTemplates
         .message-list {
             flex-grow: 1;
             padding: 8px;
+        }
+        .unity-label {
+            color: rgb(230, 230, 230);
         }
         .chat-message {
             font-size: 14px;
@@ -828,6 +943,19 @@ internal static class ToolTemplates
             flex-grow: 1;
             margin-right: 8px;
         }
+        .name-field .unity-text-field__label,
+        .chat-input .unity-text-field__label {
+            color: rgb(210, 210, 210);
+        }
+        .name-field .unity-text-field__input,
+        .chat-input .unity-text-field__input {
+            color: rgb(245, 245, 245);
+            background-color: rgb(24, 24, 24);
+            border-top-color: rgb(80, 80, 80);
+            border-right-color: rgb(80, 80, 80);
+            border-bottom-color: rgb(80, 80, 80);
+            border-left-color: rgb(80, 80, 80);
+        }
         .join-button {
             width: 80px;
         }
@@ -836,6 +964,24 @@ internal static class ToolTemplates
         }
         .send-button {
             width: 80px;
+        }
+        .join-button,
+        .send-button {
+            color: rgb(245, 245, 245);
+            background-color: rgb(54, 94, 160);
+            border-top-color: rgb(86, 132, 210);
+            border-right-color: rgb(86, 132, 210);
+            border-bottom-color: rgb(86, 132, 210);
+            border-left-color: rgb(86, 132, 210);
+        }
+        .join-button:disabled,
+        .send-button:disabled {
+            color: rgb(190, 190, 190);
+            background-color: rgb(66, 66, 66);
+            border-top-color: rgb(90, 90, 90);
+            border-right-color: rgb(90, 90, 90);
+            border-bottom-color: rgb(90, 90, 90);
+            border-left-color: rgb(90, 90, 90);
         }
         """;
     }

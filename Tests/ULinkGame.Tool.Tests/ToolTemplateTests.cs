@@ -420,6 +420,9 @@ public sealed class ToolTemplateTests
         Assert.Contains("new KcpTransport(_serverHost, _serverPort)", source, StringComparison.Ordinal);
         Assert.Contains("new MemoryPackRpcSerializer()", source, StringComparison.Ordinal);
         Assert.DoesNotContain("?.clicked +=", source, StringComparison.Ordinal);
+        Assert.Contains("ConcurrentQueue<Action>", source, StringComparison.Ordinal);
+        Assert.Contains("client.OnMessageReceived += msg => EnqueueMainThread(() => AppendMessage(msg));", source, StringComparison.Ordinal);
+        Assert.Contains("AppendSystemMessage(\"Join the chat before sending.\");", source, StringComparison.Ordinal);
         Assert.Contains("chat-input", source, StringComparison.Ordinal);
         Assert.Contains("message-list", source, StringComparison.Ordinal);
         Assert.Contains("send-button", source, StringComparison.Ordinal);
@@ -444,6 +447,18 @@ public sealed class ToolTemplateTests
         Assert.Contains("new WsTransport($\"ws://{_serverHost}:{_serverPort}{NormalizePath(_serverPath)}\")", source, StringComparison.Ordinal);
         Assert.Contains("new JsonRpcSerializer()", source, StringComparison.Ordinal);
         Assert.Contains("[SerializeField] private string _serverPath = \"/ws\";", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderClientChatUss_UsesReadableDarkThemeControls()
+    {
+        var source = ToolTemplates.RenderClientChatUss();
+
+        Assert.Contains("color: rgb(230, 230, 230);", source, StringComparison.Ordinal);
+        Assert.Contains(".name-field .unity-text-field__input", source, StringComparison.Ordinal);
+        Assert.Contains("color: rgb(245, 245, 245);", source, StringComparison.Ordinal);
+        Assert.Contains(".join-button:disabled", source, StringComparison.Ordinal);
+        Assert.Contains(".send-button:disabled", source, StringComparison.Ordinal);
     }
 
     [Fact]
