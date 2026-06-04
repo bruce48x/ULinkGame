@@ -396,6 +396,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             }
             catch (TimeoutException)
             {
+                await linkedCts.CancelAsync().ConfigureAwait(false);
                 return false;
             }
             catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
