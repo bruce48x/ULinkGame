@@ -22,7 +22,6 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         {
             MailboxCapacity = Math.Max(1, options.MailboxCapacity),
             SlowMessageThreshold = options.SlowMessageThreshold,
-            ExecutionTimeout = options.ExecutionTimeout,
             MessageInterceptor = options.MessageInterceptor
         });
         _actorSystem.DeadLetterPublished += OnDeadLetterPublished;
@@ -201,15 +200,15 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             var runtime = state.Runtime;
             var actor = ActivatorUtilities.CreateInstance<TActor>(runtime._services);
             var cell = new ActorCell(actorId, actor, typeof(TActor), runtime._services, runtime, runtime._options);
-            var actorRef = runtime._actorSystem.Spawn(
+            var actorHandle = runtime._actorSystem.Spawn(
                 actorId.Value,
                 new ActorAdapter(cell),
                 new global::ULinkActor.ActorSpawnOptions
                 {
                     MailboxCapacity = Math.Max(1, runtime._options.MailboxCapacity)
                 });
-            runtime._actorIds[actorRef.Id] = actorId;
-            cell.Bind(actorRef);
+            runtime._actorIds[actorHandle.Id] = actorId;
+            cell.Bind(actorHandle);
             return cell;
         }, new RuntimeState(this));
 
@@ -226,7 +225,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
     {
         _options.DeadLetterHandler?.Invoke(new ActorDeadLetterDiagnostic(
             MapActorId(deadLetter.Target),
-            deadLetter.Message,
+            deadLetter.MessageType,
             deadLetter.Reason));
     }
 
@@ -234,7 +233,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
     {
         _options.SlowMessageHandler?.Invoke(new ActorSlowMessageDiagnostic(
             MapActorId(slowMessage.ActorId),
-            slowMessage.Message,
+            slowMessage.MessageType,
             slowMessage.Elapsed));
     }
 
@@ -243,8 +242,8 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         _options.CallTimeoutHandler?.Invoke(new ActorCallTimeoutDiagnostic(
             timeout.Caller is { } caller ? MapActorId(caller) : null,
             MapActorId(timeout.Target),
-            timeout.Request,
-            timeout.Timeout,
+            timeout.RequestType,
+            MapCallTimeout(timeout),
             MapCallTimeoutReason(timeout.Reason),
             timeout.CallChain.Select(MapActorId).ToArray()));
     }
@@ -263,6 +262,18 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             global::ULinkActor.ActorCallTimeoutReason.QueueTimeout => ActorCallTimeoutReason.QueueTimeout,
             _ => ActorCallTimeoutReason.ResponseTimeout
         };
+    }
+
+    private static TimeSpan MapCallTimeout(global::ULinkActor.ActorCallTimeout timeout)
+    {
+        return timeout.Reason == global::ULinkActor.ActorCallTimeoutReason.QueueTimeout
+            ? timeout.QueueTimeout
+            : timeout.ResponseTimeout;
+    }
+
+    private static global::ULinkActor.ActorCallOptions CreateCallOptions(TimeSpan timeout)
+    {
+        return new global::ULinkActor.ActorCallOptions(timeout, timeout);
     }
 
     private static ActorStopOutcome MapStopOutcome(global::ULinkActor.ActorStopResult result)
@@ -292,7 +303,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         private readonly IActorRuntime _runtime;
         private readonly ActorRuntimeOptions _runtimeOptions;
         private readonly IMessageLogStore? _messageLogStore;
-        private global::ULinkActor.ActorRef<ActorRuntimeEnvelope>? _actorRef;
+        private global::ULinkActor.ActorHandle<ActorRuntimeEnvelope>? _actorHandle;
         private int _stopping;
         private bool _activated;
 
@@ -321,14 +332,14 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
         {
             get
             {
-                var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
-                return actorRef.Id;
+                var actorHandle = _actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+                return actorHandle.Id;
             }
         }
 
-        public void Bind(global::ULinkActor.ActorRef<ActorRuntimeEnvelope> actorRef)
+        public void Bind(global::ULinkActor.ActorHandle<ActorRuntimeEnvelope> actorHandle)
         {
-            _actorRef = actorRef;
+            _actorHandle = actorHandle;
         }
 
         public async ValueTask EnsureActivatedAsync(CancellationToken cancellationToken)
@@ -360,9 +371,12 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
                 return await callback(Actor, state, cancellationToken).ConfigureAwait(false);
             }
 
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorRef = (_actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.")).Ref;
             var envelope = new ActorRuntimeEnvelope(callback, state, cancellationToken);
-            return await actorRef.Call<object?>(envelope, _runtimeOptions.CallTimeout, cancellationToken).ConfigureAwait(false);
+            return await actorRef.Call<object?>(
+                envelope,
+                CreateCallOptions(_runtimeOptions.CallTimeout),
+                cancellationToken).ConfigureAwait(false);
         }
 
         public async ValueTask<bool> TryDeactivateAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
@@ -374,7 +388,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
 
             using var timeoutCts = new CancellationTokenSource(timeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorRef = (_actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.")).Ref;
             var envelope = new ActorRuntimeEnvelope(
                 static async (actor, _, ct) =>
                 {
@@ -390,7 +404,10 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
 
             try
             {
-                await actorRef.Call<object?>(envelope, timeout, linkedCts.Token).ConfigureAwait(false);
+                await actorRef.Call<object?>(
+                    envelope,
+                    CreateCallOptions(timeout),
+                    linkedCts.Token).ConfigureAwait(false);
                 _activated = false;
                 return true;
             }
@@ -410,25 +427,25 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             object state,
             CancellationToken cancellationToken)
         {
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorRef = (_actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.")).Ref;
             var envelope = new ActorRuntimeEnvelope(callback, state, cancellationToken);
             return MapTellResult(actorRef.TrySend(envelope));
         }
 
         public async ValueTask StopAsync()
         {
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorHandle = _actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
             Volatile.Write(ref _stopping, 1);
             await TryDeactivateAsync(_runtimeOptions.CallTimeout).ConfigureAwait(false);
-            await actorRef.Stop().ConfigureAwait(false);
+            await actorHandle.Stop().ConfigureAwait(false);
         }
 
         public async ValueTask<global::ULinkActor.ActorStopResult> StopAsync(TimeSpan drainTimeout)
         {
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorHandle = _actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
             Volatile.Write(ref _stopping, 1);
             var deactivated = await TryDeactivateAsync(drainTimeout).ConfigureAwait(false);
-            var stopResult = await actorRef.Stop(drainTimeout).ConfigureAwait(false);
+            var stopResult = await actorHandle.Stop(drainTimeout).ConfigureAwait(false);
 
             return !deactivated || stopResult == global::ULinkActor.ActorStopResult.TimedOut
                 ? global::ULinkActor.ActorStopResult.TimedOut
@@ -437,19 +454,19 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
 
         public ActorMailboxMetrics GetMailboxMetrics()
         {
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
-            return MapMailboxMetrics(actorRef.GetMailboxMetrics());
+            var actorHandle = _actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            return MapMailboxMetrics(actorHandle.GetMailboxMetrics());
         }
 
         public ActorState GetState()
         {
-            var actorRef = _actorRef;
-            return actorRef is null ? ActorState.Dead : MapActorState(actorRef.GetState());
+            var actorHandle = _actorHandle;
+            return actorHandle is null ? ActorState.Dead : MapActorState(actorHandle.GetState());
         }
 
         public IAsyncDisposable RegisterTimer(ActorRuntimeEnvelope tick, TimeSpan dueTime, TimeSpan? period)
         {
-            var actorRef = _actorRef ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.");
+            var actorRef = (_actorHandle ?? throw new InvalidOperationException($"Actor '{_id}' is not bound.")).Ref;
             var handle = new TimerRegistrationHandle();
 
             if (Volatile.Read(ref _stopping) != 0)

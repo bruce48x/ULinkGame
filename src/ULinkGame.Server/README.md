@@ -317,7 +317,6 @@ See `docs/message-recording.md` for details.
 builder.Services.AddULinkGameServerActors(options =>
 {
     options.MailboxCapacity = 4096;
-    options.ExecutionTimeout = TimeSpan.FromSeconds(5);  // new in 0.3.0
     options.SlowMessageThreshold = TimeSpan.FromSeconds(1);
     options.CallTimeout = TimeSpan.FromSeconds(30);
 });

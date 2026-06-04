@@ -5,11 +5,13 @@
 ### Released
 
 - `ULinkGame.Server` `0.1.22`
+- `ULinkGame.Server` `0.1.23`
 - `ULinkGame.Tool` `0.4.8`
 - `ULinkGame.Tool` `0.4.9`
 - `ULinkGame.Tool` `0.4.10`
 - `ULinkGame.Tool` `0.4.11`
 - `ULinkGame.Tool` `0.4.12`
+- `ULinkGame.Tool` `0.4.13`
 
 ### Fixed
 
@@ -18,6 +20,11 @@
 - Fixed generated Unity chat UI send interactions by surfacing join/send status, marshalling RPC callbacks onto the Unity main thread, and making dark-theme form controls readable.
 - Updated generated Godot projects to use the distributed chat app template with a Godot main chat scene.
 - Fixed actor stop timeouts so queued deactivation hooks are cancelled when timed stop drains fail.
+
+### Changed
+
+- Updated `ULinkGame.Server` to consume `ULinkActor` `0.4.0`, adapting actor handles, call options, lifecycle diagnostics, mailbox metrics, and actor state lookups to the new runtime API.
+- Removed the `ActorRuntimeOptions.ExecutionTimeout` configuration surface because `ULinkActor` `0.4.0` no longer supports preemptive actor turn execution timeouts; use `SlowMessageThreshold` for long handler diagnostics and `CallTimeout` for queue/response timeout bounds.
 
 ## 2026-06-03
 

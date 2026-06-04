@@ -8,8 +8,6 @@ public sealed class ActorRuntimeOptions
 
     public TimeSpan? SlowMessageThreshold { get; set; }
 
-    public TimeSpan? ExecutionTimeout { get; set; }
-
     public global::ULinkActor.IActorMessageInterceptor? MessageInterceptor { get; set; }
 
     public Action<ActorDeadLetterDiagnostic>? DeadLetterHandler { get; set; }
