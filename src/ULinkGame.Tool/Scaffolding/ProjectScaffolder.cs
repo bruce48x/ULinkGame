@@ -4,6 +4,7 @@ internal sealed class ProjectScaffolder
     private const string UnityChatSceneUxmlGuid = "d8e055cb54604094cb41badb6b3866f6";
     private const string UnityChatSceneUssGuid = "f7e09962267bcef45a558136fb62bb68";
     private const string UnityChatPanelSettingsGuid = "0c8089bab5856fe4d8f88e6f526fd306";
+    private const string UnityDefaultRuntimeThemeGuid = "9a59d5efd84abc44da5e32a04db78d26";
 
     public async Task AugmentProjectWithULinkGameAsync(string projectRoot, NewCommandOptions options)
     {
@@ -123,6 +124,13 @@ internal sealed class ProjectScaffolder
         var uxmlPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml");
         var ussPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uss");
         var panelSettingsPath = Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset");
+        var runtimeThemePath = Path.Combine(
+            projectRoot,
+            "Client",
+            "Assets",
+            "UI Toolkit",
+            "UnityThemes",
+            "UnityDefaultRuntimeTheme.tss");
 
         await Task.WhenAll(
             WriteIfMissingAsync(
@@ -148,19 +156,26 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderUnityUssMeta(UnityChatSceneUssGuid)),
             WriteIfMissingAsync(
                 panelSettingsPath,
-                ToolTemplates.RenderUnityPanelSettingsAsset()),
+                ToolTemplates.RenderUnityPanelSettingsAsset(UnityDefaultRuntimeThemeGuid)),
             WriteIfMissingAsync(
                 panelSettingsPath + ".meta",
-                ToolTemplates.RenderUnityNativeAssetMeta(UnityChatPanelSettingsGuid))).ConfigureAwait(false);
+                ToolTemplates.RenderUnityNativeAssetMeta(UnityChatPanelSettingsGuid)),
+            WriteIfMissingAsync(
+                runtimeThemePath,
+                ToolTemplates.RenderUnityDefaultRuntimeTheme()),
+            WriteIfMissingAsync(
+                runtimeThemePath + ".meta",
+                ToolTemplates.RenderUnityTssMeta(UnityDefaultRuntimeThemeGuid))).ConfigureAwait(false);
 
-        await InstallUnityChatSceneAsync(projectRoot, chatUiPath, uxmlPath, panelSettingsPath).ConfigureAwait(false);
+        await InstallUnityChatSceneAsync(projectRoot, chatUiPath, uxmlPath, panelSettingsPath, options).ConfigureAwait(false);
     }
 
     private static async Task InstallUnityChatSceneAsync(
         string projectRoot,
         string chatUiPath,
         string uxmlPath,
-        string panelSettingsPath)
+        string panelSettingsPath,
+        NewCommandOptions options)
     {
         var scenePath = Path.Combine(projectRoot, "Client", "Assets", "Scenes", "ConnectionTest.unity");
         if (!File.Exists(scenePath))
@@ -175,12 +190,17 @@ internal sealed class ProjectScaffolder
             UnityChatPanelSettingsGuid).ConfigureAwait(false);
 
         var scene = await File.ReadAllTextAsync(scenePath).ConfigureAwait(false);
+        var defaultPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
         var panelSettingsReference =
             $"m_PanelSettings: {{fileID: 11400000, guid: {panelSettingsGuid}, type: 2}}";
 
         if (scene.Contains("m_Name: ULinkGame Chat UI", StringComparison.Ordinal))
         {
             var patchedExisting = scene.Replace("m_PanelSettings: {fileID: 0}", panelSettingsReference, StringComparison.Ordinal);
+            patchedExisting = System.Text.RegularExpressions.Regex.Replace(
+                patchedExisting,
+                @"(?m)^  _serverPath:.*$",
+                $"  _serverPath: {defaultPath}");
             if (!string.Equals(patchedExisting, scene, StringComparison.Ordinal))
             {
                 await File.WriteAllTextAsync(scenePath, patchedExisting).ConfigureAwait(false);
@@ -200,7 +220,8 @@ internal sealed class ProjectScaffolder
             transformId,
             chatUiGuid,
             uxmlGuid,
-            panelSettingsGuid);
+            panelSettingsGuid,
+            defaultPath);
 
         var sceneRootsMarker = "--- !u!1660057539 &9223372036854775807";
         var sceneRootsIndex = scene.LastIndexOf(sceneRootsMarker, StringComparison.Ordinal);

@@ -463,16 +463,19 @@ public sealed class ToolTemplateTests
         Assert.Contains("m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}", source, StringComparison.Ordinal);
         Assert.Contains("m_PanelSettings: {fileID: 11400000, guid: panelsettingsguid, type: 2}", source, StringComparison.Ordinal);
         Assert.Contains("sourceAsset: {fileID: 9197481963319205126, guid: uxmlguid, type: 3}", source, StringComparison.Ordinal);
+        Assert.Contains("_serverPath: ", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_serverPath: /ws", source, StringComparison.Ordinal);
         Assert.Contains("--- !u!4 &103", source, StringComparison.Ordinal);
     }
 
     [Fact]
     public void RenderUnityPanelSettingsAsset_UsesPanelSettingsScript()
     {
-        var source = ToolTemplates.RenderUnityPanelSettingsAsset();
+        var source = ToolTemplates.RenderUnityPanelSettingsAsset("themeguid");
 
         Assert.Contains("m_Script: {fileID: 19101, guid: 0000000000000000e000000000000000, type: 0}", source, StringComparison.Ordinal);
         Assert.Contains("m_Name: ULinkGameChatPanelSettings", source, StringComparison.Ordinal);
+        Assert.Contains("themeUss: {fileID: -4733365628477956816, guid: themeguid, type: 3}", source, StringComparison.Ordinal);
         Assert.Contains("m_ReferenceResolution: {x: 1200, y: 800}", source, StringComparison.Ordinal);
     }
 
@@ -494,7 +497,16 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderClientChatUxml();
 
         Assert.Contains("<ui:UXML", source, StringComparison.Ordinal);
+        Assert.Contains("<Style src=\"ChatScene.uss\" />", source, StringComparison.Ordinal);
         Assert.Contains("name=\"chat-input\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"message-list\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderUnityDefaultRuntimeTheme_ImportsUnityDefaultTheme()
+    {
+        var source = ToolTemplates.RenderUnityDefaultRuntimeTheme();
+
+        Assert.Equal("@import url(\"unity-theme://default\");", source.Trim());
     }
 }

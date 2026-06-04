@@ -287,10 +287,14 @@ public sealed class ToolTextTests
             Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ChatScene.uxml.meta")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI", "ULinkGameChatPanelSettings.asset.meta")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI Toolkit", "UnityThemes", "UnityDefaultRuntimeTheme.tss")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Client", "Assets", "UI Toolkit", "UnityThemes", "UnityDefaultRuntimeTheme.tss.meta")));
             Assert.Contains("m_Name: ULinkGame Chat UI", scene, StringComparison.Ordinal);
             Assert.Contains("guid: 462a8730535800d4a801000623f4450e, type: 3", scene, StringComparison.Ordinal);
             Assert.Contains("guid: d8e055cb54604094cb41badb6b3866f6, type: 3", scene, StringComparison.Ordinal);
             Assert.Contains("m_PanelSettings: {fileID: 11400000, guid: 0c8089bab5856fe4d8f88e6f526fd306, type: 2}", scene, StringComparison.Ordinal);
+            Assert.Contains("_serverPath:", scene, StringComparison.Ordinal);
+            Assert.DoesNotContain("_serverPath: /ws", scene, StringComparison.Ordinal);
         }
         finally
         {

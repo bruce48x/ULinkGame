@@ -754,7 +754,8 @@ internal static class ToolTemplates
     {
         return """
         <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
-            <ui:VisualElement class="chat-container">
+            <Style src="ChatScene.uss" />
+            <ui:VisualElement class="chat-container" style="width: 100%; height: 100%; flex-grow: 1;">
                 <ui:VisualElement class="chat-header">
                     <ui:Label text="Chat Room" class="header-title" />
                     <ui:Label text="Online: --" name="online-count" class="header-count" />
@@ -777,6 +778,8 @@ internal static class ToolTemplates
     {
         return """
         .chat-container {
+            width: 100%;
+            height: 100%;
             flex-grow: 1;
             background-color: rgb(30, 30, 30);
         }
@@ -887,6 +890,23 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderUnityTssMeta(string guid)
+    {
+        return $$"""
+        fileFormatVersion: 2
+        guid: {{guid}}
+        ScriptedImporter:
+          internalIDToNameTable: []
+          externalObjects: {}
+          serializedVersion: 2
+          userData:
+          assetBundleName:
+          assetBundleVariant:
+          script: {fileID: 12388, guid: 0000000000000000e000000000000000, type: 0}
+          disableValidation: 0
+        """;
+    }
+
     public static string RenderUnityNativeAssetMeta(string guid)
     {
         return $$"""
@@ -901,9 +921,16 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderUnityPanelSettingsAsset()
+    public static string RenderUnityDefaultRuntimeTheme()
     {
         return """
+        @import url("unity-theme://default");
+        """;
+    }
+
+    public static string RenderUnityPanelSettingsAsset(string defaultRuntimeThemeGuid)
+    {
+        return $$"""
         %YAML 1.1
         %TAG !u! tag:unity3d.com,2011:
         --- !u!114 &11400000
@@ -918,7 +945,7 @@ internal static class ToolTemplates
           m_Script: {fileID: 19101, guid: 0000000000000000e000000000000000, type: 0}
           m_Name: ULinkGameChatPanelSettings
           m_EditorClassIdentifier:
-          themeUss: {fileID: 0}
+          themeUss: {fileID: -4733365628477956816, guid: {{defaultRuntimeThemeGuid}}, type: 3}
           m_TargetTexture: {fileID: 0}
           m_ScaleMode: 1
           m_ReferenceSpritePixelsPerUnit: 100
@@ -952,7 +979,8 @@ internal static class ToolTemplates
         long transformId,
         string chatUiScriptGuid,
         string uxmlGuid,
-        string panelSettingsGuid)
+        string panelSettingsGuid,
+        string serverPath = "")
     {
         return $$"""
         --- !u!1 &{{gameObjectId}}
@@ -987,7 +1015,7 @@ internal static class ToolTemplates
           m_EditorClassIdentifier:
           _serverHost: 127.0.0.1
           _serverPort: 20000
-          _serverPath: /ws
+          _serverPath: {{serverPath}}
         --- !u!114 &{{uiDocumentComponentId}}
         MonoBehaviour:
           m_ObjectHideFlags: 0
