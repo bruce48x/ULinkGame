@@ -7,7 +7,9 @@
 - `ULinkGame.Abstractions` `0.1.3`
 - `ULinkGame.Client` `0.1.6`
 - `ULinkGame.Server` `0.1.24`
+- `ULinkGame.Server` `0.1.25`
 - `ULinkGame.Tool` `0.4.14`
+- `ULinkGame.Tool` `0.4.15`
 - `ULinkGame.Server` `0.1.22`
 - `ULinkGame.Server` `0.1.23`
 - `ULinkGame.Tool` `0.4.8`
@@ -30,6 +32,8 @@
 - Added fixed session termination notice contracts, server-side notify-before-close orchestration, and client terminal-session helpers.
 - Updated `ULinkGame.Server` to consume `ULinkActor` `0.4.0`, adapting actor handles, call options, lifecycle diagnostics, mailbox metrics, and actor state lookups to the new runtime API.
 - Removed the `ActorRuntimeOptions.ExecutionTimeout` configuration surface because `ULinkActor` `0.4.0` no longer supports preemptive actor turn execution timeouts; use `SlowMessageThreshold` for long handler diagnostics and `CallTimeout` for queue/response timeout bounds.
+- Updated `ULinkGame.Server` to consume `ULinkActor` `0.5.16`, adapting actor spawn and disposal integration to the asynchronous actor system API.
+- Updated `ULinkGame.Tool` to ship generated templates with `ULinkGame.Server` `0.1.25`.
 
 ## 2026-06-03
 

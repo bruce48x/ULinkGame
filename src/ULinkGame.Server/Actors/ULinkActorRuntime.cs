@@ -184,12 +184,7 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
 
     public void Dispose()
     {
-        _actorSystem.DeadLetterPublished -= OnDeadLetterPublished;
-        _actorSystem.SlowMessageDetected -= OnSlowMessageDetected;
-        _actorSystem.CallTimedOut -= OnCallTimedOut;
-        _actors.Clear();
-        _actorIds.Clear();
-        _actorSystem.Dispose();
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     private ActorCell GetOrCreateCell<TActor>(ActorId id)
@@ -200,13 +195,13 @@ public sealed class ULinkActorRuntime : IActorRuntime, IDisposable, IAsyncDispos
             var runtime = state.Runtime;
             var actor = ActivatorUtilities.CreateInstance<TActor>(runtime._services);
             var cell = new ActorCell(actorId, actor, typeof(TActor), runtime._services, runtime, runtime._options);
-            var actorHandle = runtime._actorSystem.Spawn(
+            var actorHandle = runtime._actorSystem.SpawnAsync(
                 actorId.Value,
                 new ActorAdapter(cell),
                 new global::ULinkActor.ActorSpawnOptions
                 {
                     MailboxCapacity = Math.Max(1, runtime._options.MailboxCapacity)
-                });
+                }).AsTask().GetAwaiter().GetResult();
             runtime._actorIds[actorHandle.Id] = actorId;
             cell.Bind(actorHandle);
             return cell;
