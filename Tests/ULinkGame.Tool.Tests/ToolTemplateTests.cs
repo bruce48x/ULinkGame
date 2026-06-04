@@ -477,6 +477,18 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public void RenderUnityNuGetPackageImportGuard_ScansExistingAnalyzerPlugins()
+    {
+        var source = ToolTemplates.RenderUnityNuGetPackageImportGuard();
+
+        Assert.Contains("[InitializeOnLoad]", source, StringComparison.Ordinal);
+        Assert.Contains("AssetDatabase.FindAssets(\"t:PluginImporter\", new[] { \"Assets/Packages\" })", source, StringComparison.Ordinal);
+        Assert.Contains("AssetDatabase.GUIDToAssetPath", source, StringComparison.Ordinal);
+        Assert.Contains("EditorApplication.delayCall += DisableExistingAnalyzerPlugins", source, StringComparison.Ordinal);
+        Assert.Contains("/analyzers/", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RenderClientChatUxml_UsesUiNamespacePrefix()
     {
         var source = ToolTemplates.RenderClientChatUxml();

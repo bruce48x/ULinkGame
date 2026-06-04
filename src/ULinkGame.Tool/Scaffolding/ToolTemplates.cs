@@ -1029,8 +1029,14 @@ internal static class ToolTemplates
         using System;
         using UnityEditor;
 
+        [InitializeOnLoad]
         internal sealed class ULinkGameNuGetPackageImportGuard : AssetPostprocessor
         {
+            static ULinkGameNuGetPackageImportGuard()
+            {
+                EditorApplication.delayCall += DisableExistingAnalyzerPlugins;
+            }
+
             private static void OnPostprocessAllAssets(
                 string[] importedAssets,
                 string[] deletedAssets,
@@ -1044,6 +1050,16 @@ internal static class ToolTemplates
 
                 foreach (var assetPath in movedAssets)
                 {
+                    DisableAnalyzerPlugin(assetPath);
+                }
+            }
+
+            private static void DisableExistingAnalyzerPlugins()
+            {
+                var pluginGuids = AssetDatabase.FindAssets("t:PluginImporter", new[] { "Assets/Packages" });
+                foreach (var guid in pluginGuids)
+                {
+                    var assetPath = AssetDatabase.GUIDToAssetPath(guid);
                     DisableAnalyzerPlugin(assetPath);
                 }
             }
