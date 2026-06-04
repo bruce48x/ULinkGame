@@ -564,6 +564,369 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderGodotChatScene(NewCommandOptions options)
+    {
+        var defaultPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";
+        var serializerUsing = options.Serializer switch
+        {
+            "json" => "using ULinkRPC.Serializer.Json;",
+            _ => "using ULinkRPC.Serializer.MemoryPack;"
+        };
+        var transportUsing = options.Transport switch
+        {
+            "tcp" => "using ULinkRPC.Transport.Tcp;",
+            "websocket" => "using ULinkRPC.Transport.WebSocket;",
+            _ => "using ULinkRPC.Transport.Kcp;"
+        };
+        var serializerConstructor = options.Serializer switch
+        {
+            "json" => "new JsonRpcSerializer()",
+            _ => "new MemoryPackRpcSerializer()"
+        };
+        var transportConstructor = options.Transport switch
+        {
+            "tcp" => "new TcpTransport(_serverHost, _serverPort)",
+            "websocket" => "new WsTransport($\"ws://{_serverHost}:{_serverPort}{NormalizePath(_serverPath)}\")",
+            _ => "new KcpTransport(_serverHost, _serverPort)"
+        };
+
+        return $$"""
+        using System;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using Godot;
+        using Shared.Chat;
+        using ULinkRPC.Client;
+        using ULinkRPC.Core;
+        {{serializerUsing}}
+        {{transportUsing}}
+
+        namespace Client.Chat
+        {
+            public partial class ChatScene : Control
+            {
+                [Export] private string _serverHost = "127.0.0.1";
+                [Export] private int _serverPort = 20000;
+                [Export] private string _serverPath = "{{TemplateText.SanitizeStringLiteral(defaultPath)}}";
+
+                private readonly CancellationTokenSource _cts = new();
+                private ChatClient? _client;
+                private LineEdit? _nameField;
+                private LineEdit? _messageField;
+                private Button? _joinButton;
+                private Button? _sendButton;
+                private RichTextLabel? _messageLog;
+                private Label? _onlineCount;
+                private bool _isJoining;
+                private bool _isSending;
+
+                public override void _Ready()
+                {
+                    BuildUi();
+                    SetJoinBusy(false);
+                    SetSendBusy(false);
+                    AppendSystemMessage("Enter a name, click Join, then send a message.");
+                }
+
+                private void BuildUi()
+                {
+                    SetAnchorsPreset(LayoutPreset.FullRect);
+
+                    var background = new ColorRect
+                    {
+                        Name = "Background",
+                        Color = new Color(0.10f, 0.10f, 0.12f, 1.0f)
+                    };
+                    background.SetAnchorsPreset(LayoutPreset.FullRect);
+                    AddChild(background);
+
+                    var margin = new MarginContainer { Name = "Layout" };
+                    margin.SetAnchorsPreset(LayoutPreset.FullRect);
+                    margin.AddThemeConstantOverride("margin_left", 16);
+                    margin.AddThemeConstantOverride("margin_top", 16);
+                    margin.AddThemeConstantOverride("margin_right", 16);
+                    margin.AddThemeConstantOverride("margin_bottom", 16);
+                    AddChild(margin);
+
+                    var layout = new VBoxContainer { Name = "ChatLayout" };
+                    layout.AddThemeConstantOverride("separation", 10);
+                    margin.AddChild(layout);
+
+                    var header = new HBoxContainer { Name = "Header" };
+                    header.AddThemeConstantOverride("separation", 12);
+                    layout.AddChild(header);
+
+                    var title = new Label { Name = "Title", Text = "Chat Room" };
+                    title.AddThemeFontSizeOverride("font_size", 24);
+                    title.AddThemeColorOverride("font_color", new Color(0.92f, 0.94f, 0.98f, 1.0f));
+                    title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                    header.AddChild(title);
+
+                    _onlineCount = new Label { Name = "OnlineCount", Text = "Online: --" };
+                    _onlineCount.AddThemeColorOverride("font_color", new Color(0.55f, 0.85f, 0.62f, 1.0f));
+                    header.AddChild(_onlineCount);
+
+                    _messageLog = new RichTextLabel
+                    {
+                        Name = "MessageLog",
+                        BbcodeEnabled = false,
+                        ScrollFollowing = true
+                    };
+                    _messageLog.AddThemeColorOverride("default_color", new Color(0.88f, 0.90f, 0.94f, 1.0f));
+                    _messageLog.SizeFlagsVertical = SizeFlags.ExpandFill;
+                    layout.AddChild(_messageLog);
+
+                    var footer = new VBoxContainer { Name = "Footer" };
+                    footer.AddThemeConstantOverride("separation", 8);
+                    layout.AddChild(footer);
+
+                    var joinRow = new HBoxContainer { Name = "JoinRow" };
+                    joinRow.AddThemeConstantOverride("separation", 8);
+                    footer.AddChild(joinRow);
+
+                    _nameField = new LineEdit { Name = "NameField", PlaceholderText = "Name", MaxLength = 20 };
+                    StyleLineEdit(_nameField);
+                    _nameField.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                    joinRow.AddChild(_nameField);
+
+                    _joinButton = new Button { Name = "JoinButton", Text = "Join" };
+                    StyleButton(_joinButton);
+                    _joinButton.Pressed += OnJoinPressed;
+                    joinRow.AddChild(_joinButton);
+
+                    var sendRow = new HBoxContainer { Name = "SendRow" };
+                    sendRow.AddThemeConstantOverride("separation", 8);
+                    footer.AddChild(sendRow);
+
+                    _messageField = new LineEdit { Name = "MessageField", PlaceholderText = "Message", MaxLength = 500 };
+                    StyleLineEdit(_messageField);
+                    _messageField.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+                    _messageField.TextSubmitted += _ => OnSendPressed();
+                    sendRow.AddChild(_messageField);
+
+                    _sendButton = new Button { Name = "SendButton", Text = "Send" };
+                    StyleButton(_sendButton);
+                    _sendButton.Pressed += OnSendPressed;
+                    sendRow.AddChild(_sendButton);
+                }
+
+                private async void OnJoinPressed()
+                {
+                    if (_isJoining)
+                    {
+                        return;
+                    }
+
+                    if (_client != null && _client.IsConnected)
+                    {
+                        AppendSystemMessage("Already connected.");
+                        return;
+                    }
+
+                    var name = _nameField?.Text.Trim();
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        AppendSystemMessage("Enter a name before joining.");
+                        _nameField?.GrabFocus();
+                        return;
+                    }
+
+                    SetJoinBusy(true);
+                    AppendSystemMessage("Connecting...");
+
+                    var client = new ChatClient(CreateRpcClientOptions());
+                    client.OnMessageReceived += msg => CallDeferred(nameof(AppendMessageDeferred), msg.SenderName, msg.Text);
+                    client.OnUserJoined += member => CallDeferred(nameof(AppendSystemMessageDeferred), $"{member.Name} joined.");
+                    client.OnUserLeft += memberName => CallDeferred(nameof(AppendSystemMessageDeferred), $"{memberName} left.");
+                    client.OnDisconnected += () => CallDeferred(nameof(AppendSystemMessageDeferred), "Disconnected from server.");
+
+                    try
+                    {
+                        await client.ConnectAsync(_cts.Token);
+                        var reply = await client.JoinAsync(name);
+                        _client = client;
+                        AppendSystemMessage($"Connected. {reply.Members.Count} online.");
+                        SetOnlineCount(reply.Members.Count);
+
+                        foreach (var msg in reply.RecentMessages)
+                        {
+                            AppendMessageText(msg.SenderName, msg.Text);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendSystemMessage($"Connection failed: {ex.Message}");
+                        await client.DisposeAsync();
+                    }
+                    finally
+                    {
+                        SetJoinBusy(false);
+                    }
+                }
+
+                private async void OnSendPressed()
+                {
+                    if (_isSending)
+                    {
+                        return;
+                    }
+
+                    if (_client == null || !_client.IsConnected)
+                    {
+                        AppendSystemMessage("Join the chat before sending.");
+                        return;
+                    }
+
+                    var text = _messageField?.Text.Trim();
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        return;
+                    }
+
+                    SetSendBusy(true);
+                    try
+                    {
+                        await _client.SendAsync(text);
+                        if (_messageField != null)
+                        {
+                            _messageField.Text = string.Empty;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendSystemMessage($"Send failed: {ex.Message}");
+                    }
+                    finally
+                    {
+                        SetSendBusy(false);
+                    }
+                }
+
+                public void AppendMessageDeferred(string senderName, string text)
+                {
+                    AppendMessageText(senderName, text);
+                }
+
+                public void AppendSystemMessageDeferred(string text)
+                {
+                    AppendSystemMessage(text);
+                }
+
+                private void AppendMessageText(string senderName, string text)
+                {
+                    AppendLine($"[{senderName}]: {text}");
+                }
+
+                private void AppendSystemMessage(string text)
+                {
+                    AppendLine($"* {text}");
+                }
+
+                private void AppendLine(string text)
+                {
+                    _messageLog?.AppendText(text + System.Environment.NewLine);
+                }
+
+                private void SetOnlineCount(int count)
+                {
+                    if (_onlineCount != null)
+                    {
+                        _onlineCount.Text = $"Online: {count}";
+                    }
+                }
+
+                private void SetJoinBusy(bool isBusy)
+                {
+                    _isJoining = isBusy;
+                    if (_joinButton != null)
+                    {
+                        _joinButton.Disabled = isBusy;
+                        _joinButton.Text = isBusy ? "Joining..." : "Join";
+                    }
+                }
+
+                private void SetSendBusy(bool isBusy)
+                {
+                    _isSending = isBusy;
+                    if (_sendButton != null)
+                    {
+                        _sendButton.Disabled = isBusy;
+                        _sendButton.Text = isBusy ? "Sending..." : "Send";
+                    }
+                }
+
+                private RpcClientOptions CreateRpcClientOptions()
+                {
+                    return new RpcClientOptions(
+                        {{transportConstructor}},
+                        {{serializerConstructor}})
+                        .UseSecurity(ConfigureTransportSecurity);
+                }
+
+                private static string NormalizePath(string path)
+                {
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        return string.Empty;
+                    }
+
+                    return path.StartsWith("/", StringComparison.Ordinal) ? path : "/" + path;
+                }
+
+                private static void ConfigureTransportSecurity(TransportSecurityConfig security)
+                {
+                    security.EnableCompression = false;
+                    security.CompressionThresholdBytes = 1024;
+                    security.EnableEncryption = false;
+                    security.EncryptionKeyBase64 = null;
+                }
+
+                private static void StyleLineEdit(LineEdit lineEdit)
+                {
+                    lineEdit.CustomMinimumSize = new Vector2(0, 36);
+                    lineEdit.AddThemeColorOverride("font_color", new Color(0.96f, 0.96f, 0.96f, 1.0f));
+                    lineEdit.AddThemeColorOverride("font_placeholder_color", new Color(0.58f, 0.62f, 0.70f, 1.0f));
+                }
+
+                private static void StyleButton(Button button)
+                {
+                    button.CustomMinimumSize = new Vector2(96, 36);
+                    button.AddThemeColorOverride("font_color", new Color(0.96f, 0.96f, 0.96f, 1.0f));
+                    button.AddThemeColorOverride("font_disabled_color", new Color(0.70f, 0.72f, 0.76f, 1.0f));
+                }
+
+                public override void _ExitTree()
+                {
+                    _cts.Cancel();
+                    if (_client is not null)
+                    {
+                        _ = _client.DisposeAsync();
+                    }
+                    _cts.Dispose();
+                }
+            }
+        }
+        """;
+    }
+
+    public static string RenderGodotMainScene()
+    {
+        return """
+        [gd_scene load_steps=2 format=3]
+
+        [ext_resource type="Script" path="res://Scripts/Chat/ChatScene.cs" id="1"]
+
+        [node name="ChatScene" type="Control"]
+        layout_mode = 3
+        anchors_preset = 15
+        anchor_right = 1.0
+        anchor_bottom = 1.0
+        grow_horizontal = 2
+        grow_vertical = 2
+        script = ExtResource("1")
+        """;
+    }
+
     public static string RenderClientChatUI(NewCommandOptions options)
     {
         var defaultPath = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase) ? "/ws" : "";

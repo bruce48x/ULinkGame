@@ -9,12 +9,14 @@
 - `ULinkGame.Tool` `0.4.9`
 - `ULinkGame.Tool` `0.4.10`
 - `ULinkGame.Tool` `0.4.11`
+- `ULinkGame.Tool` `0.4.12`
 
 ### Fixed
 
 - Fixed generated Unity projects to rescan existing NuGet analyzer DLLs and disable them as Unity plugins after the import guard compiles.
 - Fixed generated Unity chat UI rendering by linking the chat stylesheet, generating the default runtime theme, and writing transport-specific scene path values.
 - Fixed generated Unity chat UI send interactions by surfacing join/send status, marshalling RPC callbacks onto the Unity main thread, and making dark-theme form controls readable.
+- Updated generated Godot projects to use the distributed chat app template with a Godot main chat scene.
 - Fixed actor stop timeouts so queued deactivation hooks are cancelled when timed stop drains fail.
 
 ## 2026-06-03

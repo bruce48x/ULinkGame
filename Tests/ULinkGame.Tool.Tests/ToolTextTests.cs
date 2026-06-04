@@ -347,6 +347,90 @@ public sealed class ToolTextTests
     }
 
     [Fact]
+    public async Task GodotScaffoldInstallsDistributedChatScene()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Client", "Scripts", "Rpc", "Testing"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Server", "Server"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            await File.WriteAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Client.csproj"),
+                """
+                <Project Sdk="Godot.NET.Sdk/4.6.1">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectRoot, "Client", "project.godot"),
+                """
+                ; Engine configuration file.
+                config_version=5
+
+                [application]
+                config/name="MyGame"
+                run/main_scene="res://Main.tscn"
+                config/features=PackedStringArray("4.6", "C#")
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Main.tscn"),
+                """
+                [gd_scene load_steps=2 format=3]
+
+                [ext_resource type="Script" path="res://Scripts/Rpc/Testing/RpcConnectionTester.cs" id="1"]
+
+                [node name="Main" type="Node"]
+                script = ExtResource("1")
+                """,
+                TestContext.Current.CancellationToken);
+
+            var options = new NewCommandOptions(
+                Name: "MyGame",
+                OutputPath: null,
+                ClientEngine: "godot",
+                Transport: "websocket",
+                NetworkProfile: "single",
+                Serializer: "json",
+                Persistence: "none",
+                NuGetForUnitySource: "embedded",
+                DeployProfile: "none");
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, options);
+
+            var chatSceneScript = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatScene.cs"),
+                TestContext.Current.CancellationToken);
+            var mainScene = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "Main.tscn"),
+                TestContext.Current.CancellationToken);
+            var projectGodot = await File.ReadAllTextAsync(
+                Path.Combine(projectRoot, "Client", "project.godot"),
+                TestContext.Current.CancellationToken);
+
+            Assert.Contains("public partial class ChatScene : Control", chatSceneScript, StringComparison.Ordinal);
+            Assert.Contains("new WsTransport($\"ws://{_serverHost}:{_serverPort}{NormalizePath(_serverPath)}\")", chatSceneScript, StringComparison.Ordinal);
+            Assert.Contains("new JsonRpcSerializer()", chatSceneScript, StringComparison.Ordinal);
+            Assert.Contains("CallDeferred(nameof(AppendMessageDeferred), msg.SenderName, msg.Text);", chatSceneScript, StringComparison.Ordinal);
+            Assert.Contains("[ext_resource type=\"Script\" path=\"res://Scripts/Chat/ChatScene.cs\" id=\"1\"]", mainScene, StringComparison.Ordinal);
+            Assert.Contains("[node name=\"ChatScene\" type=\"Control\"]", mainScene, StringComparison.Ordinal);
+            Assert.Contains("script = ExtResource(\"1\")", mainScene, StringComparison.Ordinal);
+            Assert.Contains("run/main_scene=\"res://Main.tscn\"", projectGodot, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ClusterEnvExampleUsesSelectedTransportForAdvertisedClientEndpoint()
     {
         var websocketOptions = new NewCommandOptions(

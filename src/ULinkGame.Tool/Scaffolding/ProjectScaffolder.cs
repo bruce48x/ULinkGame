@@ -114,9 +114,18 @@ internal sealed class ProjectScaffolder
     {
         if (ProjectConventions.IsGodot(options.ClientEngine))
         {
-            await WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatClient.cs"),
-                ToolTemplates.RenderClientChatClient()).ConfigureAwait(false);
+            await Task.WhenAll(
+                WriteIfMissingAsync(
+                    Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatClient.cs"),
+                    ToolTemplates.RenderClientChatClient()),
+                WriteIfMissingAsync(
+                    Path.Combine(projectRoot, "Client", "Scripts", "Chat", "ChatScene.cs"),
+                    ToolTemplates.RenderGodotChatScene(options)),
+                WriteAsync(
+                    Path.Combine(projectRoot, "Client", "Main.tscn"),
+                    ToolTemplates.RenderGodotMainScene())).ConfigureAwait(false);
+
+            await PatchGodotMainSceneAsync(projectRoot).ConfigureAwait(false);
             return;
         }
 
@@ -168,6 +177,35 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderUnityTssMeta(UnityDefaultRuntimeThemeGuid))).ConfigureAwait(false);
 
         await InstallUnityChatSceneAsync(projectRoot, chatUiPath, uxmlPath, panelSettingsPath, options).ConfigureAwait(false);
+    }
+
+    private static async Task PatchGodotMainSceneAsync(string projectRoot)
+    {
+        var projectPath = Path.Combine(projectRoot, "Client", "project.godot");
+        if (!File.Exists(projectPath))
+        {
+            return;
+        }
+
+        var project = await File.ReadAllTextAsync(projectPath).ConfigureAwait(false);
+        var patched = System.Text.RegularExpressions.Regex.Replace(
+            project,
+            "(?m)^run/main_scene=.*$",
+            "run/main_scene=\"res://Main.tscn\"");
+
+        if (!patched.Contains("[application]", StringComparison.Ordinal))
+        {
+            patched += Environment.NewLine + "[application]" + Environment.NewLine + "run/main_scene=\"res://Main.tscn\"" + Environment.NewLine;
+        }
+        else if (!patched.Contains("run/main_scene=", StringComparison.Ordinal))
+        {
+            patched = patched.Replace("[application]", "[application]" + Environment.NewLine + "run/main_scene=\"res://Main.tscn\"", StringComparison.Ordinal);
+        }
+
+        if (!string.Equals(project, patched, StringComparison.Ordinal))
+        {
+            await File.WriteAllTextAsync(projectPath, patched).ConfigureAwait(false);
+        }
     }
 
     private static async Task InstallUnityChatSceneAsync(
