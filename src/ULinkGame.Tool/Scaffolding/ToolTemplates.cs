@@ -13,6 +13,16 @@ internal static class ToolTemplates
 
     public static string RenderServerProgram(NewCommandOptions options)
     {
+        _ = options;
+        return """
+        using Server.Hosting.Advanced;
+
+        await ULinkGameGeneratedApplication.RunAsync(args);
+        """;
+    }
+
+    public static string RenderGeneratedServerApplication(NewCommandOptions options)
+    {
         if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
             var controlPath = GetDefaultPath(options.Transport, "/ws");
@@ -29,36 +39,44 @@ internal static class ToolTemplates
             using ULinkGame.Server.Hotfix.Loading;
             using ULinkGame.Server.Hosting;
 
-            var builder = Host.CreateApplicationBuilder(args);
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
-            builder.Configuration
-                .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables();
-            {{RenderClusterHealthCheckExit(options)}}
+            namespace Server.Hosting.Advanced;
 
-            builder.Services.AddULinkGameServer();
-            builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-                ServerRpcServerOptions.FromConfiguration(
-                    builder.Configuration,
-                    "ControlPlane",
-                    new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
-            builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-                ServerRpcServerOptions.FromConfiguration(
-                    builder.Configuration,
-                    "Realtime",
-                    new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
-            builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
-            builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
-            {{RenderHotfixServiceRegistration()}}
-            builder.Services.AddULinkGameServerGateway();
+            internal static class ULinkGameGeneratedApplication
+            {
+                public static async Task<int> RunAsync(string[] args)
+                {
+                    var builder = Host.CreateApplicationBuilder(args);
+                    builder.Logging.ClearProviders();
+                    builder.Logging.AddConsole();
+                    builder.Configuration
+                        .SetBasePath(AppContext.BaseDirectory)
+                        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                        .AddEnvironmentVariables();
+            {{TemplateText.IndentBlock(RenderClusterHealthCheckExit(options), 2)}}
 
-            var host = builder.Build();
-            await LoadInitialHotfixAsync(host);
-            await host.RunAsync();
-            return 0;
-            {{RenderHotfixHelpers()}}
+                    builder.Services.AddULinkGameServer();
+                    builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
+                        ServerRpcServerOptions.FromConfiguration(
+                            builder.Configuration,
+                            "ControlPlane",
+                            new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
+                    builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
+                        ServerRpcServerOptions.FromConfiguration(
+                            builder.Configuration,
+                            "Realtime",
+                            new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
+                    builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
+                    builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
+            {{TemplateText.IndentBlock(RenderHotfixServiceRegistration(), 2)}}
+                    builder.Services.AddULinkGameServerGateway();
+
+                    var host = builder.Build();
+                    await LoadInitialHotfixAsync(host);
+                    await host.RunAsync();
+                    return 0;
+                }
+            {{TemplateText.IndentBlock(RenderHotfixHelpers(), 1)}}
+            }
             """;
         }
 
@@ -73,30 +91,38 @@ internal static class ToolTemplates
         using ULinkGame.Server.Hotfix.Loading;
         using ULinkGame.Server.Hosting;
 
-        var builder = Host.CreateApplicationBuilder(args);
-        builder.Logging.ClearProviders();
-        builder.Logging.AddConsole();
-        builder.Configuration
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables();
-        var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
-        {{RenderULinkGameCheckExit(options)}}
-        {{RenderClusterHealthCheckExit(options)}}
+        namespace Server.Hosting.Advanced;
 
-        builder.Services.AddULinkGameServer();
-        builder.Services.AddSingleton(runtimeOptions);
-        {{RenderClusterServiceRegistration(options)}}
-        builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions());
-        builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
-        {{RenderHotfixServiceRegistration()}}
-        builder.Services.AddULinkGameServerGateway();
+        internal static class ULinkGameGeneratedApplication
+        {
+            public static async Task<int> RunAsync(string[] args)
+            {
+                var builder = Host.CreateApplicationBuilder(args);
+                builder.Logging.ClearProviders();
+                builder.Logging.AddConsole();
+                builder.Configuration
+                    .SetBasePath(AppContext.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddEnvironmentVariables();
+                var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
+        {{TemplateText.IndentBlock(RenderULinkGameCheckExit(options), 2)}}
+        {{TemplateText.IndentBlock(RenderClusterHealthCheckExit(options), 2)}}
 
-        var host = builder.Build();
-        await LoadInitialHotfixAsync(host);
-        await host.RunAsync();
-        return 0;
-        {{RenderHotfixHelpers()}}
+                builder.Services.AddULinkGameServer();
+                builder.Services.AddSingleton(runtimeOptions);
+        {{TemplateText.IndentBlock(RenderClusterServiceRegistration(options), 2)}}
+                builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions());
+                builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
+        {{TemplateText.IndentBlock(RenderHotfixServiceRegistration(), 2)}}
+                builder.Services.AddULinkGameServerGateway();
+
+                var host = builder.Build();
+                await LoadInitialHotfixAsync(host);
+                await host.RunAsync();
+                return 0;
+            }
+        {{TemplateText.IndentBlock(RenderHotfixHelpers(), 1)}}
+        }
         """;
     }
 
