@@ -24,6 +24,7 @@
 - `ULinkGame.Server` `0.1.25`
 - `ULinkGame.Tool` `0.4.14`
 - `ULinkGame.Tool` `0.4.15`
+- `ULinkGame.Tool` `0.4.16`
 - `ULinkGame.Server` `0.1.22`
 - `ULinkGame.Server` `0.1.23`
 - `ULinkGame.Tool` `0.4.8`
@@ -48,6 +49,7 @@
 - Removed the `ActorRuntimeOptions.ExecutionTimeout` configuration surface because `ULinkActor` `0.4.0` no longer supports preemptive actor turn execution timeouts; use `SlowMessageThreshold` for long handler diagnostics and `CallTimeout` for queue/response timeout bounds.
 - Updated `ULinkGame.Server` to consume `ULinkActor` `0.5.16`, adapting actor spawn and disposal integration to the asynchronous actor system API.
 - Updated `ULinkGame.Tool` to ship generated templates with `ULinkGame.Server` `0.1.25`.
+- Updated `ULinkGame.Tool` to consume `ULinkRPC.Starter` `0.3.5`.
 
 ## 2026-06-03
 
