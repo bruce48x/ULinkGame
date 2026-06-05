@@ -1,5 +1,4 @@
 using Agar.Sample.State;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Gateway.Hosting;
 using Gateway.Realtime;
@@ -9,22 +8,21 @@ using ULinkGame.Server.Hosting;
 
 namespace Gateway.Features;
 
-public sealed class GatewayBusinessFeature : IFeature
+public sealed class GatewayBusinessFeature : ULinkGameFeature
 {
-    public void Configure(IServiceCollection services, IConfiguration config)
+    public override void ConfigureServices(ULinkGameFeatureContext context)
+    {
+        ConfigureServices(context.Services, context.Endpoints);
+    }
+
+    private static void ConfigureServices(IServiceCollection services, ULinkGameEndpointCatalog endpoints)
     {
         services.AddAgarSampleState();
         services.AddSingleton<SessionDirectory>();
         services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-            GatewayRpcServerOptions.FromConfiguration(
-                config,
-                "ControlPlane",
-                new GatewayRpcServerOptions { Transport = "websocket", Port = 20000, Path = "/ws" })));
+            GatewayRpcServerOptions.FromEndpoint(endpoints.RequireTransport("websocket"))));
         services.AddSingleton(_ => new RealtimeRpcServerOptions(
-            GatewayRpcServerOptions.FromConfiguration(
-                config,
-                "Realtime",
-                new GatewayRpcServerOptions { Transport = "kcp", Port = 20001, Path = "" })));
+            GatewayRpcServerOptions.FromEndpoint(endpoints.RequireTransport("kcp"))));
         services.AddSingleton<GatewayNodeIdentity>();
         services.AddSingleton<MatchmakingMonitor>();
         services.AddSingleton<RoomRuntimeHost>();

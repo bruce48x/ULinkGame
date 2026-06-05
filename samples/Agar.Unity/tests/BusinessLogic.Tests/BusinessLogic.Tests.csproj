@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../../Server/Gateway/Hosting/GatewayRpcServerOptions.cs" Link="TestHooks/GatewayRpcServerOptions.cs" />
     <Compile Include="../../Server/Gateway/Services/SessionDirectory.cs" Link="TestHooks/SessionDirectory.cs" />
     <Compile Include="../../Server/Gateway/Services/SessionRegistration.cs" Link="TestHooks/SessionRegistration.cs" />
   </ItemGroup>

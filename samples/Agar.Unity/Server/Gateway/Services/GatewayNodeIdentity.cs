@@ -9,7 +9,7 @@ internal sealed class GatewayNodeIdentity
 {
     public GatewayNodeIdentity(IConfiguration configuration, RealtimeRpcServerOptions realtimeOptions)
     {
-        InstanceId = configuration["Gateway:NodeId"] ?? string.Empty;
+        InstanceId = configuration["ULinkGame:Node:Id"] ?? string.Empty;
         if (string.IsNullOrWhiteSpace(InstanceId))
         {
             InstanceId = $"{Environment.MachineName}-{Environment.ProcessId}";
