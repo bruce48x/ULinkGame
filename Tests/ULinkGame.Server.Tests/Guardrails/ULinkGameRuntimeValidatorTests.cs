@@ -49,7 +49,7 @@ public sealed class ULinkGameRuntimeValidatorTests
         var runtime = TestRuntime();
 
         Assert.Equal("dev-1", runtime.NodeId.Value);
-        Assert.Equal("kcp", runtime.Endpoint.Transport.Value);
+        Assert.Equal("kcp", runtime.Endpoints[0].Transport.Value);
         Assert.Equal("Server.Hotfix.dll", runtime.Hotfix.AssemblyFileName.Value);
         Assert.Equal(ULinkGameRuntimeProfile.Development, runtime.Profile);
     }
@@ -72,11 +72,7 @@ public sealed class ULinkGameRuntimeValidatorTests
     {
         var runtime = TestRuntime() with
         {
-            Endpoint = TestRuntime().Endpoint with
-            {
-                Transport = new ULinkGameResolvedValue<string>("websocket", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Transport"),
-                Path = new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default)
-            }
+            Endpoints = [TestEndpoint("websocket", "127.0.0.1", 20000, path: "")]
         };
         var result = Validate(runtime);
 
@@ -124,6 +120,64 @@ public sealed class ULinkGameRuntimeValidatorTests
     }
 
     [Fact]
+    public void EndpointRule_rejects_duplicate_transports()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints =
+            [
+                TestEndpoint("kcp", "127.0.0.1", 20000),
+                TestEndpoint("kcp", "127.0.0.1", 20001)
+            ]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK024");
+    }
+
+    [Fact]
+    public void EndpointRule_rejects_websocket_without_path()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("websocket", "127.0.0.1", 20000, path: "")]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK023");
+    }
+
+    [Fact]
+    public void EndpointRule_rejects_kcp_with_path()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("kcp", "127.0.0.1", 20000, path: "/bad")]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK025");
+    }
+
+    [Fact]
+    public void ClusterEndpointRule_rejects_missing_endpoint_when_cluster_is_configured()
+    {
+        var runtime = TestRuntime() with
+        {
+            ClusterEndpoint = new ULinkGameResolvedClusterEndpoint(
+                Endpoint: new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Configuration, "ULinkGame:Cluster:Endpoint"),
+                Seeds: [])
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK040");
+    }
+
+    [Fact]
     public void AddULinkGameRuntimeValidation_RegistersDefaultValidator()
     {
         var services = new ServiceCollection();
@@ -140,15 +194,15 @@ public sealed class ULinkGameRuntimeValidatorTests
     {
         return new ULinkGameResolvedRuntime(
             NodeId: new ULinkGameResolvedValue<string>("dev-1", ULinkGameValueSource.Configuration, "ULinkGame:Node:Id"),
-            Endpoint: new ULinkGameResolvedEndpoint(
-                Transport: new ULinkGameResolvedValue<string>("kcp", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Transport"),
-                Host: new ULinkGameResolvedValue<string>("127.0.0.1", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Host"),
-                Port: new ULinkGameResolvedValue<int>(20000, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Port"),
-                Path: new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default),
-                AdvertisedEndpoint: new ULinkGameResolvedValue<string>("kcp://127.0.0.1:20000", ULinkGameValueSource.GeneratedConvention)),
+            Endpoints: [TestEndpoint("kcp", "127.0.0.1", 20000)],
             Cluster: new ULinkGameResolvedCluster(
                 Services: [new ULinkGameResolvedClusterService("gateway", "gateway")],
                 AdvertisedEndpoints: new Dictionary<string, string> { ["client"] = "kcp://127.0.0.1:20000" }),
+            ClusterEndpoint: null,
+            Feature: new ULinkGameResolvedFeature(
+                Configured: null,
+                Active: [],
+                StartupOrder: []),
             Hotfix: new ULinkGameResolvedHotfix(
                 AssemblyPath: new ULinkGameResolvedValue<string>("Server.Hotfix.dll", ULinkGameValueSource.GeneratedConvention),
                 AssemblyFileName: new ULinkGameResolvedValue<string>("Server.Hotfix.dll", ULinkGameValueSource.GeneratedConvention)),
@@ -160,12 +214,29 @@ public sealed class ULinkGameRuntimeValidatorTests
             Profile: ULinkGameRuntimeProfile.Development);
     }
 
+    private static ULinkGameResolvedEndpoint TestEndpoint(
+        string transport,
+        string host,
+        int port,
+        string path = "",
+        string advertisedHost = "")
+    {
+        return new ULinkGameResolvedEndpoint(
+            Transport: new ULinkGameResolvedValue<string>(transport, ULinkGameValueSource.Configuration),
+            Host: new ULinkGameResolvedValue<string>(host, ULinkGameValueSource.Configuration),
+            Port: new ULinkGameResolvedValue<int>(port, ULinkGameValueSource.Configuration),
+            Path: new ULinkGameResolvedValue<string>(path, ULinkGameValueSource.Configuration),
+            AdvertisedHost: new ULinkGameResolvedValue<string>(advertisedHost, ULinkGameValueSource.Configuration),
+            AdvertisedEndpoint: new ULinkGameResolvedValue<string>($"{transport}://{host}:{port}{path}", ULinkGameValueSource.GeneratedConvention));
+    }
+
     private static ULinkGameValidationResult Validate(ULinkGameResolvedRuntime runtime)
     {
         var validator = new ULinkGameRuntimeValidator(
             [
                 new NodeIdentityRule(),
                 new EndpointRule(),
+                new ClusterEndpointRule(),
                 new HotfixSourceRule(),
                 new ClusterServiceGraphRule()
             ]);

@@ -12,6 +12,7 @@ public static class ULinkGameGuardrailServiceCollectionExtensions
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IULinkGameValidationRule, NodeIdentityRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IULinkGameValidationRule, EndpointRule>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IULinkGameValidationRule, ClusterEndpointRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IULinkGameValidationRule, HotfixSourceRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IULinkGameValidationRule, ClusterServiceGraphRule>());
         services.TryAddSingleton<ULinkGameRuntimeValidator>();
