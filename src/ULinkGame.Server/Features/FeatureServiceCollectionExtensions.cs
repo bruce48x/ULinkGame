@@ -47,6 +47,8 @@ public static class FeatureServiceCollectionExtensions
         configure(builder);
 
         var catalog = builder.Build(options);
+        ValidateFeatureDependencies(catalog.ActiveDefinitions, options);
+
         var endpointCatalog = new ULinkGameEndpointCatalog(options.Endpoints);
         var context = new ULinkGameFeatureContext(services, config, endpointCatalog);
 
@@ -61,6 +63,33 @@ public static class FeatureServiceCollectionExtensions
         }
 
         return services;
+    }
+
+    private static void ValidateFeatureDependencies(
+        IReadOnlyList<ULinkGameFeatureDefinition> activeDefinitions,
+        ULinkGameRuntimeOptions options)
+    {
+        var transports = options.Endpoints
+            .Select(endpoint => endpoint.Transport)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var definition in activeDefinitions)
+        {
+            foreach (var transport in definition.RequiredTransports)
+            {
+                if (!transports.Contains(transport))
+                {
+                    throw new InvalidOperationException(
+                        $"ULinkGame feature '{definition.Name}' requires transport '{transport}', but that transport is not configured.");
+                }
+            }
+
+            if (definition.IsClusterRequired && options.Cluster is null)
+            {
+                throw new InvalidOperationException(
+                    $"ULinkGame feature '{definition.Name}' requires Cluster configuration.");
+            }
+        }
     }
 
     private static ULinkGameFeature CreateFeature(ULinkGameFeatureDefinition definition)

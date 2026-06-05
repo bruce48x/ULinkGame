@@ -238,6 +238,48 @@ public sealed class FeatureBuilderTests
     }
 
     [Fact]
+    public void AddULinkGame_rejects_feature_missing_required_transport()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "game-c",
+                ["ULinkGame:Feature:0"] = "battle"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddULinkGame(configuration, game =>
+            {
+                game.Feature<MarkerFeatureA>("battle").RequiresTransport("kcp");
+            }));
+
+        Assert.Contains("kcp", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AddULinkGame_rejects_feature_missing_cluster()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "game-b",
+                ["ULinkGame:Feature:0"] = "chat"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddULinkGame(configuration, game =>
+            {
+                game.Feature<MarkerFeatureA>("chat").RequiresCluster();
+            }));
+
+        Assert.Contains("Cluster", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void FeatureCatalog_rejects_feature_constructor_dependencies()
     {
         var services = new ServiceCollection();
