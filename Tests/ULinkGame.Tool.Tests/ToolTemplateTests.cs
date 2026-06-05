@@ -109,10 +109,10 @@ public sealed class ToolTemplateTests
         Assert.Contains("--ulinkgame-check", source, StringComparison.Ordinal);
         Assert.Contains("ULinkGameCheck", source, StringComparison.Ordinal);
         Assert.True(
-            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) >
+            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration, \"kcp\"), args)", StringComparison.Ordinal) >
             source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
         Assert.True(
-            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) <
+            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration, \"kcp\"), args)", StringComparison.Ordinal) <
             source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
     }
 
@@ -175,7 +175,8 @@ public sealed class ToolTemplateTests
         Assert.Contains("ULinkGameNodeOptions", source);
         Assert.Contains("ULinkGameEndpointOptions", source);
         Assert.Contains("configuration.GetSection(\"ULinkGame\")", source);
-        Assert.Contains("ToClusterOptions()", source);
+        Assert.Contains("ToClusterOptions(string transport)", source);
+        Assert.Contains("ToClusterOptions(IConfiguration configuration, string transport)", source);
         Assert.Contains("ToServerRpcServerOptions(string transport)", source);
         Assert.Contains("Path = ReadString(section, \"Path\", GetDefaultPath(transport))", source);
         Assert.Contains("return string.Equals(transport, \"websocket\", StringComparison.OrdinalIgnoreCase)", source);
@@ -187,7 +188,8 @@ public sealed class ToolTemplateTests
         Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Port", source);
         Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Path", source);
         Assert.Contains("[\"cluster\"] = ClusterEndpoint", source);
-        Assert.Contains("[\"client\"] = AdvertisedClientEndpoint", source);
+        Assert.Contains("FindEndpoint(transport).ToAdvertisedEndpoint()", source);
+        Assert.Contains("[\"client\"] = clientEndpoint", source);
         Assert.Contains("NodeDirectoryEndpoints = new[] { ClusterEndpoint }", source);
         Assert.Contains("new ClusterServiceOptions { Kind = \"node-directory\", Name = \"node-directory\" }", source);
         Assert.Contains("new ClusterServiceOptions { Kind = \"route-directory\", Name = \"route-directory\" }", source);
@@ -207,6 +209,34 @@ public sealed class ToolTemplateTests
         Assert.Contains("Services = ReadServices(section.GetSection(\"Services\"), defaults.Services)", source);
         Assert.Contains("RouteLeaseSeconds = ReadInt(section, \"RouteLeaseSeconds\", defaults.RouteLeaseSeconds)", source);
         Assert.Contains("SendTimeoutMilliseconds = ReadInt(section, \"SendTimeoutMilliseconds\", defaults.SendTimeoutMilliseconds)", source);
+    }
+
+    [Fact]
+    public void GeneratedRuntimeOptions_AdvertisesClientEndpointForSelectedTransport()
+    {
+        var assembly = CompileGeneratedClusterOptions();
+        var runtime = CreateRuntimeOptions(
+            assembly,
+            CreateEndpoint(assembly, "kcp", "127.0.0.1", 20001, ""),
+            CreateEndpoint(assembly, "websocket", "127.0.0.1", 20000, "/ws"));
+
+        var clusterOptions = Invoke(runtime, "ToClusterOptions", "websocket");
+        var advertisedEndpoints = (IReadOnlyDictionary<string, string>)GetProperty(clusterOptions, "AdvertisedEndpoints");
+
+        Assert.Equal("ws://127.0.0.1:20000/ws", advertisedEndpoints["client"]);
+    }
+
+    [Fact]
+    public void GeneratedRuntimeOptions_EmptyEndpointsThrowsMissingEndpointError()
+    {
+        var assembly = CompileGeneratedClusterOptions();
+        var runtime = CreateRuntimeOptions(assembly);
+
+        var exception = Assert.ThrowsAny<Exception>(() => Invoke(runtime, "ToServerRpcServerOptions", "websocket"));
+        var message = exception.InnerException?.Message ?? exception.Message;
+
+        Assert.Contains("No ULinkGame endpoints are configured", message, StringComparison.Ordinal);
+        Assert.Contains("ULinkGame:Endpoints", message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -502,6 +532,132 @@ public sealed class ToolTemplateTests
         }
 
         Assert.Empty(diagnostics);
+    }
+
+    private static System.Reflection.Assembly CompileGeneratedClusterOptions()
+    {
+        var source = ToolTemplates.RenderClusterOptions();
+        var checkStart = source.IndexOf("internal static class ULinkGameCheck", StringComparison.Ordinal);
+        var clusterOptionsStart = source.IndexOf("internal sealed class ClusterOptions", StringComparison.Ordinal);
+        Assert.True(checkStart > 0);
+        Assert.True(clusterOptionsStart > checkStart);
+
+        var runtimeOnlySource = string.Concat(
+            source.AsSpan(0, checkStart),
+            source.AsSpan(clusterOptionsStart));
+        var stubs = """
+        namespace Microsoft.Extensions.Configuration
+        {
+            public interface IConfiguration
+            {
+                IConfigurationSection GetSection(string key);
+                string? this[string key] { get; set; }
+            }
+
+            public interface IConfigurationSection : IConfiguration
+            {
+                string Key { get; }
+                string? Value { get; set; }
+                System.Collections.Generic.IEnumerable<IConfigurationSection> GetChildren();
+            }
+        }
+
+        namespace ULinkGame.Server.Guardrails {}
+        namespace ULinkGame.Server.Guardrails.Rules {}
+
+        namespace Server.Hosting
+        {
+            internal sealed class ServerRpcServerOptions
+            {
+                public string Transport { get; init; } = "kcp";
+                public string Host { get; init; } = "127.0.0.1";
+                public int Port { get; init; } = 20000;
+                public string Path { get; init; } = "";
+            }
+        }
+        """;
+        var compilation = CSharpCompilation.Create(
+            "GeneratedClusterOptionsTests",
+            new[]
+            {
+                CSharpSyntaxTree.ParseText(runtimeOnlySource),
+                CSharpSyntaxTree.ParseText(stubs)
+            },
+            GetTrustedPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        var diagnostics = result.Diagnostics
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(static diagnostic => $"{diagnostic.Id} {diagnostic.GetMessage()}")
+            .ToArray();
+        Assert.Empty(diagnostics);
+
+        stream.Position = 0;
+        return System.Reflection.Assembly.Load(stream.ToArray());
+    }
+
+    private static IReadOnlyList<MetadataReference> GetTrustedPlatformReferences()
+    {
+        return ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))!
+            .Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .ToArray();
+    }
+
+    private static object CreateEndpoint(
+        System.Reflection.Assembly assembly,
+        string transport,
+        string host,
+        int port,
+        string path)
+    {
+        var endpointType = assembly.GetType("Server.Hosting.ULinkGameEndpointOptions", throwOnError: true)!;
+        var endpoint = Activator.CreateInstance(endpointType)!;
+        SetProperty(endpoint, "Transport", transport);
+        SetProperty(endpoint, "Host", host);
+        SetProperty(endpoint, "Port", port);
+        SetProperty(endpoint, "Path", path);
+        return endpoint;
+    }
+
+    private static object CreateRuntimeOptions(System.Reflection.Assembly assembly, params object[] endpoints)
+    {
+        var runtimeType = assembly.GetType("Server.Hosting.ULinkGameRuntimeOptions", throwOnError: true)!;
+        var endpointType = assembly.GetType("Server.Hosting.ULinkGameEndpointOptions", throwOnError: true)!;
+        var endpointArray = Array.CreateInstance(endpointType, endpoints.Length);
+        for (var i = 0; i < endpoints.Length; i++)
+        {
+            endpointArray.SetValue(endpoints[i], i);
+        }
+
+        var runtime = Activator.CreateInstance(runtimeType)!;
+        SetProperty(runtime, "Endpoints", endpointArray);
+        return runtime;
+    }
+
+    private static object Invoke(object instance, string methodName, params object[] arguments)
+    {
+        var method = instance.GetType()
+            .GetMethods()
+            .Single(candidate =>
+                candidate.Name == methodName &&
+                candidate.GetParameters().Length == arguments.Length &&
+                candidate.GetParameters()
+                    .Zip(arguments)
+                    .All(pair => pair.First.ParameterType.IsInstanceOfType(pair.Second)));
+        return method.Invoke(instance, arguments)!;
+    }
+
+    private static object GetProperty(object instance, string propertyName)
+    {
+        return instance.GetType().GetProperty(propertyName)!.GetValue(instance)!;
+    }
+
+    private static void SetProperty(object instance, string propertyName, object value)
+    {
+        instance.GetType().GetProperty(propertyName)!.SetValue(instance, value);
     }
 
     [Fact]

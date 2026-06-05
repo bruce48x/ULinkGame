@@ -165,13 +165,13 @@ public sealed class ToolTextTests
         Assert.DoesNotContain("ULinkGameRuntimeOptions", program, StringComparison.Ordinal);
         Assert.Contains("--health-check", generatedApplication, StringComparison.Ordinal);
         Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration)", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration, \"tcp\")", generatedApplication, StringComparison.Ordinal);
         Assert.Contains("using Server.Hosting;", generatedApplication, StringComparison.Ordinal);
         Assert.Contains("ULinkGameRuntimeOptions", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("ToClusterOptions()", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("ToClusterOptions(string transport)", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("[\"cluster\"] = \"tcp://127.0.0.1:21000\"", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("[\"client\"] = AdvertisedClientEndpoint", clusterOptions, StringComparison.Ordinal);
+        Assert.Contains("[\"client\"] = clientEndpoint", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("Services", clusterOptions, StringComparison.Ordinal);
         Assert.DoesNotContain("NodeEpoch", clusterHealthCheck, StringComparison.Ordinal);
         Assert.Contains("cluster=healthy", clusterHealthCheck, StringComparison.Ordinal);

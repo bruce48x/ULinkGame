@@ -1757,11 +1757,8 @@ internal sealed class ULinkGameRuntimeOptions
     private const string EndpointsConfigurationKey = ""ULinkGame:Endpoints"";
 
     public ULinkGameNodeOptions Node { get; init; } = new();
-    public IReadOnlyList<ULinkGameEndpointOptions> Endpoints { get; init; } = new[] { new ULinkGameEndpointOptions() };
+    public IReadOnlyList<ULinkGameEndpointOptions> Endpoints { get; init; } = Array.Empty<ULinkGameEndpointOptions>();
     public string ClusterEndpoint { get; init; } = ""tcp://127.0.0.1:21000"";
-    public string AdvertisedClientEndpoint => Endpoints.Count == 0
-        ? new ULinkGameEndpointOptions().ToAdvertisedEndpoint()
-        : Endpoints[0].ToAdvertisedEndpoint();
 
     public static ULinkGameRuntimeOptions FromConfiguration(IConfiguration configuration)
     {
@@ -1794,9 +1791,13 @@ internal sealed class ULinkGameRuntimeOptions
             return endpoint;
         }
 
-        var configuredTransports = Endpoints.Count == 0
-            ? ""none""
-            : string.Join("", "", Endpoints.Select(candidate => candidate.Transport));
+        if (Endpoints.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $""No ULinkGame endpoints are configured. Configure ULinkGame:Endpoints with an endpoint for transport '{transport}'."");
+        }
+
+        var configuredTransports = string.Join("", "", Endpoints.Select(candidate => candidate.Transport));
         throw new InvalidOperationException(
             $""ULinkGame endpoint transport '{transport}' is not configured. Configure ULinkGame:Endpoints with one of: {configuredTransports}."");
     }
@@ -1808,20 +1809,19 @@ internal sealed class ULinkGameRuntimeOptions
             .Select(ULinkGameEndpointOptions.FromConfiguration)
             .ToArray();
 
-        return values.Length == 0
-            ? new[] { new ULinkGameEndpointOptions() }
-            : values;
+        return values;
     }
 
-    public ClusterOptions ToClusterOptions()
+    public ClusterOptions ToClusterOptions(string transport)
     {
+        var clientEndpoint = FindEndpoint(transport).ToAdvertisedEndpoint();
         return new ClusterOptions
         {
             NodeId = Node.Id,
             AdvertisedEndpoints = new Dictionary<string, string>
             {
                 [""cluster""] = ClusterEndpoint,
-                [""client""] = AdvertisedClientEndpoint
+                [""client""] = clientEndpoint
             },
             Bootstrap = new ClusterBootstrapOptions
             {
@@ -1836,10 +1836,10 @@ internal sealed class ULinkGameRuntimeOptions
         };
     }
 
-    public ClusterOptions ToClusterOptions(IConfiguration configuration)
+    public ClusterOptions ToClusterOptions(IConfiguration configuration, string transport)
     {
         var section = configuration.GetSection(""Cluster"");
-        var defaults = ToClusterOptions();
+        var defaults = ToClusterOptions(transport);
         return new ClusterOptions
         {
             NodeId = ReadString(section, ""NodeId"", defaults.NodeId),
@@ -2030,7 +2030,7 @@ internal static class ULinkGameCheck
         var serviceNames = clusterOptions.Services.Select(service => service.Name);
         var rpcEndpoint = clusterOptions.AdvertisedEndpoints.TryGetValue(""client"", out var clientEndpoint)
             ? clientEndpoint
-            : runtime.AdvertisedClientEndpoint;
+            : runtime.Endpoints.FirstOrDefault()?.ToAdvertisedEndpoint() ?? ""not configured"";
 
         Console.WriteLine(""cluster: ok single-node"");
         Console.WriteLine($""node: ok {clusterOptions.NodeId}"");
@@ -2127,11 +2127,11 @@ internal sealed class ClusterOptions
     public int RouteLeaseSeconds { get; init; } = 30;
     public int SendTimeoutMilliseconds { get; init; } = 2000;
 
-    public static ClusterOptions FromConfiguration(IConfiguration configuration)
+    public static ClusterOptions FromConfiguration(IConfiguration configuration, string transport)
     {
         return ULinkGameRuntimeOptions
             .FromConfiguration(configuration)
-            .ToClusterOptions(configuration);
+            .ToClusterOptions(configuration, transport);
     }
 }
 
@@ -2450,17 +2450,17 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string RenderClusterServiceRegistration(NewCommandOptions options)
     {
         return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
-            ? "builder.Services.AddSingleton(runtimeOptions.ToClusterOptions(builder.Configuration));"
+            ? $$"""builder.Services.AddSingleton(runtimeOptions.ToClusterOptions(builder.Configuration, "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"));"""
             : string.Empty;
     }
 
     private static string RenderULinkGameCheckExit(NewCommandOptions options)
     {
         return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
-            ? """
+            ? $$"""
               if (args.Contains("--ulinkgame-check", StringComparer.Ordinal))
               {
-                  return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args);
+                  return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration, "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"), args);
               }
               """
             : string.Empty;
@@ -2469,10 +2469,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
     private static string RenderClusterHealthCheckExit(NewCommandOptions options)
     {
         return ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile)
-            ? """
+            ? $$"""
               if (args.Contains("--health-check", StringComparer.Ordinal))
               {
-                  return ClusterHealthCheck.Run(runtimeOptions.ToClusterOptions(builder.Configuration));
+                  return ClusterHealthCheck.Run(runtimeOptions.ToClusterOptions(builder.Configuration, "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"));
               }
               """
             : string.Empty;
