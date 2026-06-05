@@ -1948,6 +1948,7 @@ internal static class ULinkGameCheck
             {
                 new NodeIdentityRule(),
                 new EndpointRule(),
+                new ClusterEndpointRule(),
                 new HotfixSourceRule(),
                 new ClusterServiceGraphRule()
             });
@@ -2037,7 +2038,12 @@ internal static class ULinkGameCheck
                     .Select(service => new ULinkGameResolvedClusterService(service.Kind, service.Name))
                     .ToArray(),
                 AdvertisedEndpoints: clusterOptions.AdvertisedEndpoints),
-            ClusterEndpoint: null,
+            ClusterEndpoint: new ULinkGameResolvedClusterEndpoint(
+                new ULinkGameResolvedValue<string>(
+                    runtime.ClusterEndpoint,
+                    ULinkGameValueSource.GeneratedConvention,
+                    ""ULinkGame:Cluster:Endpoint""),
+                new[] { runtime.ClusterEndpoint }),
             Feature: new ULinkGameResolvedFeature(
                 Configured: null,
                 Active: Array.Empty<string>(),

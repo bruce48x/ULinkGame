@@ -229,6 +229,8 @@ public sealed class ToolTemplateTests
         Assert.Contains("new ULinkGameResolvedHotfix", source);
         Assert.Contains("Endpoints:", source);
         Assert.Contains("new ULinkGameResolvedFeature", source);
+        Assert.Contains("new ClusterEndpointRule()", source);
+        Assert.Contains("new ULinkGameResolvedClusterEndpoint", source);
         Assert.DoesNotContain("Hotfix:Directory", source);
         Assert.DoesNotContain("Hotfix:Assembly", source);
     }
