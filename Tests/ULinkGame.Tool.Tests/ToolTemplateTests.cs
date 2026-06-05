@@ -25,16 +25,20 @@ public sealed class ToolTemplateTests
         Assert.Contains("\"ULinkGame\"", json);
         Assert.Contains("\"Node\"", json);
         Assert.Contains("\"Id\": \"dev-1\"", json);
-        Assert.Contains("\"Endpoint\"", json);
+        Assert.Contains("\"Endpoints\"", json);
         Assert.Contains("\"Transport\": \"kcp\"", json);
         Assert.Contains("\"Host\": \"127.0.0.1\"", json);
         Assert.Contains("\"Port\": 20000", json);
+        Assert.DoesNotContain("\"Endpoint\"", json);
         Assert.DoesNotContain("\"Cluster\"", json);
+        Assert.DoesNotContain("\"Deployment\"", json);
         Assert.DoesNotContain("\"Hotfix\"", json);
         Assert.DoesNotContain("\"ReliablePush\"", json);
         Assert.DoesNotContain("\"Bootstrap\"", json);
         Assert.DoesNotContain("\"Services\"", json);
         Assert.DoesNotContain("\"NodeDirectory\"", json);
+        Assert.DoesNotContain("\"ControlPlane\"", json);
+        Assert.DoesNotContain("\"Realtime\"", json);
     }
 
     [Fact]
@@ -53,8 +57,10 @@ public sealed class ToolTemplateTests
 
         var json = ToolTemplates.RenderServerAppSettings(options);
 
+        Assert.Contains("\"Endpoints\"", json);
         Assert.Contains("\"Transport\": \"websocket\"", json);
         Assert.Contains("\"Path\": \"/ws\"", json);
+        Assert.DoesNotContain("\"Endpoint\"", json);
         Assert.DoesNotContain("\"AdvertisedEndpoints\"", json);
     }
 
@@ -152,10 +158,12 @@ public sealed class ToolTemplateTests
 
         var source = ToolTemplates.RenderGeneratedServerApplication(options);
 
-        Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
-        Assert.Contains("ServerRpcServerOptions.FromConfiguration", source, StringComparison.Ordinal);
-        Assert.Contains("\"ControlPlane\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"Realtime\"", source, StringComparison.Ordinal);
+        Assert.Contains("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerRpcServerOptions.FromConfiguration", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"ControlPlane\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Realtime\"", source, StringComparison.Ordinal);
+        Assert.Contains("runtimeOptions.ToServerRpcServerOptions(\"websocket\")", source, StringComparison.Ordinal);
+        Assert.Contains("runtimeOptions.ToServerRpcServerOptions(\"kcp\")", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -168,14 +176,16 @@ public sealed class ToolTemplateTests
         Assert.Contains("ULinkGameEndpointOptions", source);
         Assert.Contains("configuration.GetSection(\"ULinkGame\")", source);
         Assert.Contains("ToClusterOptions()", source);
-        Assert.Contains("ToServerRpcServerOptions()", source);
+        Assert.Contains("ToServerRpcServerOptions(string transport)", source);
         Assert.Contains("Path = ReadString(section, \"Path\", GetDefaultPath(transport))", source);
         Assert.Contains("return string.Equals(transport, \"websocket\", StringComparison.OrdinalIgnoreCase)", source);
         Assert.Contains("ULinkGame:Node:Id", source);
-        Assert.Contains("ULinkGame:Endpoint:Transport", source);
-        Assert.Contains("ULinkGame:Endpoint:Host", source);
-        Assert.Contains("ULinkGame:Endpoint:Port", source);
-        Assert.Contains("ULinkGame:Endpoint:Path", source);
+        Assert.Contains("section.GetSection(\"Endpoints\")", source);
+        Assert.Contains("ULinkGame:Endpoints", source);
+        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Transport", source);
+        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Host", source);
+        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Port", source);
+        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Path", source);
         Assert.Contains("[\"cluster\"] = ClusterEndpoint", source);
         Assert.Contains("[\"client\"] = AdvertisedClientEndpoint", source);
         Assert.Contains("NodeDirectoryEndpoints = new[] { ClusterEndpoint }", source);

@@ -147,10 +147,11 @@ public sealed class ToolTextTests
         Assert.Contains("\"ULinkGame\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Node\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Id\": \"dev-1\"", appSettings, StringComparison.Ordinal);
-        Assert.Contains("\"Endpoint\"", appSettings, StringComparison.Ordinal);
+        Assert.Contains("\"Endpoints\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Transport\": \"tcp\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Host\": \"127.0.0.1\"", appSettings, StringComparison.Ordinal);
         Assert.Contains("\"Port\": 20000", appSettings, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Endpoint\"", appSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Cluster\"", appSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"AdvertisedEndpoints\"", appSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Bootstrap\"", appSettings, StringComparison.Ordinal);
@@ -181,10 +182,10 @@ public sealed class ToolTextTests
         Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT", env, StringComparison.Ordinal);
         Assert.Contains("Cluster__AdvertisedEndpoints__client", compose, StringComparison.Ordinal);
         Assert.Contains("ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT", compose, StringComparison.Ordinal);
-        Assert.Contains("ULinkGame__Endpoint__Transport", compose, StringComparison.Ordinal);
-        Assert.Contains("ULinkGame__Endpoint__Host", compose, StringComparison.Ordinal);
-        Assert.Contains("ULinkGame__Endpoint__Port", compose, StringComparison.Ordinal);
-        Assert.Contains("ULinkGame__Endpoint__Path", compose, StringComparison.Ordinal);
+        Assert.Contains("ULinkGame__Endpoints__0__Transport", compose, StringComparison.Ordinal);
+        Assert.Contains("ULinkGame__Endpoints__0__Host", compose, StringComparison.Ordinal);
+        Assert.Contains("ULinkGame__Endpoints__0__Port", compose, StringComparison.Ordinal);
+        Assert.Contains("ULinkGame__Endpoints__0__Path", compose, StringComparison.Ordinal);
         Assert.DoesNotContain("\n              Endpoint__Transport:", compose.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.DoesNotContain("\n              Endpoint__Host:", compose.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.DoesNotContain("\n              Endpoint__Port:", compose.Replace("\r\n", "\n"), StringComparison.Ordinal);

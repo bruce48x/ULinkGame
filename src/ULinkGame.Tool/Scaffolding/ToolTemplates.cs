@@ -25,9 +25,6 @@ internal static class ToolTemplates
     {
         if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
         {
-            var controlPath = GetDefaultPath(options.Transport, "/ws");
-            var realtimePath = GetDefaultPath(options.Transport, "/realtime");
-
             return $$"""
             using Microsoft.Extensions.Configuration;
             using Microsoft.Extensions.DependencyInjection;
@@ -52,19 +49,13 @@ internal static class ToolTemplates
                         .SetBasePath(AppContext.BaseDirectory)
                         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                         .AddEnvironmentVariables();
+                    var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
             {{TemplateText.IndentBlock(RenderClusterHealthCheckExit(options), 2)}}
 
                     builder.Services.AddULinkGameServer();
-                    builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(
-                        ServerRpcServerOptions.FromConfiguration(
-                            builder.Configuration,
-                            "ControlPlane",
-                            new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20000, Path = "{{TemplateText.SanitizeStringLiteral(controlPath)}}" })));
-                    builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(
-                        ServerRpcServerOptions.FromConfiguration(
-                            builder.Configuration,
-                            "Realtime",
-                            new ServerRpcServerOptions { Transport = "{{TemplateText.SanitizeStringLiteral(options.Transport)}}", Port = 20001, Path = "{{TemplateText.SanitizeStringLiteral(realtimePath)}}" })));
+                    builder.Services.AddSingleton(runtimeOptions);
+                    builder.Services.AddSingleton(_ => new ControlPlaneRpcServerOptions(runtimeOptions.ToServerRpcServerOptions("websocket")));
+                    builder.Services.AddSingleton(_ => new RealtimeRpcServerOptions(runtimeOptions.ToServerRpcServerOptions("kcp")));
                     builder.Services.AddULinkRpcServer<DefaultControlPlaneRpcServerConfigurator>();
                     builder.Services.AddULinkRpcServer<DefaultRealtimeRpcServerConfigurator>();
             {{TemplateText.IndentBlock(RenderHotfixServiceRegistration(), 2)}}
@@ -111,7 +102,7 @@ internal static class ToolTemplates
                 builder.Services.AddULinkGameServer();
                 builder.Services.AddSingleton(runtimeOptions);
         {{TemplateText.IndentBlock(RenderClusterServiceRegistration(options), 2)}}
-                builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions());
+                builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions("{{TemplateText.SanitizeStringLiteral(options.Transport)}}"));
                 builder.Services.AddULinkRpcServer<DefaultRpcServerConfigurator>();
         {{TemplateText.IndentBlock(RenderHotfixServiceRegistration(), 2)}}
                 builder.Services.AddULinkGameServerGateway();
@@ -179,6 +170,32 @@ internal static class ToolTemplates
 
     public static string RenderServerAppSettings(NewCommandOptions options)
     {
+        if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
+        {
+            return """
+            {
+              "ULinkGame": {
+                "Node": {
+                  "Id": "dev-1"
+                },
+                "Endpoints": [
+                  {
+                    "Transport": "websocket",
+                    "Host": "127.0.0.1",
+                    "Port": 20000,
+                    "Path": "/ws"
+                  },
+                  {
+                    "Transport": "kcp",
+                    "Host": "127.0.0.1",
+                    "Port": 20001
+                  }
+                ]
+              }
+            }
+            """;
+        }
+
         var pathLine = string.Equals(options.Transport, "websocket", StringComparison.OrdinalIgnoreCase)
             ? "," + Environment.NewLine + "          \"Path\": \"/ws\""
             : string.Empty;
@@ -189,11 +206,13 @@ internal static class ToolTemplates
             "Node": {
               "Id": "dev-1"
             },
-            "Endpoint": {
-              "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
-              "Host": "127.0.0.1",
-              "Port": 20000{{pathLine}}
-            }
+            "Endpoints": [
+              {
+                "Transport": "{{TemplateText.SanitizeStringLiteral(options.Transport)}}",
+                "Host": "127.0.0.1",
+                "Port": 20000{{pathLine}}
+              }
+            ]
           }
         }
         """;
@@ -1735,15 +1754,14 @@ namespace Server.Hosting;
 internal sealed class ULinkGameRuntimeOptions
 {
     private const string NodeIdConfigurationKey = ""ULinkGame:Node:Id"";
-    private const string EndpointTransportConfigurationKey = ""ULinkGame:Endpoint:Transport"";
-    private const string EndpointHostConfigurationKey = ""ULinkGame:Endpoint:Host"";
-    private const string EndpointPortConfigurationKey = ""ULinkGame:Endpoint:Port"";
-    private const string EndpointPathConfigurationKey = ""ULinkGame:Endpoint:Path"";
+    private const string EndpointsConfigurationKey = ""ULinkGame:Endpoints"";
 
     public ULinkGameNodeOptions Node { get; init; } = new();
-    public ULinkGameEndpointOptions Endpoint { get; init; } = new();
+    public IReadOnlyList<ULinkGameEndpointOptions> Endpoints { get; init; } = new[] { new ULinkGameEndpointOptions() };
     public string ClusterEndpoint { get; init; } = ""tcp://127.0.0.1:21000"";
-    public string AdvertisedClientEndpoint => Endpoint.ToAdvertisedEndpoint();
+    public string AdvertisedClientEndpoint => Endpoints.Count == 0
+        ? new ULinkGameEndpointOptions().ToAdvertisedEndpoint()
+        : Endpoints[0].ToAdvertisedEndpoint();
 
     public static ULinkGameRuntimeOptions FromConfiguration(IConfiguration configuration)
     {
@@ -1751,19 +1769,48 @@ internal sealed class ULinkGameRuntimeOptions
         return new ULinkGameRuntimeOptions
         {
             Node = ULinkGameNodeOptions.FromConfiguration(section.GetSection(""Node"")),
-            Endpoint = ULinkGameEndpointOptions.FromConfiguration(section.GetSection(""Endpoint""))
+            Endpoints = ReadEndpoints(section.GetSection(""Endpoints""))
         };
     }
 
-    public ServerRpcServerOptions ToServerRpcServerOptions()
+    public ServerRpcServerOptions ToServerRpcServerOptions(string transport)
     {
+        var endpoint = FindEndpoint(transport);
         return new ServerRpcServerOptions
         {
-            Transport = Endpoint.Transport,
-            Host = Endpoint.Host,
-            Port = Endpoint.Port,
-            Path = Endpoint.Path
+            Transport = endpoint.Transport,
+            Host = endpoint.Host,
+            Port = endpoint.Port,
+            Path = endpoint.Path
         };
+    }
+
+    private ULinkGameEndpointOptions FindEndpoint(string transport)
+    {
+        var endpoint = Endpoints.FirstOrDefault(candidate =>
+            string.Equals(candidate.Transport, transport, StringComparison.OrdinalIgnoreCase));
+        if (endpoint is not null)
+        {
+            return endpoint;
+        }
+
+        var configuredTransports = Endpoints.Count == 0
+            ? ""none""
+            : string.Join("", "", Endpoints.Select(candidate => candidate.Transport));
+        throw new InvalidOperationException(
+            $""ULinkGame endpoint transport '{transport}' is not configured. Configure ULinkGame:Endpoints with one of: {configuredTransports}."");
+    }
+
+    private static IReadOnlyList<ULinkGameEndpointOptions> ReadEndpoints(IConfigurationSection section)
+    {
+        var values = section
+            .GetChildren()
+            .Select(ULinkGameEndpointOptions.FromConfiguration)
+            .ToArray();
+
+        return values.Length == 0
+            ? new[] { new ULinkGameEndpointOptions() }
+            : values;
     }
 
     public ClusterOptions ToClusterOptions()
@@ -1983,7 +2030,7 @@ internal static class ULinkGameCheck
         var serviceNames = clusterOptions.Services.Select(service => service.Name);
         var rpcEndpoint = clusterOptions.AdvertisedEndpoints.TryGetValue(""client"", out var clientEndpoint)
             ? clientEndpoint
-            : runtime.Endpoint.ToAdvertisedEndpoint();
+            : runtime.AdvertisedClientEndpoint;
 
         Console.WriteLine(""cluster: ok single-node"");
         Console.WriteLine($""node: ok {clusterOptions.NodeId}"");
@@ -2023,16 +2070,15 @@ internal static class ULinkGameCheck
 
         return new ULinkGameResolvedRuntime(
             NodeId: new ULinkGameResolvedValue<string>(clusterOptions.NodeId, ULinkGameValueSource.Configuration, ""ULinkGame:Node:Id""),
-            Endpoints: new[]
-            {
+            Endpoints: runtime.Endpoints.Select((endpoint, endpointIndex) =>
                 new ULinkGameResolvedEndpoint(
-                    Transport: new ULinkGameResolvedValue<string>(runtime.Endpoint.Transport, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Transport""),
-                    Host: new ULinkGameResolvedValue<string>(runtime.Endpoint.Host, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Host""),
-                    Port: new ULinkGameResolvedValue<int>(runtime.Endpoint.Port, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Port""),
-                    Path: new ULinkGameResolvedValue<string>(runtime.Endpoint.Path, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Path""),
-                    AdvertisedHost: new ULinkGameResolvedValue<string>(runtime.Endpoint.AdvertisedHost, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:AdvertisedHost""),
-                    AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention))
-            },
+                    Transport: new ULinkGameResolvedValue<string>(endpoint.Transport, ULinkGameValueSource.Configuration, $""ULinkGame:Endpoints:{endpointIndex}:Transport""),
+                    Host: new ULinkGameResolvedValue<string>(endpoint.Host, ULinkGameValueSource.Configuration, $""ULinkGame:Endpoints:{endpointIndex}:Host""),
+                    Port: new ULinkGameResolvedValue<int>(endpoint.Port, ULinkGameValueSource.Configuration, $""ULinkGame:Endpoints:{endpointIndex}:Port""),
+                    Path: new ULinkGameResolvedValue<string>(endpoint.Path, ULinkGameValueSource.Configuration, $""ULinkGame:Endpoints:{endpointIndex}:Path""),
+                    AdvertisedHost: new ULinkGameResolvedValue<string>(endpoint.AdvertisedHost, ULinkGameValueSource.Configuration, $""ULinkGame:Endpoints:{endpointIndex}:AdvertisedHost""),
+                    AdvertisedEndpoint: new ULinkGameResolvedValue<string>(endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention)))
+                .ToArray(),
             Cluster: new ULinkGameResolvedCluster(
                 Services: clusterOptions.Services
                     .Select(service => new ULinkGameResolvedClusterService(service.Kind, service.Name))
@@ -2460,10 +2506,10 @@ internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConf
               context: .
               dockerfile: Server/Dockerfile
             environment:
-              ULinkGame__Endpoint__Transport: "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"
-              ULinkGame__Endpoint__Host: "0.0.0.0"
-              ULinkGame__Endpoint__Port: "20000"
-              ULinkGame__Endpoint__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
+              ULinkGame__Endpoints__0__Transport: "{{TemplateText.SanitizeStringLiteral(options.Transport)}}"
+              ULinkGame__Endpoints__0__Host: "0.0.0.0"
+              ULinkGame__Endpoints__0__Port: "20000"
+              ULinkGame__Endpoints__0__Path: "{{TemplateText.SanitizeStringLiteral(endpointPath)}}"
               Cluster__NodeId: "${ULINKGAME_CLUSTER_NODE_ID:-gateway-1}"
               Cluster__AdvertisedEndpoints__cluster: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLUSTER:-tcp://gateway:21000}"
               Cluster__AdvertisedEndpoints__client: "${ULINKGAME_CLUSTER_ADVERTISED_ENDPOINTS_CLIENT:-{{TemplateText.SanitizeStringLiteral(advertisedClientEndpoint)}}}"
