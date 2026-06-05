@@ -172,13 +172,6 @@ internal sealed class ToolText
         _ => "  2) dotnet run --project \"Server/Server/Server.csproj\" -- --ulinkgame-check"
     };
 
-    public string RebuildContractsStep => Language switch
-    {
-        ToolLanguage.SimplifiedChinese => "  4) 修改 Shared 合约后，重新构建 server 或重新打开/编译 client，使 ULinkRPC.Analyzers 重新生成 RPC glue。",
-        ToolLanguage.TraditionalChinese => "  4) 修改 Shared 合約後，重新建置 server 或重新開啟/編譯 client，使 ULinkRPC.Analyzers 重新生成 RPC glue。",
-        _ => "  4) After changing Shared contracts, rebuild the server or reopen/recompile the client so ULinkRPC.Analyzers regenerates RPC glue."
-    };
-
     public string UnableToLocateStarter => Language switch
     {
         ToolLanguage.SimplifiedChinese => "无法找到 `ulinkrpc-starter`。",

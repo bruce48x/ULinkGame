@@ -24,7 +24,6 @@ public sealed class ToolTextTests
 
         Assert.Contains("命令:", text.HelpText, StringComparison.Ordinal);
         Assert.Equal("ULinkGame 项目已就绪。下一步:", text.NewProjectReadyHeader);
-        Assert.Contains("修改 Shared 合约后", text.RebuildContractsStep, StringComparison.Ordinal);
         Assert.Contains("正在自动安装", text.InstallingStarter("ULinkRPC.Starter", ToolPackageVersions.ULinkRpcStarter), StringComparison.Ordinal);
     }
 
@@ -41,7 +40,6 @@ public sealed class ToolTextTests
 
         Assert.Contains("命令:", text.HelpText, StringComparison.Ordinal);
         Assert.Equal("ULinkGame 專案已就緒。下一步:", text.NewProjectReadyHeader);
-        Assert.Contains("修改 Shared 合約後", text.RebuildContractsStep, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -54,7 +52,35 @@ public sealed class ToolTextTests
         Assert.Contains("--ulinkgame-check", simplifiedChinese.CheckProjectStep, StringComparison.Ordinal);
         Assert.StartsWith("  2)", english.CheckProjectStep, StringComparison.Ordinal);
         Assert.StartsWith("  3)", english.StartServerStep, StringComparison.Ordinal);
-        Assert.StartsWith("  4)", english.RebuildContractsStep, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NewProjectReadyOutput_DoesNotPrintFourthStep()
+    {
+        var text = ToolText.ForCulture(CultureInfo.GetCultureInfo("zh-CN"));
+        var app = new CliApplication(new ToolProcessRunner(text), new ProjectScaffolder(), new ToolConfigStore(), text);
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        var originalOut = Console.Out;
+
+        try
+        {
+            Console.SetOut(writer);
+            typeof(CliApplication)
+                .GetMethod("PrintNewProjectNextSteps", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(app, ["D:\\ULinkGame-Sample-Unity24"]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = writer.ToString();
+        Assert.Contains("ULinkGame 项目已就绪。下一步:", output, StringComparison.Ordinal);
+        Assert.Contains("  1) cd \"D:\\ULinkGame-Sample-Unity24\"", output, StringComparison.Ordinal);
+        Assert.Contains("  2) dotnet run --project \"Server/Server/Server.csproj\" -- --ulinkgame-check", output, StringComparison.Ordinal);
+        Assert.Contains("  3) dotnet run --project \"Server/Server/Server.csproj\"", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("  4)", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("修改 Shared 合约后", output, StringComparison.Ordinal);
     }
 
     [Fact]

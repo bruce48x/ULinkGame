@@ -94,7 +94,6 @@ internal sealed class CliApplication(
         Console.WriteLine($"  1) cd \"{projectRoot}\"");
         Console.WriteLine(text.CheckProjectStep);
         Console.WriteLine(text.StartServerStep);
-        Console.WriteLine(text.RebuildContractsStep);
     }
 }
 

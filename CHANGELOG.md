@@ -8,12 +8,14 @@
 - `ULinkGame.Server` `0.1.26`
 - `ULinkGame.Tool` `0.4.17`
 - `ULinkGame.Tool` `0.4.18`
+- `ULinkGame.Tool` `0.4.19`
 
 ### Changed
 
 - Updated `ULinkGame.Cluster.ULinkRPC` and `ULinkGame.Server` to consume `ULinkRPC.Client` `0.12.0`, `ULinkRPC.Server` `0.12.1`, and `ULinkRPC.Transport.Tcp` `0.11.4`.
 - Updated `ULinkGame.Tool` to consume `ULinkRPC.Starter` `0.4.1` and generate contracts with the `ULinkRPC` `0.12` notification naming.
 - Updated `ULinkGame.Tool` generated server projects to keep `Program.cs` as a thin entrypoint and move generated hosting, check, cluster, RPC, and hotfix setup into `Hosting/Advanced/ULinkGameGeneratedApplication.cs`.
+- Removed the fourth post-create next step from `ulinkgame-tool new` output.
 - Updated Agar samples and tests to use `ULinkRPC.Core` `0.12.0`, `ULinkRPC.Client` `0.12.0`, and `ULinkRPC.Analyzers` `0.2.0`, replacing callback/push contract attributes with notification contract attributes.
 
 ## 2026-06-04
