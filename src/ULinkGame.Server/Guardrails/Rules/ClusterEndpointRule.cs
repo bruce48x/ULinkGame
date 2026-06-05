@@ -23,7 +23,7 @@ public sealed class ClusterEndpointRule : IULinkGameValidationRule
             || !IsSupportedTcpUri(uri))
         {
             yield return new ULinkGameDiagnostic(
-                "ULINK041",
+                "ULINK043",
                 ULinkGameDiagnosticSeverity.Error,
                 "ULinkGame:Cluster:Endpoint must be a tcp URI with host and explicit port.",
                 "Use a value such as tcp://127.0.0.1:21001.");

@@ -1882,6 +1882,7 @@ internal sealed class ULinkGameEndpointOptions
     public string Host { get; init; } = ""127.0.0.1"";
     public int Port { get; init; } = 20000;
     public string Path { get; init; } = """";
+    public string AdvertisedHost { get; init; } = """";
 
     public static ULinkGameEndpointOptions FromConfiguration(IConfiguration section)
     {
@@ -1891,7 +1892,8 @@ internal sealed class ULinkGameEndpointOptions
             Transport = transport,
             Host = ReadString(section, ""Host"", ""127.0.0.1""),
             Port = ReadInt(section, ""Port"", 20000),
-            Path = ReadString(section, ""Path"", GetDefaultPath(transport))
+            Path = ReadString(section, ""Path"", GetDefaultPath(transport)),
+            AdvertisedHost = ReadString(section, ""AdvertisedHost"", """")
         };
     }
 
@@ -1903,10 +1905,11 @@ internal sealed class ULinkGameEndpointOptions
             ""tcp"" => ""tcp"",
             _ => ""kcp""
         };
+        var host = string.IsNullOrWhiteSpace(AdvertisedHost) ? Host : AdvertisedHost;
 
         return string.IsNullOrWhiteSpace(Path)
-            ? $""{scheme}://{Host}:{Port}""
-            : $""{scheme}://{Host}:{Port}{Path}"";
+            ? $""{scheme}://{host}:{Port}""
+            : $""{scheme}://{host}:{Port}{Path}"";
     }
 
     private static string NormalizeTransport(string? rawValue, string fallback)
@@ -2019,17 +2022,26 @@ internal static class ULinkGameCheck
 
         return new ULinkGameResolvedRuntime(
             NodeId: new ULinkGameResolvedValue<string>(clusterOptions.NodeId, ULinkGameValueSource.Configuration, ""ULinkGame:Node:Id""),
-            Endpoint: new ULinkGameResolvedEndpoint(
-                Transport: new ULinkGameResolvedValue<string>(runtime.Endpoint.Transport, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Transport""),
-                Host: new ULinkGameResolvedValue<string>(runtime.Endpoint.Host, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Host""),
-                Port: new ULinkGameResolvedValue<int>(runtime.Endpoint.Port, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Port""),
-                Path: new ULinkGameResolvedValue<string>(runtime.Endpoint.Path, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Path""),
-                AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention)),
+            Endpoints: new[]
+            {
+                new ULinkGameResolvedEndpoint(
+                    Transport: new ULinkGameResolvedValue<string>(runtime.Endpoint.Transport, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Transport""),
+                    Host: new ULinkGameResolvedValue<string>(runtime.Endpoint.Host, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Host""),
+                    Port: new ULinkGameResolvedValue<int>(runtime.Endpoint.Port, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Port""),
+                    Path: new ULinkGameResolvedValue<string>(runtime.Endpoint.Path, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:Path""),
+                    AdvertisedHost: new ULinkGameResolvedValue<string>(runtime.Endpoint.AdvertisedHost, ULinkGameValueSource.Configuration, ""ULinkGame:Endpoint:AdvertisedHost""),
+                    AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention))
+            },
             Cluster: new ULinkGameResolvedCluster(
                 Services: clusterOptions.Services
                     .Select(service => new ULinkGameResolvedClusterService(service.Kind, service.Name))
                     .ToArray(),
                 AdvertisedEndpoints: clusterOptions.AdvertisedEndpoints),
+            ClusterEndpoint: null,
+            Feature: new ULinkGameResolvedFeature(
+                Configured: null,
+                Active: Array.Empty<string>(),
+                StartupOrder: Array.Empty<string>()),
             Hotfix: new ULinkGameResolvedHotfix(
                 AssemblyPath: new ULinkGameResolvedValue<string>(hotfixPath, ULinkGameValueSource.GeneratedConvention),
                 AssemblyFileName: new ULinkGameResolvedValue<string>(""Server.Hotfix.dll"", ULinkGameValueSource.GeneratedConvention)),

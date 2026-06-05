@@ -262,7 +262,7 @@ public sealed class ULinkGameRuntimeValidatorTests
 
         var result = Validate(runtime);
 
-        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK041");
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK043");
     }
 
     [Fact]
