@@ -56,12 +56,26 @@ public static class FeatureServiceCollectionExtensions
 
         foreach (var definition in catalog.ActiveDefinitions)
         {
-            var feature = (ULinkGameFeature)ActivatorUtilities.CreateInstance(
-                services.BuildServiceProvider(),
-                definition.ImplementationType);
+            var feature = CreateFeature(definition);
             feature.ConfigureServices(context);
         }
 
         return services;
+    }
+
+    private static ULinkGameFeature CreateFeature(ULinkGameFeatureDefinition definition)
+    {
+        try
+        {
+            return (ULinkGameFeature?)Activator.CreateInstance(definition.ImplementationType)
+                ?? throw new InvalidOperationException(
+                    $"ULinkGame feature '{definition.Name}' ({definition.ImplementationType.FullName}) could not be created.");
+        }
+        catch (MissingMethodException ex)
+        {
+            throw new InvalidOperationException(
+                $"ULinkGame feature '{definition.Name}' ({definition.ImplementationType.FullName}) must have a public parameterless constructor. Pass dependencies through ULinkGameFeatureContext instead.",
+                ex);
+        }
     }
 }

@@ -214,6 +214,47 @@ public sealed class FeatureBuilderTests
         Assert.Equal(["battle", "settlement"], catalog.ActiveNames);
     }
 
+    [Fact]
+    public void FeatureCatalog_rejects_missing_required_feature()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "dev-1",
+                ["ULinkGame:Feature:0"] = "settlement"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddULinkGame(configuration, game =>
+            {
+                game.Feature<MarkerFeatureA>("settlement").RequiresFeature("battle");
+                game.Feature<MarkerFeatureB>("battle");
+            }));
+
+        Assert.Contains("settlement", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("battle", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FeatureCatalog_rejects_feature_constructor_dependencies()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "dev-1"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddULinkGame(configuration, game => game.Feature<ConstructorDependencyFeature>("constructor")));
+
+        Assert.Contains(nameof(ConstructorDependencyFeature), ex.Message, StringComparison.Ordinal);
+        Assert.Contains("parameterless", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed record FeatureConfiguredMarker(string FeatureName);
 
     private sealed class TestRole(string name, IFeature[] features) : INodeRole
@@ -291,5 +332,10 @@ public sealed class FeatureBuilderTests
         public void Configure(IServiceCollection services, IConfiguration config)
         {
         }
+    }
+
+    private sealed class ConstructorDependencyFeature(string value) : ULinkGameFeature
+    {
+        public string Value { get; } = value;
     }
 }

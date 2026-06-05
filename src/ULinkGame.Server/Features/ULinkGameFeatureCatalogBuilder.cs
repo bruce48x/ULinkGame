@@ -26,6 +26,7 @@ public sealed class ULinkGameFeatureCatalogBuilder
     internal ULinkGameFeatureCatalog Build(ULinkGameRuntimeOptions options)
     {
         var active = ResolveActiveDefinitions(options.Feature);
+        ValidateRequiredFeatures(active);
         return new ULinkGameFeatureCatalog(SortAfterDependencies(active));
     }
 
@@ -50,6 +51,25 @@ public sealed class ULinkGameFeatureCatalogBuilder
         }
 
         return active;
+    }
+
+    private static void ValidateRequiredFeatures(IReadOnlyList<ULinkGameFeatureDefinition> active)
+    {
+        var activeNames = active
+            .Select(definition => definition.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var definition in active)
+        {
+            foreach (var requiredFeature in definition.RequiredFeatures)
+            {
+                if (!activeNames.Contains(requiredFeature))
+                {
+                    throw new InvalidOperationException(
+                        $"ULinkGame feature '{definition.Name}' requires feature '{requiredFeature}', but '{requiredFeature}' is not active.");
+                }
+            }
+        }
     }
 
     private static IReadOnlyList<ULinkGameFeatureDefinition> SortAfterDependencies(
