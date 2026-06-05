@@ -137,6 +137,77 @@ public sealed class ULinkGameRuntimeValidatorTests
     }
 
     [Fact]
+    public void EndpointRule_rejects_missing_transport()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("", "127.0.0.1", 20000)]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK020");
+    }
+
+    [Fact]
+    public void EndpointRule_rejects_missing_host()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("kcp", "", 20000)]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK021");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(65536)]
+    public void EndpointRule_rejects_invalid_port(int port)
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("kcp", "127.0.0.1", port)]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK022");
+    }
+
+    [Fact]
+    public void EndpointRule_rejects_unknown_transport()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("quic", "127.0.0.1", 20000)]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK020");
+    }
+
+    [Fact]
+    public void EndpointRule_rejects_duplicate_bind_address()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints =
+            [
+                TestEndpoint("kcp", "127.0.0.1", 20000),
+                TestEndpoint("tcp", "127.0.0.1", 20000)
+            ]
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK026");
+    }
+
+    [Fact]
     public void EndpointRule_rejects_websocket_without_path()
     {
         var runtime = TestRuntime() with
@@ -175,6 +246,37 @@ public sealed class ULinkGameRuntimeValidatorTests
         var result = Validate(runtime);
 
         Assert.Contains(result.Diagnostics, d => d.Code == "ULINK040");
+    }
+
+    [Theory]
+    [InlineData("udp://127.0.0.1:21000")]
+    [InlineData("tcp://127.0.0.1")]
+    [InlineData("tcp://127.0.0.1:0")]
+    [InlineData("tcp://:21000")]
+    public void ClusterEndpointRule_rejects_unsupported_cluster_uri(string endpoint)
+    {
+        var runtime = TestRuntime() with
+        {
+            ClusterEndpoint = TestClusterEndpoint(endpoint)
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK041");
+    }
+
+    [Fact]
+    public void ClusterEndpointRule_rejects_business_port_conflict()
+    {
+        var runtime = TestRuntime() with
+        {
+            Endpoints = [TestEndpoint("kcp", "127.0.0.1", 20000)],
+            ClusterEndpoint = TestClusterEndpoint("tcp://127.0.0.1:20000")
+        };
+
+        var result = Validate(runtime);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == "ULINK042");
     }
 
     [Fact]
@@ -228,6 +330,13 @@ public sealed class ULinkGameRuntimeValidatorTests
             Path: new ULinkGameResolvedValue<string>(path, ULinkGameValueSource.Configuration),
             AdvertisedHost: new ULinkGameResolvedValue<string>(advertisedHost, ULinkGameValueSource.Configuration),
             AdvertisedEndpoint: new ULinkGameResolvedValue<string>($"{transport}://{host}:{port}{path}", ULinkGameValueSource.GeneratedConvention));
+    }
+
+    private static ULinkGameResolvedClusterEndpoint TestClusterEndpoint(string endpoint)
+    {
+        return new ULinkGameResolvedClusterEndpoint(
+            Endpoint: new ULinkGameResolvedValue<string>(endpoint, ULinkGameValueSource.Configuration, "ULinkGame:Cluster:Endpoint"),
+            Seeds: []);
     }
 
     private static ULinkGameValidationResult Validate(ULinkGameResolvedRuntime runtime)

@@ -20,12 +20,12 @@ public sealed class ClusterEndpointRule : IULinkGameValidationRule
         }
 
         if (!Uri.TryCreate(runtime.ClusterEndpoint.Endpoint.Value, UriKind.Absolute, out var uri)
-            || !string.Equals(uri.Scheme, "tcp", StringComparison.OrdinalIgnoreCase))
+            || !IsSupportedTcpUri(uri))
         {
             yield return new ULinkGameDiagnostic(
                 "ULINK041",
                 ULinkGameDiagnosticSeverity.Error,
-                "ULinkGame:Cluster:Endpoint must be a tcp URI.",
+                "ULinkGame:Cluster:Endpoint must be a tcp URI with host and explicit port.",
                 "Use a value such as tcp://127.0.0.1:21001.");
             yield break;
         }
@@ -41,5 +41,13 @@ public sealed class ClusterEndpointRule : IULinkGameValidationRule
                     "Use a different port for ULinkGame:Cluster:Endpoint.");
             }
         }
+    }
+
+    private static bool IsSupportedTcpUri(Uri uri)
+    {
+        return string.Equals(uri.Scheme, "tcp", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(uri.Host)
+            && !uri.IsDefaultPort
+            && uri.Port is >= 1 and <= 65535;
     }
 }
