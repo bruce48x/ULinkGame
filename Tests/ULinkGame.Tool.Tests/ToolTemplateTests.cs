@@ -59,7 +59,7 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
-    public void RenderServerProgram_DefaultSingleEndpoint_UsesRuntimeOptionsFromCompactSection()
+    public void RenderServerProgram_DefaultSingleEndpoint_IsThinEntrypoint()
     {
         var options = new NewCommandOptions(
             Name: "MyGame",
@@ -73,18 +73,19 @@ public sealed class ToolTemplateTests
             DeployProfile: ProjectConventions.DefaultDeployProfile);
 
         var source = ToolTemplates.RenderServerProgram(options);
-        var normalizedSource = source.Replace("\r\n", "\n");
 
-        Assert.Contains("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", source);
-        Assert.Contains("builder.Services.AddSingleton(runtimeOptions)", source);
-        Assert.Contains("builder.Services.AddSingleton(runtimeOptions.ToServerRpcServerOptions())", source);
-        Assert.Contains("builder.Services.AddSingleton(runtimeOptions.ToClusterOptions(builder.Configuration))", source);
-        Assert.DoesNotContain("\"ULinkGame:Endpoint\"", source);
-        Assert.DoesNotContain("\n            \"Endpoint\",\n", normalizedSource);
+        Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
+        Assert.Contains("await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddULinkRpcServer", source, StringComparison.Ordinal);
+        Assert.True(source.Split('\n').Length <= 8);
     }
 
     [Fact]
-    public void RenderServerProgram_DefaultSingleEndpoint_IncludesULinkGameCheckCommand()
+    public void RenderGeneratedServerApplication_DefaultSingleEndpoint_IncludesULinkGameCheckCommand()
     {
         var options = new NewCommandOptions(
             Name: "MyGame",
@@ -97,10 +98,10 @@ public sealed class ToolTemplateTests
             NuGetForUnitySource: ProjectConventions.DefaultNuGetForUnitySource,
             DeployProfile: ProjectConventions.DefaultDeployProfile);
 
-        var source = ToolTemplates.RenderServerProgram(options);
+        var source = ToolTemplates.RenderGeneratedServerApplication(options);
 
-        Assert.Contains("--ulinkgame-check", source);
-        Assert.Contains("ULinkGameCheck", source);
+        Assert.Contains("--ulinkgame-check", source, StringComparison.Ordinal);
+        Assert.Contains("ULinkGameCheck", source, StringComparison.Ordinal);
         Assert.True(
             source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) >
             source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
@@ -110,7 +111,7 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
-    public void RenderServerProgram_RealtimeProfile_DoesNotReferenceRuntimeOptionsHelper()
+    public void RenderServerProgram_RealtimeProfile_IsThinEntrypoint()
     {
         var options = new NewCommandOptions(
             Name: "MyGame",
@@ -125,10 +126,33 @@ public sealed class ToolTemplateTests
 
         var source = ToolTemplates.RenderServerProgram(options);
 
-        Assert.DoesNotContain("ULinkGameRuntimeOptions", source);
-        Assert.Contains("ServerRpcServerOptions.FromConfiguration", source);
-        Assert.Contains("\"ControlPlane\"", source);
-        Assert.Contains("\"Realtime\"", source);
+        Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
+        Assert.Contains("await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
+        Assert.True(source.Split('\n').Length <= 8);
+    }
+
+    [Fact]
+    public void RenderGeneratedServerApplication_RealtimeProfile_ConfiguresNamedRpcServers()
+    {
+        var options = new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: ProjectConventions.DefaultClientEngine,
+            Transport: "websocket",
+            NetworkProfile: "realtime",
+            Serializer: ProjectConventions.DefaultSerializer,
+            Persistence: ProjectConventions.DefaultPersistence,
+            NuGetForUnitySource: ProjectConventions.DefaultNuGetForUnitySource,
+            DeployProfile: ProjectConventions.DefaultDeployProfile);
+
+        var source = ToolTemplates.RenderGeneratedServerApplication(options);
+
+        Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
+        Assert.Contains("ServerRpcServerOptions.FromConfiguration", source, StringComparison.Ordinal);
+        Assert.Contains("\"ControlPlane\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"Realtime\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -219,6 +243,7 @@ public sealed class ToolTemplateTests
         var hotfixChatSystem = ToolTemplates.RenderHotfixChatSystem();
         var appSettings = ToolTemplates.RenderServerAppSettings(options);
         var program = ToolTemplates.RenderServerProgram(options);
+        var generatedApplication = ToolTemplates.RenderGeneratedServerApplication(options);
         var chatRoom = ToolTemplates.RenderServerChatRoom();
         var chatServiceImpl = ToolTemplates.RenderServerChatServiceImpl();
         var generatedText = string.Concat(
@@ -232,6 +257,7 @@ public sealed class ToolTemplateTests
             hotfixChatSystem,
             appSettings,
             program,
+            generatedApplication,
             chatRoom,
             chatServiceImpl);
 
@@ -256,9 +282,12 @@ public sealed class ToolTemplateTests
         Assert.Contains("class ChatRoom", chatRoom, StringComparison.Ordinal);
         Assert.Contains("class ChatServiceImpl", chatServiceImpl, StringComparison.Ordinal);
         Assert.Contains("IChatService", chatServiceImpl, StringComparison.Ordinal);
-        Assert.Contains("AddULinkGameHotfix", program, StringComparison.Ordinal);
-        Assert.Contains("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
-        Assert.Contains("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddULinkGameHotfix", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("CurrentDirectoryHotfixAssemblySource", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("IHotfixManager", generatedApplication, StringComparison.Ordinal);
         Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
     }
 
