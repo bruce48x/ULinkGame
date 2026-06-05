@@ -418,6 +418,23 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public void RenderServerHostingTemplates_ParseAsCurrentCSharp()
+    {
+        var options = CliParser.ParseNewOptions([]);
+        var sources = new[]
+        {
+            ("Server/Server/Program.cs", ToolTemplates.RenderServerProgram(options)),
+            ("Server/Server/Hosting/Advanced/ULinkGameGeneratedApplication.cs", ToolTemplates.RenderGeneratedServerApplication(options)),
+            ("Server/Server/Hosting/ServerRpcServerOptions.cs", ToolTemplates.RenderServerRpcServerOptions()),
+            ("Server/Server/Hosting/DefaultRpcServerConfigurator.cs", ToolTemplates.RenderDefaultConfigurator(options)),
+            ("Server/Server/Hosting/ClusterOptions.cs", ToolTemplates.RenderClusterOptions()),
+            ("Server/Server/Hosting/ClusterHealthCheck.cs", ToolTemplates.RenderClusterHealthCheck())
+        };
+
+        AssertGeneratedSourcesParseAsCurrentCSharp(sources);
+    }
+
+    [Fact]
     public void RenderUnityFacingChatTemplates_ParseAsCSharpNine()
     {
         var sources = new[]
@@ -434,6 +451,23 @@ public sealed class ToolTemplateTests
     private static void AssertGeneratedSourcesParseAsCSharp9(IEnumerable<(string Path, string Source)> sources)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9);
+        var diagnostics = new List<string>();
+
+        foreach (var (path, source) in sources)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source, parseOptions, path);
+            diagnostics.AddRange(
+                tree.GetDiagnostics()
+                    .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                    .Select(diagnostic => $"{path}: {diagnostic.Id} {diagnostic.GetMessage()}"));
+        }
+
+        Assert.Empty(diagnostics);
+    }
+
+    private static void AssertGeneratedSourcesParseAsCurrentCSharp(IEnumerable<(string Path, string Source)> sources)
+    {
+        var parseOptions = CSharpParseOptions.Default;
         var diagnostics = new List<string>();
 
         foreach (var (path, source) in sources)
