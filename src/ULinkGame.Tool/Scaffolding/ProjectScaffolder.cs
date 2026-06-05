@@ -15,6 +15,7 @@ internal sealed class ProjectScaffolder
         await WriteSharedHotfixBoundaryFilesAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerSolutionAsync(projectRoot).ConfigureAwait(false);
         await WriteServerProgramAsync(projectRoot, options).ConfigureAwait(false);
+        await WriteGeneratedServerApplicationAsync(projectRoot, options).ConfigureAwait(false);
         await WriteServerProjectAsync(projectRoot, options).ConfigureAwait(false);
         await WriteHotfixProjectAsync(projectRoot).ConfigureAwait(false);
         await WriteHotfixBoundaryFilesAsync(projectRoot).ConfigureAwait(false);
@@ -379,6 +380,13 @@ internal sealed class ProjectScaffolder
     private static Task WriteServerProgramAsync(string projectRoot, NewCommandOptions options)
     {
         return WriteAsync(Path.Combine(projectRoot, "Server", "Server", "Program.cs"), ToolTemplates.RenderServerProgram(options));
+    }
+
+    private static Task WriteGeneratedServerApplicationAsync(string projectRoot, NewCommandOptions options)
+    {
+        return WriteAsync(
+            Path.Combine(projectRoot, "Server", "Server", "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs"),
+            ToolTemplates.RenderGeneratedServerApplication(options));
     }
 
     private static async Task WriteServerProjectAsync(string projectRoot, NewCommandOptions options)

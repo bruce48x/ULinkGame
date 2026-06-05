@@ -295,6 +295,50 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
+    public async Task AugmentExistingStarterServerProjectWritesAdvancedGeneratedApplication()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var serverDirectory = Path.Combine(projectRoot, "Server", "Server");
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            await File.WriteAllTextAsync(
+                Path.Combine(serverDirectory, "Server.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            var program = await File.ReadAllTextAsync(
+                Path.Combine(serverDirectory, "Program.cs"),
+                TestContext.Current.CancellationToken);
+            var generatedApplication = await File.ReadAllTextAsync(
+                Path.Combine(serverDirectory, "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs"),
+                TestContext.Current.CancellationToken);
+
+            Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", program, StringComparison.Ordinal);
+            Assert.Contains("namespace Server.Hosting.Advanced;", generatedApplication, StringComparison.Ordinal);
+            Assert.Contains("internal static class ULinkGameGeneratedApplication", generatedApplication, StringComparison.Ordinal);
+            Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration", generatedApplication, StringComparison.Ordinal);
+            Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task AugmentExistingStarterServerProjectAddsHotfixCopyTarget()
     {
         var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
