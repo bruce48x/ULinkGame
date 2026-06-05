@@ -148,6 +148,72 @@ public sealed class FeatureBuilderTests
         Assert.Single(discovered);
     }
 
+    [Fact]
+    public void FeatureCatalog_enables_all_features_when_config_is_omitted()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "dev-1"
+            })
+            .Build();
+
+        services.AddULinkGame(configuration, game =>
+        {
+            game.Feature<MarkerFeatureA>("login");
+            game.Feature<MarkerFeatureB>("chat");
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var catalog = provider.GetRequiredService<ULinkGameFeatureCatalog>();
+
+        Assert.Equal(["login", "chat"], catalog.ActiveNames);
+    }
+
+    [Fact]
+    public void FeatureCatalog_rejects_unknown_configured_feature()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "dev-1",
+                ["ULinkGame:Feature:0"] = "missing"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            services.AddULinkGame(configuration, game => game.Feature<MarkerFeatureA>("login")));
+
+        Assert.Contains("missing", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FeatureCatalog_sorts_after_dependency()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ULinkGame:Node:Id"] = "dev-1",
+                ["ULinkGame:Feature:0"] = "battle",
+                ["ULinkGame:Feature:1"] = "settlement"
+            })
+            .Build();
+
+        services.AddULinkGame(configuration, game =>
+        {
+            game.Feature<MarkerFeatureA>("settlement").After("battle");
+            game.Feature<MarkerFeatureB>("battle");
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var catalog = provider.GetRequiredService<ULinkGameFeatureCatalog>();
+
+        Assert.Equal(["battle", "settlement"], catalog.ActiveNames);
+    }
+
     private sealed record FeatureConfiguredMarker(string FeatureName);
 
     private sealed class TestRole(string name, IFeature[] features) : INodeRole
@@ -187,19 +253,29 @@ public sealed class FeatureBuilderTests
     }
 
     // Types for assembly scanning test
-    private sealed class MarkerFeatureA : IFeature
+    private sealed class MarkerFeatureA : ULinkGameFeature, IFeature
     {
         public void Configure(IServiceCollection services, IConfiguration config)
         {
             services.AddSingleton(new FeatureConfiguredMarker("MarkerA"));
         }
+
+        public override void ConfigureServices(ULinkGameFeatureContext context)
+        {
+            context.Services.AddSingleton(new FeatureConfiguredMarker("MarkerA"));
+        }
     }
 
-    private sealed class MarkerFeatureB : IFeature
+    private sealed class MarkerFeatureB : ULinkGameFeature, IFeature
     {
         public void Configure(IServiceCollection services, IConfiguration config)
         {
             services.AddSingleton(new FeatureConfiguredMarker("MarkerB"));
+        }
+
+        public override void ConfigureServices(ULinkGameFeatureContext context)
+        {
+            context.Services.AddSingleton(new FeatureConfiguredMarker("MarkerB"));
         }
     }
 
