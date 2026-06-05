@@ -129,7 +129,10 @@ public sealed class ToolTemplateTests
         Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
         Assert.Contains("await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddULinkRpcServer", source, StringComparison.Ordinal);
         Assert.True(source.Split('\n').Length <= 8);
     }
 
