@@ -75,7 +75,7 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderServerProgram(options);
 
         Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
-        Assert.Contains("await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
@@ -103,10 +103,10 @@ public sealed class ToolTemplateTests
         Assert.Contains("--ulinkgame-check", source, StringComparison.Ordinal);
         Assert.Contains("ULinkGameCheck", source, StringComparison.Ordinal);
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) >
+            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) >
             source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
         Assert.True(
-            source.IndexOf("ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) <
+            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration), args)", StringComparison.Ordinal) <
             source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
     }
 
@@ -127,7 +127,7 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderServerProgram(options);
 
         Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
-        Assert.Contains("await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);

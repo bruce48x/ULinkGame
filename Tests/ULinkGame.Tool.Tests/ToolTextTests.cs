@@ -111,6 +111,7 @@ public sealed class ToolTextTests
         var appSettings = ToolTemplates.RenderServerAppSettings(options);
         var project = ToolTemplates.RenderServerProject(options);
         var program = ToolTemplates.RenderServerProgram(options);
+        var generatedApplication = ToolTemplates.RenderGeneratedServerApplication(options);
         var clusterOptions = ToolTemplates.RenderClusterOptions();
         var clusterHealthCheck = ToolTemplates.RenderClusterHealthCheck();
         var compose = ToolTemplates.RenderClusterCompose(options);
@@ -133,10 +134,12 @@ public sealed class ToolTextTests
         Assert.Contains("ULinkGame.Cluster.ULinkRPC", project, StringComparison.Ordinal);
         Assert.Contains("<RootNamespace>Server</RootNamespace>", project, StringComparison.Ordinal);
         Assert.Contains("<ULinkRPCServerGeneratedNamespace>Server.Generated</ULinkRPCServerGeneratedNamespace>", project, StringComparison.Ordinal);
-        Assert.Contains("--health-check", program, StringComparison.Ordinal);
-        Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", program, StringComparison.Ordinal);
-        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration)", program, StringComparison.Ordinal);
-        Assert.Contains("using Server.Hosting;", program, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameRuntimeOptions", program, StringComparison.Ordinal);
+        Assert.Contains("--health-check", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration)", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("using Server.Hosting;", generatedApplication, StringComparison.Ordinal);
         Assert.Contains("ULinkGameRuntimeOptions", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("ToClusterOptions()", clusterOptions, StringComparison.Ordinal);
         Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
@@ -162,7 +165,7 @@ public sealed class ToolTextTests
         Assert.DoesNotContain("\n              Endpoint__Path:", compose.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains("ULinkRpcClusterDependencyProbe", operations, StringComparison.Ordinal);
         Assert.Contains("Cluster__AdvertisedEndpoints__client", operations, StringComparison.Ordinal);
-        var generatedText = string.Concat(appSettings, project, program, clusterOptions, clusterHealthCheck, compose, env, operations);
+        var generatedText = string.Concat(appSettings, project, program, generatedApplication, clusterOptions, clusterHealthCheck, compose, env, operations);
         Assert.DoesNotContain("NodeEpoch", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("InternalEndpoint", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("RouteDirectoryEndpoint", generatedText, StringComparison.Ordinal);
@@ -190,6 +193,7 @@ public sealed class ToolTextTests
         var hotfixChatSystem = ToolTemplates.RenderHotfixChatSystem();
         var appSettings = ToolTemplates.RenderServerAppSettings(options);
         var program = ToolTemplates.RenderServerProgram(options);
+        var generatedApplication = ToolTemplates.RenderGeneratedServerApplication(options);
         var chatRoom = ToolTemplates.RenderServerChatRoom();
         var chatServiceImpl = ToolTemplates.RenderServerChatServiceImpl();
         var generatedText = string.Concat(
@@ -203,6 +207,7 @@ public sealed class ToolTextTests
             hotfixChatSystem,
             appSettings,
             program,
+            generatedApplication,
             chatRoom,
             chatServiceImpl);
 
@@ -227,9 +232,12 @@ public sealed class ToolTextTests
         Assert.Contains("class ChatRoom", chatRoom, StringComparison.Ordinal);
         Assert.Contains("class ChatServiceImpl", chatServiceImpl, StringComparison.Ordinal);
         Assert.Contains("IChatService", chatServiceImpl, StringComparison.Ordinal);
-        Assert.Contains("AddULinkGameHotfix", program, StringComparison.Ordinal);
-        Assert.Contains("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
-        Assert.Contains("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddULinkGameHotfix", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("IHotfixManager", program, StringComparison.Ordinal);
+        Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("CurrentDirectoryHotfixAssemblySource", generatedApplication, StringComparison.Ordinal);
+        Assert.Contains("IHotfixManager", generatedApplication, StringComparison.Ordinal);
         Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
     }
 
