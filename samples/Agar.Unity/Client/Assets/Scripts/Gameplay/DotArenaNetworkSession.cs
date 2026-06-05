@@ -60,7 +60,7 @@ namespace SampleClient.Gameplay
             IsConnecting = true;
             try
             {
-                var callbacks = new RpcClient.RpcCallbackBindings();
+                var callbacks = new RpcClient.RpcNotificationBindings();
                 callbacks.Add(callback);
 
                 _controlConnection = Rpc.WebSocketRpcClientFactory.Create(host, port, path, callbacks);
@@ -219,7 +219,7 @@ namespace SampleClient.Gameplay
 
             try
             {
-                var callbacks = new RpcClient.RpcCallbackBindings();
+                var callbacks = new RpcClient.RpcNotificationBindings();
                 callbacks.Add(callback);
 
                 _realtimeConnection = Rpc.KcpRpcClientFactory.Create(realtimeConnection.Host, realtimeConnection.Port, callbacks);

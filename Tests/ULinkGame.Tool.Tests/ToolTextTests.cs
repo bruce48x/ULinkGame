@@ -31,7 +31,7 @@ public sealed class ToolTextTests
     [Fact]
     public void PinsCurrentStarterPackageVersion()
     {
-        Assert.Equal("0.3.4", ToolPackageVersions.ULinkRpcStarter);
+        Assert.Equal("0.4.1", ToolPackageVersions.ULinkRpcStarter);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public sealed class ToolTextTests
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
-        Assert.Contains("[RpcService(2, Callback = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(2, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);

@@ -190,9 +190,9 @@ public sealed class ULinkRpcClusterDependencyProbeTests
             return ValueTask.FromResult((TResult)reply);
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }
@@ -208,9 +208,9 @@ public sealed class ULinkRpcClusterDependencyProbeTests
             throw new InvalidOperationException("unreachable");
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }

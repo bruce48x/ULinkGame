@@ -11,7 +11,7 @@ namespace Rpc;
 
 public static class WebSocketRpcClientFactory
 {
-    public static RpcClient Create(string host, int port, string path, RpcClient.RpcCallbackBindings callbacks)
+    public static RpcClient Create(string host, int port, string path, RpcClient.RpcNotificationBindings callbacks)
     {
         return new RpcClient(
             new RpcClientOptions(

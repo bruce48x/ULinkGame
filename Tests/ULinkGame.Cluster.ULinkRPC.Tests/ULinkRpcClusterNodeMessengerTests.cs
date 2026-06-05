@@ -143,9 +143,9 @@ public sealed class ULinkRpcClusterNodeMessengerTests
             return ValueTask.FromResult((TResult)(object)_reply);
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }
@@ -161,9 +161,9 @@ public sealed class ULinkRpcClusterNodeMessengerTests
             throw new InvalidOperationException("unreachable");
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }
@@ -185,9 +185,9 @@ public sealed class ULinkRpcClusterNodeMessengerTests
             throw _exception;
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }

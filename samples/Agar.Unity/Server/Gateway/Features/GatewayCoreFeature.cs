@@ -20,7 +20,7 @@ public sealed class GatewayCoreFeature : IFeature
         services.AddULinkGameServerActors(options =>
         {
             options.MailboxCapacity = 4096;
-            options.ExecutionTimeout = TimeSpan.FromSeconds(5);
+            options.CallTimeout = TimeSpan.FromSeconds(5);
             options.SlowMessageThreshold = TimeSpan.FromSeconds(1);
         });
         services.AddULinkGameServer();

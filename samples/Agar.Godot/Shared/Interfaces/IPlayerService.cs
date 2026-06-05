@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Shared.Interfaces
 {
-    [RpcService(1, Callback = typeof(IPlayerCallback))]
+    [RpcService(1, NotificationContract = typeof(IPlayerCallback))]
     public interface IPlayerService
     {
         [RpcMethod(1)]
@@ -33,19 +33,19 @@ namespace Shared.Interfaces
         ValueTask LogoutAsync(LogoutRequest req);
     }
 
-    [RpcCallback(typeof(IPlayerService))]
+    [RpcNotificationContract(typeof(IPlayerService))]
     public interface IPlayerCallback
     {
-        [RpcPush(1)]
+        [RpcNotification(1)]
         void OnWorldState(WorldState worldState);
 
-        [RpcPush(2)]
+        [RpcNotification(2)]
         void OnPlayerDead(PlayerDead deadEvent);
 
-        [RpcPush(3)]
+        [RpcNotification(3)]
         void OnMatchEnd(MatchEnd matchEnd);
 
-        [RpcPush(4)]
+        [RpcNotification(4)]
         void OnMatchmakingStatus(MatchmakingStatusUpdate matchmakingStatus) { }
     }
 

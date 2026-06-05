@@ -46,7 +46,7 @@ internal sealed class AgarNetworkSession
         IPlayerCallback callback,
         CancellationToken cancellationToken)
     {
-        var callbacks = new RpcClient.RpcCallbackBindings();
+        var callbacks = new RpcClient.RpcNotificationBindings();
         callbacks.Add(callback);
 
         _controlConnection = WebSocketRpcClientFactory.Create(host, port, path, callbacks);
@@ -145,7 +145,7 @@ internal sealed class AgarNetworkSession
 
         await DisposeRealtimeAsync().ConfigureAwait(false);
 
-        var callbacks = new RpcClient.RpcCallbackBindings();
+        var callbacks = new RpcClient.RpcNotificationBindings();
         callbacks.Add(callback);
 
         _realtimeRoomId = realtimeConnection.RoomId ?? string.Empty;

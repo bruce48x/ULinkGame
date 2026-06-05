@@ -48,7 +48,7 @@ namespace Rpc.Testing
 
         public float RequestIntervalSeconds = 1f;
         public bool AutoConnect = true;
-        private readonly RpcClient.RpcCallbackBindings _callbacks;
+        private readonly RpcClient.RpcNotificationBindings _callbacks;
 
         private readonly CancellationTokenSource _cts = new();
         private bool _cleanupStarted;
@@ -61,7 +61,7 @@ namespace Rpc.Testing
 
         public RpcConnectionTester()
         {
-            _callbacks = new RpcClient.RpcCallbackBindings();
+            _callbacks = new RpcClient.RpcNotificationBindings();
             _callbacks.Add(new PlayerCallbacks(this));
         }
 

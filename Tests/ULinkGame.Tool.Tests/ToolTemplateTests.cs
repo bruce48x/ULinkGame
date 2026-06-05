@@ -243,7 +243,7 @@ public sealed class ToolTemplateTests
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
-        Assert.Contains("[RpcService(2, Callback = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(2, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);
@@ -311,7 +311,7 @@ public sealed class ToolTemplateTests
         Assert.Contains("[RpcMethod(1)]", source, StringComparison.Ordinal);
         Assert.Contains("[RpcMethod(2)]", source, StringComparison.Ordinal);
         Assert.Contains("[RpcMethod(3)]", source, StringComparison.Ordinal);
-        Assert.Contains("[RpcPush(1)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcNotification(1)]", source, StringComparison.Ordinal);
         Assert.Contains("OnMessageReceived", source, StringComparison.Ordinal);
         Assert.Contains("OnUserJoined", source, StringComparison.Ordinal);
         Assert.Contains("OnUserLeft", source, StringComparison.Ordinal);

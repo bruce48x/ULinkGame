@@ -384,9 +384,9 @@ public sealed class ULinkRpcNodeDirectoryTests
             return ValueTask.FromResult((TResult)_replies.Dequeue());
         }
 
-        public void RegisterPushHandler<TArg>(
-            RpcPushMethod<TArg> method,
-            Action<TArg> handler)
+        public void RegisterNotificationHandler<TArg>(
+            RpcNotificationMethod<TArg> method,
+            Func<TArg, ValueTask> handler)
         {
         }
     }

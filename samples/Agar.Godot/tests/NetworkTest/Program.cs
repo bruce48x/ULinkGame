@@ -103,7 +103,7 @@ static async Task RunNetworkTestAsync()
             }
         });
 
-    var callbacks = new RpcClient.RpcCallbackBindings();
+    var callbacks = new RpcClient.RpcNotificationBindings();
     callbacks.Add(testCallbacks);
 
     var controlClient = new RpcClient(

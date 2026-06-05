@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageReference Include="MemoryPack.UnityShims" Version="1.21.4" />
-    <PackageReference Include="ULinkRPC.Core" Version="0.11.8" />
+    <PackageReference Include="ULinkRPC.Core" Version="0.12.0" />
     <PackageReference Include="ULinkRPC.Serializer.MemoryPack" Version="0.11.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />

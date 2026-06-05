@@ -11,7 +11,7 @@ namespace Rpc;
 
 public static class KcpRpcClientFactory
 {
-    public static RpcClient Create(string host, int port, RpcClient.RpcCallbackBindings callbacks)
+    public static RpcClient Create(string host, int port, RpcClient.RpcNotificationBindings callbacks)
     {
         return new RpcClient(
             new RpcClientOptions(

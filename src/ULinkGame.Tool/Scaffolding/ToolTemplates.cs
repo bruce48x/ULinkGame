@@ -227,7 +227,7 @@ internal static class ToolTemplates
 
         namespace Shared.Chat
         {
-            [RpcService(2, Callback = typeof(IChatCallback))]
+            [RpcService(2, NotificationContract = typeof(IChatCallback))]
             public interface IChatService
             {
                 [RpcMethod(1)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
@@ -235,12 +235,12 @@ internal static class ToolTemplates
                 [RpcMethod(3)] ValueTask LeaveAsync(ChatLeaveRequest req);
             }
 
-            [RpcCallback(typeof(IChatService))]
+            [RpcNotificationContract(typeof(IChatService))]
             public interface IChatCallback
             {
-                [RpcPush(1)] void OnMessageReceived(ChatMessage msg);
-                [RpcPush(2)] void OnUserJoined(ChatMember member);
-                [RpcPush(3)] void OnUserLeft(ChatUserLeft evt);
+                [RpcNotification(1)] void OnMessageReceived(ChatMessage msg);
+                [RpcNotification(2)] void OnUserJoined(ChatMember member);
+                [RpcNotification(3)] void OnUserLeft(ChatUserLeft evt);
             }
         }
         """;
@@ -503,7 +503,7 @@ internal static class ToolTemplates
 
                 public ChatClient(RpcClientOptions options)
                 {
-                    var callbacks = new RpcClient.RpcCallbackBindings();
+                    var callbacks = new RpcClient.RpcNotificationBindings();
                     callbacks.Add(this);
 
                     _rpcClient = new RpcClient(options, callbacks);
