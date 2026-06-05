@@ -10,11 +10,12 @@ public sealed class ULinkGameEndpointOptions
 
     public string ToAdvertisedEndpoint()
     {
-        var scheme = Transport switch
+        var normalizedTransport = Transport.ToLowerInvariant();
+        var scheme = normalizedTransport switch
         {
             "websocket" => "ws",
             "tcp" => "tcp",
-            _ => "kcp"
+            _ => normalizedTransport
         };
         var host = string.IsNullOrWhiteSpace(AdvertisedHost) ? Host : AdvertisedHost;
 

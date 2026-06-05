@@ -66,6 +66,61 @@ public sealed class ULinkGameRuntimeOptionsTests
         Assert.Null(options.Cluster);
     }
 
+    [Fact]
+    public void ToAdvertisedEndpoint_maps_websocket_to_ws()
+    {
+        var endpoint = new ULinkGameEndpointOptions
+        {
+            Transport = "websocket",
+            Host = "127.0.0.1",
+            Port = 20000,
+            Path = "/ws"
+        };
+
+        Assert.Equal("ws://127.0.0.1:20000/ws", endpoint.ToAdvertisedEndpoint());
+    }
+
+    [Fact]
+    public void ToAdvertisedEndpoint_uses_advertised_host_when_present()
+    {
+        var endpoint = new ULinkGameEndpointOptions
+        {
+            Transport = "kcp",
+            Host = "0.0.0.0",
+            AdvertisedHost = "game.example.com",
+            Port = 20001
+        };
+
+        Assert.Equal("kcp://game.example.com:20001", endpoint.ToAdvertisedEndpoint());
+    }
+
+    [Fact]
+    public void ToAdvertisedEndpoint_preserves_unknown_transport()
+    {
+        var endpoint = new ULinkGameEndpointOptions
+        {
+            Transport = "quic",
+            Host = "127.0.0.1",
+            Port = 20002
+        };
+
+        Assert.Equal("quic://127.0.0.1:20002", endpoint.ToAdvertisedEndpoint());
+    }
+
+    [Fact]
+    public void ToAdvertisedEndpoint_normalizes_transport_case()
+    {
+        var endpoint = new ULinkGameEndpointOptions
+        {
+            Transport = "WebSocket",
+            Host = "127.0.0.1",
+            Port = 20003,
+            Path = "/ws"
+        };
+
+        Assert.Equal("ws://127.0.0.1:20003/ws", endpoint.ToAdvertisedEndpoint());
+    }
+
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
     {
         return new ConfigurationBuilder()
