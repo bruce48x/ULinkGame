@@ -28,6 +28,8 @@ The default local topology is a single process with generated defaults for the n
 
 ## Configuration Principle
 
+The canonical configuration and startup model is defined in [ULinkGame Configuration And Startup Model](ulinkgame-configuration-startup.md). Generated projects should use `ULinkGame:Node:Id`, `ULinkGame:Endpoints[]`, compact `ULinkGame:Feature` selection when needed, and `AddULinkGame` Feature Catalog startup.
+
 The generated `appsettings.json` should contain only source values the user can understand and may reasonably change.
 
 It should not contain:
@@ -46,16 +48,19 @@ The default configuration should be:
     "Node": {
       "Id": "dev-1"
     },
-    "Endpoint": {
-      "Transport": "kcp",
-      "Host": "127.0.0.1",
-      "Port": 20000
-    }
+    "Endpoints": [
+      {
+        "Name": "game",
+        "Transport": "kcp",
+        "Host": "127.0.0.1",
+        "Port": 20000
+      }
+    ]
   }
 }
 ```
 
-For WebSocket transport, the generated endpoint may include the path:
+For WebSocket transport, the generated endpoint includes the path:
 
 ```json
 {
@@ -63,12 +68,15 @@ For WebSocket transport, the generated endpoint may include the path:
     "Node": {
       "Id": "dev-1"
     },
-    "Endpoint": {
-      "Transport": "websocket",
-      "Host": "127.0.0.1",
-      "Port": 20000,
-      "Path": "/ws"
-    }
+    "Endpoints": [
+      {
+        "Name": "game",
+        "Transport": "websocket",
+        "Host": "127.0.0.1",
+        "Port": 20000,
+        "Path": "/ws"
+      }
+    ]
   }
 }
 ```
@@ -79,11 +87,11 @@ Generated server code should derive the full runtime model from the small config
 
 From `ULinkGame:Node:Id`, it derives the local node identity.
 
-From `ULinkGame:Endpoint`, it derives:
+From `ULinkGame:Endpoints[]`, it derives:
 
-- the RPC listener address
-- the advertised client endpoint
-- the default WebSocket path when the transport is WebSocket
+- the RPC listener addresses
+- the advertised client endpoints
+- framework-owned endpoint transport wiring
 
 From the generated project structure, it derives the local hotfix source:
 
@@ -200,6 +208,7 @@ These documents should explain that Cluster, Hotfix, and Reliable Push are defau
 - Generate the smaller `ULinkGame` configuration shape.
 - Move Hotfix, Reliable Push, and Cluster defaults into generated server code.
 - Add a runtime options type that derives full endpoint, cluster, hotfix, and reliable push settings from the small configuration shape.
+- Register project Features through the `AddULinkGame` Feature Catalog so startup order and transport requirements are explicit in code.
 
 ### Phase 2: Add Check Output
 

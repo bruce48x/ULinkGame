@@ -38,11 +38,14 @@ Generated projects should call framework APIs for default derivation when possib
 Suggested generated host shape:
 
 ```csharp
-builder.Services.AddULinkGameDefaults(builder.Configuration);
-builder.Services.AddULinkGameRuntimeValidation();
+builder.Services.AddULinkGame(builder.Configuration, game =>
+{
+    game.Feature<LoginFeature>("login").RequiresTransport("websocket");
+    game.Feature<BattleFeature>("battle").RequiresTransport("kcp");
+});
 ```
 
-This keeps old generated projects from freezing old framework assumptions. When a default rule improves in the framework, projects should benefit by updating package versions rather than by regenerating their server host.
+This keeps generated projects aligned with the Feature Catalog startup model in [ULinkGame Configuration And Startup Model](ulinkgame-configuration-startup.md). When a default rule improves in the framework, projects should benefit by updating package versions rather than by regenerating their server host.
 
 ## Validation Levels
 
@@ -58,6 +61,7 @@ Use errors for framework invariants:
 - endpoint transport is unknown
 - endpoint scheme, transport, and path are inconsistent
 - WebSocket transport cannot derive a listener path
+- endpoint transport names are duplicated where the framework needs one endpoint per transport
 - cluster service names are duplicated
 - cluster service kind is unknown
 - gateway service is configured without reachable route-directory or node-directory support
@@ -162,7 +166,7 @@ public sealed record ULinkGameResolvedValue<T>(
 
 public sealed record ULinkGameResolvedRuntime(
     ULinkGameResolvedValue<string> NodeId,
-    ULinkGameResolvedEndpoint Endpoint,
+    IReadOnlyList<ULinkGameResolvedEndpoint> Endpoints,
     ULinkGameResolvedCluster Cluster,
     ULinkGameResolvedHotfix Hotfix,
     ULinkGameResolvedReliablePush ReliablePush,
@@ -330,11 +334,14 @@ Default generated configuration should remain compact:
     "Node": {
       "Id": "dev-1"
     },
-    "Endpoint": {
-      "Transport": "kcp",
-      "Host": "127.0.0.1",
-      "Port": 20000
-    }
+    "Endpoints": [
+      {
+        "Name": "game",
+        "Transport": "kcp",
+        "Host": "127.0.0.1",
+        "Port": 20000
+      }
+    ]
   }
 }
 ```
@@ -344,36 +351,42 @@ Advanced configuration should express source values, not derived internals.
 Acceptable advanced values:
 
 - node id
-- endpoint transport, host, port, path
-- deployment profile
-- topology profile
+- endpoint names, transports, hosts, ports, paths, and advertised addresses
+- compact `ULinkGame:Feature` selection for process-local startup composition
+- topology or operational profile selected outside the framework schema
 - persistent storage provider and connection string names
-- advertised endpoints when deployment requires them
-- service descriptors for split-node deployments
 
 Advanced configuration should still use user-facing ULinkGame concepts:
 
 ```json
 {
   "ULinkGame": {
-    "Deployment": {
-      "Profile": "production",
-      "Topology": "split-directory"
-    },
     "Node": {
       "Id": "gateway-1"
     },
-    "Endpoint": {
-      "Transport": "kcp",
-      "Host": "0.0.0.0",
-      "Port": 20000,
-      "AdvertisedHost": "game.example.com"
-    }
+    "Feature": ["login", "battle"],
+    "Endpoints": [
+      {
+        "Name": "control",
+        "Transport": "websocket",
+        "Host": "0.0.0.0",
+        "Port": 20000,
+        "Path": "/ws",
+        "AdvertisedHost": "game.example.com"
+      },
+      {
+        "Name": "gameplay",
+        "Transport": "kcp",
+        "Host": "0.0.0.0",
+        "Port": 20001,
+        "AdvertisedHost": "game.example.com"
+      }
+    ]
   }
 }
 ```
 
-This keeps advanced configuration centered on deployment intent instead of exposing the internal object graph.
+This keeps advanced configuration centered on framework-owned source values instead of exposing the internal object graph.
 
 Avoid user-facing defaults for:
 
@@ -383,6 +396,10 @@ Avoid user-facing defaults for:
 - `Hotfix.Directory`
 - `ReliablePush.Outbox`
 - `Node.Profile`
+- `Deployment`
+- `Services`
+- `Cluster.Directory`
+- top-level business endpoint sections such as `ControlPlane` or `Realtime`
 - derived bootstrap endpoints
 - derived service lists for the default local topology
 

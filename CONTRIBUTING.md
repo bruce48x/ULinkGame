@@ -9,6 +9,7 @@ Before contributing, read the design philosophy and architectural boundary docum
 - **[Design Philosophy](docs/design-philosophy.md)** — The design principles (influenced by skynet), analysis of four reference frameworks (skynet, ET, Fantasy, GeekServer), what we absorb and reject, and the development roadmap.
 - **[ULinkActor Boundary](docs/ulinkactor-boundary.md)** — The responsibility split between ULinkActor (process-local actor runtime) and ULinkGame (distributed game server), the facade pattern, and configuration flow.
 - **[ULinkGame.Tool Default Experience](docs/ulinkgame-tool-default-experience.md)** — The generated project experience, reduced default configuration surface, derived runtime state, and check-command direction for `ulinkgame-tool new`.
+- **[ULinkGame Configuration And Startup Model](docs/ulinkgame-configuration-startup.md)** — The canonical `ULinkGame` configuration schema, Feature Catalog startup model, endpoint rules, and local validation boundary.
 - **[ULinkGame Runtime Guardrails](docs/ulinkgame-runtime-guardrails.md)** — The framework-level validation model for preventing invalid Cluster, Hotfix, Reliable Push, endpoint, and production-profile states.
 - **[ULinkGame Runtime Guardrails Implementation Plan](docs/ulinkgame-runtime-guardrails-implementation-plan.md)** — The task-by-task plan for implementing the first shared runtime validation loop and generated check integration.
 
