@@ -421,6 +421,16 @@ public sealed class ToolTemplateTests
     public void RenderServerHostingTemplates_ParseAsCurrentCSharp()
     {
         var options = CliParser.ParseNewOptions([]);
+        var realtimeOptions = new NewCommandOptions(
+            Name: "MyGame",
+            OutputPath: null,
+            ClientEngine: ProjectConventions.DefaultClientEngine,
+            Transport: "websocket",
+            NetworkProfile: "realtime",
+            Serializer: ProjectConventions.DefaultSerializer,
+            Persistence: ProjectConventions.DefaultPersistence,
+            NuGetForUnitySource: ProjectConventions.DefaultNuGetForUnitySource,
+            DeployProfile: ProjectConventions.DefaultDeployProfile);
         var sources = new[]
         {
             ("Server/Server/Program.cs", ToolTemplates.RenderServerProgram(options)),
@@ -428,7 +438,13 @@ public sealed class ToolTemplateTests
             ("Server/Server/Hosting/ServerRpcServerOptions.cs", ToolTemplates.RenderServerRpcServerOptions()),
             ("Server/Server/Hosting/DefaultRpcServerConfigurator.cs", ToolTemplates.RenderDefaultConfigurator(options)),
             ("Server/Server/Hosting/ClusterOptions.cs", ToolTemplates.RenderClusterOptions()),
-            ("Server/Server/Hosting/ClusterHealthCheck.cs", ToolTemplates.RenderClusterHealthCheck())
+            ("Server/Server/Hosting/ClusterHealthCheck.cs", ToolTemplates.RenderClusterHealthCheck()),
+            ("Server/Server/RealtimeProgram.cs", ToolTemplates.RenderServerProgram(realtimeOptions)),
+            ("Server/Server/Hosting/Advanced/RealtimeULinkGameGeneratedApplication.cs", ToolTemplates.RenderGeneratedServerApplication(realtimeOptions)),
+            ("Server/Server/Hosting/ControlPlaneRpcServerOptions.cs", ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
+            ("Server/Server/Hosting/RealtimeRpcServerOptions.cs", ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
+            ("Server/Server/Hosting/DefaultControlPlaneRpcServerConfigurator.cs", ToolTemplates.RenderControlPlaneConfigurator(realtimeOptions)),
+            ("Server/Server/Hosting/DefaultRealtimeRpcServerConfigurator.cs", ToolTemplates.RenderRealtimeConfigurator(realtimeOptions))
         };
 
         AssertGeneratedSourcesParseAsCurrentCSharp(sources);
@@ -450,24 +466,16 @@ public sealed class ToolTemplateTests
 
     private static void AssertGeneratedSourcesParseAsCSharp9(IEnumerable<(string Path, string Source)> sources)
     {
-        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9);
-        var diagnostics = new List<string>();
-
-        foreach (var (path, source) in sources)
-        {
-            var tree = CSharpSyntaxTree.ParseText(source, parseOptions, path);
-            diagnostics.AddRange(
-                tree.GetDiagnostics()
-                    .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                    .Select(diagnostic => $"{path}: {diagnostic.Id} {diagnostic.GetMessage()}"));
-        }
-
-        Assert.Empty(diagnostics);
+        AssertGeneratedSourcesParse(sources, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp9));
     }
 
     private static void AssertGeneratedSourcesParseAsCurrentCSharp(IEnumerable<(string Path, string Source)> sources)
     {
-        var parseOptions = CSharpParseOptions.Default;
+        AssertGeneratedSourcesParse(sources, CSharpParseOptions.Default);
+    }
+
+    private static void AssertGeneratedSourcesParse(IEnumerable<(string Path, string Source)> sources, CSharpParseOptions parseOptions)
+    {
         var diagnostics = new List<string>();
 
         foreach (var (path, source) in sources)
