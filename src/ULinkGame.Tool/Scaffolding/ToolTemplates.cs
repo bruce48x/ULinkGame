@@ -17,7 +17,7 @@ internal static class ToolTemplates
         return """
         using Server.Hosting.Advanced;
 
-        await ULinkGameGeneratedApplication.RunAsync(args);
+        return await ULinkGameGeneratedApplication.RunAsync(args);
         """;
     }
 
