@@ -349,6 +349,21 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderSharedChatRuleState()
+    {
+        return """
+        using ULinkGame.Server.Hotfix.Abstractions;
+
+        namespace Shared.Contracts.Chat
+        {
+            [HotfixState]
+            public partial sealed class ChatRuleState
+            {
+            }
+        }
+        """;
+    }
+
     public static string RenderServerChatRoomActor()
     {
         return """
@@ -443,16 +458,11 @@ internal static class ToolTemplates
     public static string RenderServerChatRules()
     {
         return """
-        using ULinkGame.Server.Hotfix.Abstractions;
+        using Shared.Contracts.Chat;
         using ULinkGame.Server.Hotfix.Dispatch;
 
         namespace Server.Chat
         {
-            [HotfixState]
-            public partial sealed class ChatRuleState
-            {
-            }
-
             internal sealed class ChatRules
             {
                 private readonly ChatRuleState _state = new();
@@ -529,7 +539,7 @@ internal static class ToolTemplates
     public static string RenderHotfixChatSystem()
     {
         return """
-        using Server.Chat;
+        using Shared.Contracts.Chat;
         using ULinkGame.Server.Hotfix.Abstractions;
 
         namespace Server.Hotfix.Chat

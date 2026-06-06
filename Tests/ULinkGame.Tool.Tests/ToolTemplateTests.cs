@@ -474,10 +474,19 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderServerChatRules();
 
         Assert.Contains("class ChatRules", source, StringComparison.Ordinal);
-        Assert.Contains("[HotfixState]", source, StringComparison.Ordinal);
-        Assert.Contains("partial sealed class ChatRuleState", source, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", source, StringComparison.Ordinal);
         Assert.Contains("HotfixDispatch.Invoke<ChatRuleState, string, string>", source, StringComparison.Ordinal);
         Assert.Contains("\"FilterMessage\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderSharedChatRuleState_DefinesHotfixState()
+    {
+        var source = ToolTemplates.RenderSharedChatRuleState();
+
+        Assert.Contains("[HotfixState]", source, StringComparison.Ordinal);
+        Assert.Contains("partial sealed class ChatRuleState", source, StringComparison.Ordinal);
+        Assert.Contains("namespace Shared.Contracts.Chat", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -510,7 +519,7 @@ public sealed class ToolTemplateTests
         Assert.Contains("namespace Shared.Contracts.Chat", messages, StringComparison.Ordinal);
         Assert.Contains("using Shared.Contracts.Chat;", roomActor, StringComparison.Ordinal);
         Assert.Contains("using Shared.Contracts.Chat;", service, StringComparison.Ordinal);
-        Assert.Contains("using Server.Chat;", hotfix, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", hotfix, StringComparison.Ordinal);
         Assert.Contains("using Shared.Contracts.Chat;", client, StringComparison.Ordinal);
         Assert.Contains("using Shared.Contracts.Chat;", unityUi, StringComparison.Ordinal);
         Assert.Contains("using Shared.Contracts.Chat;", godotScene, StringComparison.Ordinal);

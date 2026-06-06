@@ -134,7 +134,10 @@ internal sealed class ProjectScaffolder
                 ToolTemplates.RenderSharedChatProtocols()),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatMessages.cs"),
-                ToolTemplates.RenderSharedChatMessages(options)));
+                ToolTemplates.RenderSharedChatMessages(options)),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatRuleState.cs"),
+                ToolTemplates.RenderSharedChatRuleState()));
     }
 
     private static async Task WriteUnityClientPackageReferenceAsync(string projectRoot)
