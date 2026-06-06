@@ -264,7 +264,7 @@ internal static class ToolTemplates
         using System.Threading.Tasks;
         using ULinkRPC.Core;
 
-        namespace Shared.Chat
+        namespace Shared.Contracts.Chat
         {
             [RpcService(2, NotificationContract = typeof(IChatCallback))]
             public interface IChatService
@@ -306,7 +306,7 @@ internal static class ToolTemplates
         using System.Collections.Generic;
         {{memoryPackUsing}}
 
-        namespace Shared.Chat
+        namespace Shared.Contracts.Chat
         {
             {{memoryPackable}}public partial class ChatJoinRequest
             {
@@ -355,7 +355,7 @@ internal static class ToolTemplates
         using System.Collections.Concurrent;
         using System.Collections.Generic;
         using System.Linq;
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
 
         namespace Server.Chat
         {
@@ -448,7 +448,7 @@ internal static class ToolTemplates
     {
         return """
         using System;
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
 
         namespace Server.Chat
         {
@@ -491,7 +491,7 @@ internal static class ToolTemplates
     public static string RenderHotfixChatSystem()
     {
         return """
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
 
         namespace Server.Hotfix.Chat
         {
@@ -522,7 +522,7 @@ internal static class ToolTemplates
         using System.Threading;
         using System.Threading.Tasks;
         using Rpc.Generated;
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
         using ULinkRPC.Client;
 
         namespace Client.Chat
@@ -556,7 +556,7 @@ internal static class ToolTemplates
                 public async Task ConnectAsync(CancellationToken cancellationToken = default)
                 {
                     await _rpcClient.ConnectAsync(cancellationToken);
-                    _chatService = _rpcClient.Api.Shared.Chat;
+                    _chatService = _rpcClient.Api.Shared.Contracts.Chat;
                     _isConnected = true;
                 }
 
@@ -634,7 +634,7 @@ internal static class ToolTemplates
         using System.Threading;
         using System.Threading.Tasks;
         using Godot;
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
         using ULinkRPC.Client;
         using ULinkRPC.Core;
         {{serializerUsing}}
@@ -997,7 +997,7 @@ internal static class ToolTemplates
         using System.Collections.Concurrent;
         using System.Threading;
         using System.Threading.Tasks;
-        using Shared.Chat;
+        using Shared.Contracts.Chat;
         using ULinkRPC.Client;
         using ULinkRPC.Core;
         {{serializerUsing}}

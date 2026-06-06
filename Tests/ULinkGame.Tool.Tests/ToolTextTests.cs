@@ -350,7 +350,7 @@ public sealed class ToolTextTests
             await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, options);
 
             var chatMessages = await File.ReadAllTextAsync(
-                Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs"),
+                Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatMessages.cs"),
                 TestContext.Current.CancellationToken);
 
             Assert.DoesNotContain("MemoryPack", chatMessages, StringComparison.Ordinal);

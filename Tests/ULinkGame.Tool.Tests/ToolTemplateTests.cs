@@ -358,8 +358,9 @@ public sealed class ToolTemplateTests
     {
         var sources = new[]
         {
-            ("Shared/Chat/ChatProtocols.cs", ToolTemplates.RenderSharedChatProtocols()),
-            ("Shared/Chat/ChatMessages.cs", ToolTemplates.RenderSharedChatMessages()),
+            ("Shared/Contracts/RpcContractIds.cs", ToolTemplates.RenderSharedRpcContractIds()),
+            ("Shared/Contracts/Chat/ChatProtocols.cs", ToolTemplates.RenderSharedChatProtocols()),
+            ("Shared/Contracts/Chat/ChatMessages.cs", ToolTemplates.RenderSharedChatMessages()),
             ("Client/Assets/Scripts/Chat/ChatClient.cs", ToolTemplates.RenderClientChatClient()),
             ("Client/Assets/Scripts/Chat/ChatUI.cs", ToolTemplates.RenderClientChatUI(CliParser.ParseNewOptions([])))
         };
@@ -428,8 +429,31 @@ public sealed class ToolTemplateTests
         Assert.Contains("using System.Threading.Tasks;", source, StringComparison.Ordinal);
         Assert.Contains("using Rpc.Generated;", source, StringComparison.Ordinal);
         Assert.Contains("new RpcClient(options, callbacks)", source, StringComparison.Ordinal);
-        Assert.Contains("_rpcClient.Api.Shared.Chat", source, StringComparison.Ordinal);
+        Assert.Contains("_rpcClient.Api.Shared.Contracts.Chat", source, StringComparison.Ordinal);
         Assert.Contains("OnMessageReceived?.Invoke", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderChatTemplatesUseSharedContractsChatNamespace()
+    {
+        var protocols = ToolTemplates.RenderSharedChatProtocols();
+        var messages = ToolTemplates.RenderSharedChatMessages();
+        var room = ToolTemplates.RenderServerChatRoom();
+        var service = ToolTemplates.RenderServerChatServiceImpl();
+        var hotfix = ToolTemplates.RenderHotfixChatSystem();
+        var client = ToolTemplates.RenderClientChatClient();
+        var unityUi = ToolTemplates.RenderClientChatUI(CliParser.ParseNewOptions([]));
+        var godotScene = ToolTemplates.RenderGodotChatScene(CliParser.ParseNewOptions([]));
+
+        Assert.Contains("namespace Shared.Contracts.Chat", protocols, StringComparison.Ordinal);
+        Assert.Contains("namespace Shared.Contracts.Chat", messages, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", room, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", service, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", hotfix, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", client, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", unityUi, StringComparison.Ordinal);
+        Assert.Contains("using Shared.Contracts.Chat;", godotScene, StringComparison.Ordinal);
+        Assert.DoesNotContain("Shared.Chat", string.Concat(protocols, messages, room, service, hotfix, client, unityUi, godotScene), StringComparison.Ordinal);
     }
 
     [Fact]
