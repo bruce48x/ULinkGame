@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-06
+
+### Released
+
+- `ULinkGame.Server` `0.2.0`
+- `ULinkGame.Tool` `0.5.0`
+
+### Changed
+
+- Added the canonical `ULinkGame` runtime configuration model with `ULinkGame:Node:Id`, `ULinkGame:Endpoints[]`, compact `ULinkGame:Feature`, and minimal `ULinkGame:Cluster` binding.
+- Added Feature Catalog startup APIs with ordered `ULinkGameFeature` registration, feature dependencies, transport requirements, and fail-fast validation.
+- Updated guardrails, generated project templates, and Agar Unity Gateway sample to use `ULinkGame:Endpoints[]` and Feature Catalog startup instead of singular endpoint or role-shaped configuration.
+- Updated configuration/startup documentation and package READMEs to make the new schema the current guidance.
+
 ## 2026-06-05
 
 ### Released
