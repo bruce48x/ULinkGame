@@ -83,16 +83,18 @@ The default development appsettings file has this shape:
     "Node": {
       "Id": "dev-1"
     },
-    "Endpoint": {
-      "Transport": "kcp",
-      "Host": "127.0.0.1",
-      "Port": 20000
-    }
+    "Endpoints": [
+      {
+        "Transport": "kcp",
+        "Host": "127.0.0.1",
+        "Port": 20000
+      }
+    ]
   }
 }
 ```
 
-For WebSocket projects, the endpoint also includes `"Path": "/ws"`.
+For WebSocket projects, the endpoint entry also includes `"Path": "/ws"`.
 
 Validate the derived project state with:
 
@@ -112,59 +114,4 @@ dotnet run --project "Server/Server/Server.csproj" -- --ulinkgame-check --json
 
 The generated server derives a node-local service model. A node is one .NET server process; generated defaults include gateway, node-directory, and route-directory services inside that node.
 
-The generated development profile derives an all-in-one node equivalent to:
-
-```json
-{
-  "Cluster": {
-    "NodeId": "dev-1",
-    "AdvertisedEndpoints": {
-      "cluster": "tcp://127.0.0.1:21000",
-      "client": "kcp://127.0.0.1:20000"
-    },
-    "Bootstrap": {
-      "NodeDirectoryEndpoints": [
-        "tcp://127.0.0.1:21000"
-      ]
-    },
-    "NodeDirectory": {
-      "Enabled": true,
-      "Storage": {
-        "Mode": "InMemory"
-      }
-    },
-    "Services": [
-      { "Kind": "node-directory", "Name": "node-directory" },
-      { "Kind": "route-directory", "Name": "route-directory" },
-      { "Kind": "gateway", "Name": "gateway" }
-    ]
-  }
-}
-```
-
-Production-oriented profiles can keep the same service model, split services across nodes, add project services such as lobby, match, room, or chat as needed, and use persistent node-directory storage:
-
-```json
-{
-  "Cluster": {
-    "NodeId": "control-1",
-    "AdvertisedEndpoints": {
-      "cluster": "tcp://10.0.0.10:21000"
-    },
-    "NodeDirectory": {
-      "Enabled": true,
-      "Storage": {
-        "Mode": "Persistent",
-        "Provider": "postgres",
-        "ConnectionStringName": "ClusterDirectory"
-      }
-    },
-    "Services": [
-      { "Kind": "node-directory", "Name": "node-directory" },
-      { "Kind": "route-directory", "Name": "route-directory" }
-    ]
-  }
-}
-```
-
-Provider names and connection-string keys are configuration guidance; concrete provider references and secret loading remain project-owned deployment choices.
+The default `appsettings.json` does not expose that full derived topology. Use `--ulinkgame-check` to inspect it. When a generated project is intentionally split across processes, use the canonical `ULinkGame:Feature`, `ULinkGame:Endpoints[]`, and minimal `ULinkGame:Cluster` shape described in `../../docs/ulinkgame-configuration-startup.md`; do not add `Cluster.Directory`, `Services`, or deployment-shaped sections to appsettings until the framework owns and validates those settings.
