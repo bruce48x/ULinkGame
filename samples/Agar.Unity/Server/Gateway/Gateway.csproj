@@ -34,4 +34,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="CopyHotfixOutput" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Agar.Sample.Hotfix.dll"
+      DestinationFolder="$(OutDir)hotfix\"
+      Condition="Exists('$(ProjectDir)..\Hotfix\bin\$(Configuration)\$(TargetFramework)\Agar.Sample.Hotfix.dll')" />
+  </Target>
 </Project>

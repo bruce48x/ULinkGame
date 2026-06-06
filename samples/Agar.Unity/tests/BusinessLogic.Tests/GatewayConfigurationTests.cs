@@ -24,6 +24,7 @@ public sealed class GatewayConfigurationTests
         Assert.False(root.TryGetProperty("ControlPlane", out _));
         Assert.False(root.TryGetProperty("Realtime", out _));
         Assert.False(root.TryGetProperty("Gateway", out _));
+        Assert.False(root.TryGetProperty("Hotfix", out _));
         Assert.False(root.TryGetProperty("Deployment", out _));
         Assert.False(root.TryGetProperty("Services", out _));
         Assert.False(root.TryGetProperty("Cluster", out _));
