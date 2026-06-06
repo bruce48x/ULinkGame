@@ -96,6 +96,12 @@ dotnet build Server/Gateway/Gateway.csproj
 dotnet test tests/BusinessLogic.Tests/BusinessLogic.Tests.csproj
 ```
 
+### Core Runtime Model
+
+- Actor state: `Server/State/*/*Actor.cs` owns user, session, room, matchmaking, and leaderboard state behind the ULinkGame actor facade.
+- Hotfix rules: `Server/Hotfix/Gameplay/*System.cs` contains reloadable gameplay rules invoked through stable wrappers.
+- RPC services in `Server/Gateway/Services` are adapters; they should not own long-lived mutable game state directly.
+
 ## 当前状态
 
 已完成：
