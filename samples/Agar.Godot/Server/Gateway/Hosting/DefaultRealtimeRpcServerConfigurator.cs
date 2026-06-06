@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Gateway.Generated;
 using Gateway.Services;
+using ULinkGame.Server.Configuration;
 using ULinkGame.Server.Hosting;
 using ULinkRPC.Serializer.MemoryPack;
 using ULinkRPC.Transport.Kcp;
@@ -10,11 +11,11 @@ namespace Gateway.Hosting;
 
 internal sealed class DefaultRealtimeRpcServerConfigurator : IULinkRpcServerConfigurator
 {
-    private readonly GatewayRpcServerOptions _options;
+    private readonly ServerRpcServerOptions _options;
 
-    public DefaultRealtimeRpcServerConfigurator(RealtimeRpcServerOptions options)
+    public DefaultRealtimeRpcServerConfigurator(ServerRpcServerOptions options)
     {
-        _options = options.Endpoint;
+        _options = options;
     }
 
     public string Name => "realtime";

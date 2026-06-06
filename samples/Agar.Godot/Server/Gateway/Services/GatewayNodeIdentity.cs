@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Agar.Godot.Sample.State.Contracts;
-using Gateway.Hosting;
 using Shared.Interfaces;
+using ULinkGame.Server.Configuration;
 
 namespace Gateway.Services;
 
 internal sealed class GatewayNodeIdentity
 {
-    public GatewayNodeIdentity(IConfiguration configuration, RealtimeRpcServerOptions realtimeOptions)
+    public GatewayNodeIdentity(IConfiguration configuration, ServerRpcServerOptions realtimeOptions)
     {
         InstanceId = configuration["ULinkGame:Node:Id"] ?? string.Empty;
         if (string.IsNullOrWhiteSpace(InstanceId))
@@ -18,10 +18,10 @@ internal sealed class GatewayNodeIdentity
         RealtimeEndpoint = new GatewayEndpointDescriptor
         {
             InstanceId = InstanceId,
-            Transport = RealtimeTransportToString(realtimeOptions.Endpoint.Transport),
-            Host = realtimeOptions.Endpoint.Host,
-            Port = realtimeOptions.Endpoint.Port,
-            Path = realtimeOptions.Endpoint.Path
+            Transport = RealtimeTransportToString(realtimeOptions.Transport),
+            Host = realtimeOptions.Host,
+            Port = realtimeOptions.Port,
+            Path = realtimeOptions.Path
         };
     }
 

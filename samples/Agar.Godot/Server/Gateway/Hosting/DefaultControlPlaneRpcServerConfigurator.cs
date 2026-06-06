@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Gateway.Generated;
 using Gateway.Services;
+using ULinkGame.Server.Configuration;
 using ULinkGame.Server.Hosting;
 using ULinkRPC.Serializer.MemoryPack;
 using ULinkRPC.Transport.WebSocket;
@@ -9,11 +10,11 @@ namespace Gateway.Hosting;
 
 internal sealed class DefaultControlPlaneRpcServerConfigurator : IULinkRpcServerConfigurator
 {
-    private readonly GatewayRpcServerOptions _options;
+    private readonly ServerRpcServerOptions _options;
 
-    public DefaultControlPlaneRpcServerConfigurator(ControlPlaneRpcServerOptions options)
+    public DefaultControlPlaneRpcServerConfigurator(ServerRpcServerOptions options)
     {
-        _options = options.Endpoint;
+        _options = options;
     }
 
     public string Name => "control";
