@@ -92,6 +92,8 @@ Warnings should not make local development painful. They should be visible in `-
 
 Hotfix assembly absence is not a warning in any profile or command mode. It is always an error because Hotfix is part of the ULinkGame default application model. `--ulinkgame-check` should make the repair path friendly, but it must still return a non-zero exit code.
 
+Normal server startup must fail when the initial Hotfix load fails. A missing, invalid, or scanner-rejected `Server.Hotfix.dll` is not a degraded mode. `--ulinkgame-check`, readiness checks, and normal startup must agree that Hotfix absence is an error for generated ULinkGame projects.
+
 ### Info
 
 Info explains derived state without implying risk:

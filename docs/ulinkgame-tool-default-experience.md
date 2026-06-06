@@ -135,6 +135,8 @@ The generated application should include a small vertical slice that demonstrate
 - reconnect with pending reliable push replay
 - stable wrapper calling a hotfix rule
 
+The generated Chat vertical slice must use the core ULinkGame runtime model: RPC enters through `IChatService`, stable server code dispatches to `ChatRoomActor` through `IActorRuntime`, and message filtering calls a reloadable Hotfix rule through a stable wrapper. The generated project must not use static mutable process state as the room concurrency model.
+
 The user should see ULinkGame's core capabilities through a working game-server story instead of isolated infrastructure examples.
 
 ## Health And Check Command

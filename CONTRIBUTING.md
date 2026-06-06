@@ -47,7 +47,7 @@ samples/
   Agar.Unity/             Unity + .NET multiplayer sample
     docs/                 Sample gameplay design and development plan
     tests/                Sample gameplay and server policy tests
-  Agar.Godot/             Godot .NET client sample
+  Chat.Godot/             Godot .NET single-endpoint Chat sample
 
 Tests/
   tests.slnx              Framework test entry point
@@ -70,16 +70,17 @@ The repository currently contains one cluster infrastructure sample and two game
 samples/Cluster.TwoNode/
   Multi-process ULinkRPC route-directory and node-messenger smoke sample
 
-samples/Agar.Unity/
-  Shared/  MemoryPack contracts and shared gameplay kernel
-  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
-  Client/  Unity client
+samples/Chat.Godot/
+  Godot .NET single-endpoint Chat sample demonstrating the generated default model
 
-samples/Agar.Godot/
-  Shared/  MemoryPack contracts and shared gameplay kernel
-  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
-  Client/  Godot .NET client
+samples/Agar.Unity/
+  Unity .NET multi-endpoint realtime sample with WebSocket control plus KCP realtime
 ```
+
+- `samples/Chat.Godot` is the single-endpoint Godot Chat sample. It demonstrates the generated default model with one RPC endpoint, Actor-owned Chat state, and Hotfix message filtering.
+- `samples/Agar.Unity` is the multi-endpoint Unity realtime sample. It demonstrates WebSocket control plus KCP realtime, matchmaking/rooms, reliable push, Actor state, and Hotfix gameplay rules.
+
+Agar.Godot was replaced by Chat.Godot so the sample set contains a clear single-endpoint Godot project and a separate multi-endpoint Unity project.
 
 `samples/Cluster.TwoNode` starts a directory process and worker process, then verifies ULinkRPC-based node registration, route registration, local dispatch, remote dispatch, route not found, expired message rejection, timeout, handler unavailable, backpressure, stale registration rejection, clear-by-node-epoch, and node restart with a new directory-assigned epoch.
 
@@ -98,8 +99,6 @@ dotnet run --project samples/Cluster.TwoNode/Cluster.TwoNode.csproj -- --mode dr
 - business-level reliable push for server notifications
 - an agar-style arena built on a shared simulation kernel
 
-`samples/Agar.Godot` follows the same high-level shape as the Unity sample with its own shared contracts, server projects, and Godot client. It is intentionally smaller than the Unity sample, but it is an online client/server sample, not an offline playground.
-
 Sample-specific documentation and local infrastructure live with the sample:
 
 - `samples/Agar.Unity/README.md`
@@ -117,7 +116,7 @@ dotnet run --project samples/Agar.Unity/Server/Gateway/Gateway.csproj
 
 Open `samples/Agar.Unity/Client` in Unity for the client.
 
-Open `samples/Agar.Godot/Client` in Godot 4 .NET for the Godot client.
+Open `samples/Chat.Godot/Client` in Godot 4 .NET for the Godot client.
 
 ## Contributor Workflow
 
@@ -618,6 +617,8 @@ First versions should avoid hotfixing:
 - transport protocol structure
 - persistent state schema
 - low-level schedulers
+
+Generated ULinkGame project templates must show live runtime paths for core capabilities. If a template creates `Server/Hotfix`, stable server code must call a Hotfix method on the default business path. If a template creates stateful server behavior, that state must live behind the ULinkGame actor facade, not in static mutable process objects guarded by ad hoc locks.
 
 ## Cluster Architecture
 
