@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Historical note:** This plan is superseded for configuration and startup shape by [ULinkGame Configuration And Startup Model](ulinkgame-configuration-startup.md) and [ULinkGame Configuration Startup Implementation Plan](ulinkgame-configuration-startup-implementation-plan.md). Old singular endpoint examples and service-shaped cluster examples below are historical only; current guidance uses `ULinkGame:Endpoints[]`, `ULinkGame:Node:Id`, compact `ULinkGame:Feature`, and the `AddULinkGame` Feature Catalog.
+
 **Goal:** Build the first runtime guardrails loop so generated projects and server startup can validate ULinkGame runtime invariants with shared framework diagnostics.
 
 **Architecture:** Add small diagnostic and validation primitives to `ULinkGame.Server`, introduce a resolved runtime model that records final values and provenance, implement the first low-risk validation rules, then make generated `--ulinkgame-check` consume the framework validation model. Keep rule ownership in runtime packages and keep generated code responsible only for project-specific presentation.
@@ -209,7 +211,7 @@ public void ResolvedRuntime_CarriesCoreRuntimeSections()
     var runtime = TestRuntime();
 
     Assert.Equal("dev-1", runtime.NodeId.Value);
-    Assert.Equal("kcp", runtime.Endpoint.Transport.Value);
+    Assert.Equal("kcp", runtime.Endpoints[0].Transport.Value);
     Assert.Equal("Server.Hotfix.dll", runtime.Hotfix.AssemblyFileName.Value);
     Assert.Equal(ULinkGameRuntimeProfile.Development, runtime.Profile);
 }
@@ -218,14 +220,17 @@ private static ULinkGameResolvedRuntime TestRuntime()
 {
     return new ULinkGameResolvedRuntime(
         NodeId: new ULinkGameResolvedValue<string>("dev-1", ULinkGameValueSource.Configuration, "ULinkGame:Node:Id"),
-        Endpoint: new ULinkGameResolvedEndpoint(
-            Transport: new ULinkGameResolvedValue<string>("kcp", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Transport"),
-            Host: new ULinkGameResolvedValue<string>("127.0.0.1", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Host"),
-            Port: new ULinkGameResolvedValue<int>(20000, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Port"),
-            Path: new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default),
-            AdvertisedEndpoint: new ULinkGameResolvedValue<string>("kcp://127.0.0.1:20000", ULinkGameValueSource.GeneratedConvention)),
+        Endpoints:
+        [
+            new ULinkGameResolvedEndpoint(
+                Transport: new ULinkGameResolvedValue<string>("kcp", ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Transport"),
+                Host: new ULinkGameResolvedValue<string>("127.0.0.1", ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Host"),
+                Port: new ULinkGameResolvedValue<int>(20000, ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Port"),
+                Path: new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default),
+                AdvertisedEndpoint: new ULinkGameResolvedValue<string>("kcp://127.0.0.1:20000", ULinkGameValueSource.GeneratedConvention))
+        ],
         Cluster: new ULinkGameResolvedCluster(
-            Services: [new ULinkGameResolvedClusterService("gateway", "gateway")],
+            Services: [new ULinkGameResolvedClusterService("gateway", "gateway")], // Historical/superseded: current startup uses Feature Catalog, not service-shaped framework config.
             AdvertisedEndpoints: new Dictionary<string, string> { ["client"] = "kcp://127.0.0.1:20000" }),
         Hotfix: new ULinkGameResolvedHotfix(
             AssemblyPath: new ULinkGameResolvedValue<string>("Server.Hotfix.dll", ULinkGameValueSource.GeneratedConvention),
@@ -406,11 +411,14 @@ public void RuntimeValidator_Fails_WhenWebSocketPathIsMissing()
 {
     var runtime = TestRuntime() with
     {
-        Endpoint = TestRuntime().Endpoint with
-        {
-            Transport = new ULinkGameResolvedValue<string>("websocket", ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Transport"),
-            Path = new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default)
-        }
+        Endpoints =
+        [
+            TestRuntime().Endpoints[0] with
+            {
+                Transport = new ULinkGameResolvedValue<string>("websocket", ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Transport"),
+                Path = new ULinkGameResolvedValue<string>("", ULinkGameValueSource.Default)
+            }
+        ]
     };
     var result = Validate(runtime);
 
@@ -444,7 +452,7 @@ public void RuntimeValidator_Fails_WhenClusterServiceNameIsDuplicated()
     {
         Cluster = TestRuntime().Cluster with
         {
-            Services =
+            Services = // Historical/superseded: current startup uses Feature Catalog, not service-shaped framework config.
             [
                 new ULinkGameResolvedClusterService("gateway", "gateway"),
                 new ULinkGameResolvedClusterService("gateway", "gateway")
@@ -562,7 +570,8 @@ public sealed class EndpointRule : IULinkGameValidationRule
 
     public IEnumerable<ULinkGameDiagnostic> Validate(ULinkGameResolvedRuntime runtime)
     {
-        var transport = runtime.Endpoint.Transport.Value;
+        var endpoint = runtime.Endpoints[0];
+        var transport = endpoint.Transport.Value;
         if (!KnownTransports.Contains(transport))
         {
             yield return new ULinkGameDiagnostic(
@@ -574,13 +583,13 @@ public sealed class EndpointRule : IULinkGameValidationRule
         }
 
         if (string.Equals(transport, "websocket", StringComparison.OrdinalIgnoreCase)
-            && string.IsNullOrWhiteSpace(runtime.Endpoint.Path.Value))
+            && string.IsNullOrWhiteSpace(endpoint.Path.Value))
         {
             yield return new ULinkGameDiagnostic(
                 "ULINK023",
                 ULinkGameDiagnosticSeverity.Error,
                 "WebSocket endpoint path is required.",
-                "Set ULinkGame:Endpoint:Path to /ws or another explicit WebSocket path.");
+                "Set ULinkGame:Endpoints:0:Path to /ws or another explicit WebSocket path.");
         }
     }
 }
@@ -841,10 +850,10 @@ internal static class ULinkGameCheck
         ClusterOptions clusterOptions,
         ULinkGameValidationResult result)
     {
-        var serviceNames = clusterOptions.Services.Select(service => service.Name);
+        var serviceNames = clusterOptions.Services.Select(service => service.Name); // Historical/superseded: current startup uses Feature Catalog, not service-shaped framework config.
         var rpcEndpoint = clusterOptions.AdvertisedEndpoints.TryGetValue("client", out var clientEndpoint)
             ? clientEndpoint
-            : runtime.Endpoint.ToAdvertisedEndpoint();
+            : runtime.Endpoints[0].ToAdvertisedEndpoint();
 
         Console.WriteLine("cluster: ok single-node");
         Console.WriteLine($"node: ok {clusterOptions.NodeId}");
@@ -886,14 +895,17 @@ internal static class ULinkGameCheck
 
         return new ULinkGameResolvedRuntime(
             NodeId: new ULinkGameResolvedValue<string>(clusterOptions.NodeId, ULinkGameValueSource.Configuration, "ULinkGame:Node:Id"),
-            Endpoint: new ULinkGameResolvedEndpoint(
-                Transport: new ULinkGameResolvedValue<string>(runtime.Endpoint.Transport, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Transport"),
-                Host: new ULinkGameResolvedValue<string>(runtime.Endpoint.Host, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Host"),
-                Port: new ULinkGameResolvedValue<int>(runtime.Endpoint.Port, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Port"),
-                Path: new ULinkGameResolvedValue<string>(runtime.Endpoint.Path, ULinkGameValueSource.Configuration, "ULinkGame:Endpoint:Path"),
-                AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoint.ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention)),
+            Endpoints:
+            [
+                new ULinkGameResolvedEndpoint(
+                    Transport: new ULinkGameResolvedValue<string>(runtime.Endpoints[0].Transport, ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Transport"),
+                    Host: new ULinkGameResolvedValue<string>(runtime.Endpoints[0].Host, ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Host"),
+                    Port: new ULinkGameResolvedValue<int>(runtime.Endpoints[0].Port, ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Port"),
+                    Path: new ULinkGameResolvedValue<string>(runtime.Endpoints[0].Path, ULinkGameValueSource.Configuration, "ULinkGame:Endpoints:0:Path"),
+                    AdvertisedEndpoint: new ULinkGameResolvedValue<string>(runtime.Endpoints[0].ToAdvertisedEndpoint(), ULinkGameValueSource.GeneratedConvention))
+            ],
             Cluster: new ULinkGameResolvedCluster(
-                Services: clusterOptions.Services
+                Services: clusterOptions.Services // Historical/superseded: current startup uses Feature Catalog, not service-shaped framework config.
                     .Select(service => new ULinkGameResolvedClusterService(service.Kind, service.Name))
                     .ToArray(),
                 AdvertisedEndpoints: clusterOptions.AdvertisedEndpoints),
