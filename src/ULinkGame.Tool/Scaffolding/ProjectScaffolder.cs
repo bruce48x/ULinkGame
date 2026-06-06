@@ -122,10 +122,13 @@ internal sealed class ProjectScaffolder
                 Path.Combine(projectRoot, "Shared", "Properties", "AssemblyInfo.cs"),
                 ToolTemplates.RenderSharedHotfixAssemblyInfo()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Shared", "Chat", "ChatProtocols.cs"),
+                Path.Combine(projectRoot, "Shared", "Contracts", "RpcContractIds.cs"),
+                ToolTemplates.RenderSharedRpcContractIds()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatProtocols.cs"),
                 ToolTemplates.RenderSharedChatProtocols()),
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs"),
+                Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatMessages.cs"),
                 ToolTemplates.RenderSharedChatMessages(options)));
     }
 

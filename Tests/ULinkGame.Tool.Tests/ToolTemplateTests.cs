@@ -637,4 +637,41 @@ public sealed class ToolTemplateTests
             }
         }
     }
+
+    [Fact]
+    public async Task AugmentExistingStarterServerProjectWritesULinkGameContractsUnderSharedContracts()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var serverDirectory = Path.Combine(projectRoot, "Server", "Server");
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            await File.WriteAllTextAsync(
+                Path.Combine(serverDirectory, "Server.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Shared", "Contracts", "RpcContractIds.cs")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatProtocols.cs")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "Shared", "Contracts", "Chat", "ChatMessages.cs")));
+            Assert.False(File.Exists(Path.Combine(projectRoot, "Shared", "Chat", "ChatProtocols.cs")));
+            Assert.False(File.Exists(Path.Combine(projectRoot, "Shared", "Chat", "ChatMessages.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
 }

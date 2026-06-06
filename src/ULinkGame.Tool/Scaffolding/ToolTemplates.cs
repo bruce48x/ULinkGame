@@ -228,6 +228,36 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderSharedRpcContractIds()
+    {
+        return """
+        namespace Shared.Contracts
+        {
+            public static class RpcContractIds
+            {
+                public static class Services
+                {
+                    public const int Chat = 2;
+                }
+
+                public static class ChatServiceMethods
+                {
+                    public const int JoinAsync = 1;
+                    public const int SendAsync = 2;
+                    public const int LeaveAsync = 3;
+                }
+
+                public static class ChatNotifications
+                {
+                    public const int MessageReceived = 1;
+                    public const int UserJoined = 2;
+                    public const int UserLeft = 3;
+                }
+            }
+        }
+        """;
+    }
+
     public static string RenderSharedChatProtocols()
     {
         return """
