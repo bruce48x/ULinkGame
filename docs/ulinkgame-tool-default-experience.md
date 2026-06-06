@@ -124,6 +124,8 @@ Server/Server/Game/    stable business orchestration
 Server/Hotfix/         hotfixable business rules
 ```
 
+The framework still allows user-owned RPC contracts to live in any compiled shared assembly path and namespace. The generated project uses `Shared/Contracts/<Domain>/` as the recommended convention so new projects have one obvious place for RPC services, notification contracts, DTOs, and named RPC contract IDs.
+
 The generated application should include a small vertical slice that demonstrates:
 
 - login creating a session
