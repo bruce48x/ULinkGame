@@ -384,9 +384,15 @@ internal sealed class ProjectScaffolder
 
     private static Task WriteGeneratedServerApplicationAsync(string projectRoot, NewCommandOptions options)
     {
+        var content = ToolTemplates.RenderGeneratedServerApplication(options);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return Task.CompletedTask;
+        }
+
         return WriteAsync(
             Path.Combine(projectRoot, "Server", "Server", "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs"),
-            ToolTemplates.RenderGeneratedServerApplication(options));
+            content);
     }
 
     private static async Task WriteServerProjectAsync(string projectRoot, NewCommandOptions options)
@@ -450,32 +456,9 @@ internal sealed class ProjectScaffolder
 
     private static Task WriteServerConfiguratorsAsync(string projectRoot, NewCommandOptions options)
     {
-        var hostingDirectory = Path.Combine(projectRoot, "Server", "Server", "Hosting");
-        Directory.CreateDirectory(hostingDirectory);
-
-        if (ProjectConventions.IsRealtimeNetworkProfile(options.NetworkProfile))
-        {
-            return Task.WhenAll(
-                WriteAsync(Path.Combine(hostingDirectory, "ServerRpcServerOptions.cs"), ToolTemplates.RenderServerRpcServerOptions()),
-                WriteAsync(Path.Combine(hostingDirectory, "ControlPlaneRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
-                WriteAsync(Path.Combine(hostingDirectory, "RealtimeRpcServerOptions.cs"), ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
-                WriteAsync(Path.Combine(hostingDirectory, "DefaultControlPlaneRpcServerConfigurator.cs"), ToolTemplates.RenderControlPlaneConfigurator(options)),
-                WriteAsync(Path.Combine(hostingDirectory, "DefaultRealtimeRpcServerConfigurator.cs"), ToolTemplates.RenderRealtimeConfigurator(options)));
-        }
-
-        var writes = new List<Task>
-        {
-            WriteAsync(Path.Combine(hostingDirectory, "ServerRpcServerOptions.cs"), ToolTemplates.RenderServerRpcServerOptions()),
-            WriteAsync(Path.Combine(hostingDirectory, "DefaultRpcServerConfigurator.cs"), ToolTemplates.RenderDefaultConfigurator(options))
-        };
-
-        if (ProjectConventions.IsClusterNetworkProfile(options.NetworkProfile))
-        {
-            writes.Add(WriteAsync(Path.Combine(hostingDirectory, "ClusterOptions.cs"), ToolTemplates.RenderClusterOptions()));
-            writes.Add(WriteAsync(Path.Combine(hostingDirectory, "ClusterHealthCheck.cs"), ToolTemplates.RenderClusterHealthCheck()));
-        }
-
-        return Task.WhenAll(writes);
+        return WriteAsync(
+            Path.Combine(projectRoot, "Server", "Server", "Hosting", "ServiceBindingConfigurator.cs"),
+            ToolTemplates.RenderServiceBindingConfigurator());
     }
 
     private static Task WriteOperationsScaffoldingAsync(string projectRoot, NewCommandOptions options)

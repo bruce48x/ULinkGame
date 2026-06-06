@@ -80,40 +80,15 @@ public sealed class ToolTemplateTests
 
         var source = ToolTemplates.RenderServerProgram(options);
 
-        Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
-        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.Contains("using Server.Hosting;", source, StringComparison.Ordinal);
+        Assert.Contains("using ULinkGame.Server.Hosting;", source, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameServer.RunAsync(args", source, StringComparison.Ordinal);
+        Assert.Contains("ServiceBindingConfigurator.Bind", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameGeneratedApplication", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", source, StringComparison.Ordinal);
         Assert.DoesNotContain("AddULinkRpcServer", source, StringComparison.Ordinal);
-        Assert.True(source.Split('\n').Length <= 8);
-    }
-
-    [Fact]
-    public void RenderGeneratedServerApplication_DefaultSingleEndpoint_IncludesULinkGameCheckCommand()
-    {
-        var options = new NewCommandOptions(
-            Name: "MyGame",
-            OutputPath: null,
-            ClientEngine: ProjectConventions.DefaultClientEngine,
-            Transport: "kcp",
-            NetworkProfile: ProjectConventions.DefaultNetworkProfile,
-            Serializer: ProjectConventions.DefaultSerializer,
-            Persistence: ProjectConventions.DefaultPersistence,
-            NuGetForUnitySource: ProjectConventions.DefaultNuGetForUnitySource,
-            DeployProfile: ProjectConventions.DefaultDeployProfile);
-
-        var source = ToolTemplates.RenderGeneratedServerApplication(options);
-
-        Assert.Contains("--ulinkgame-check", source, StringComparison.Ordinal);
-        Assert.Contains("ULinkGameCheck", source, StringComparison.Ordinal);
-        Assert.True(
-            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration, \"kcp\"), args)", StringComparison.Ordinal) >
-            source.IndexOf("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", StringComparison.Ordinal));
-        Assert.True(
-            source.IndexOf("return ULinkGameCheck.Run(runtimeOptions, runtimeOptions.ToClusterOptions(builder.Configuration, \"kcp\"), args)", StringComparison.Ordinal) <
-            source.IndexOf("builder.Services.AddULinkGameServer()", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -132,18 +107,19 @@ public sealed class ToolTemplateTests
 
         var source = ToolTemplates.RenderServerProgram(options);
 
-        Assert.Contains("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
-        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", source, StringComparison.Ordinal);
+        Assert.Contains("using Server.Hosting;", source, StringComparison.Ordinal);
+        Assert.Contains("using ULinkGame.Server.Hosting;", source, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameServer.RunAsync(args", source, StringComparison.Ordinal);
+        Assert.Contains("ServiceBindingConfigurator.Bind", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("using Server.Hosting.Advanced;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameGeneratedApplication", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ClusterOptions", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("ServerRpcServerOptions", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", source, StringComparison.Ordinal);
         Assert.DoesNotContain("AddULinkRpcServer", source, StringComparison.Ordinal);
-        Assert.True(source.Split('\n').Length <= 8);
     }
 
     [Fact]
-    public void RenderGeneratedServerApplication_RealtimeProfile_ConfiguresNamedRpcServers()
+    public void RenderGeneratedServerApplication_RealtimeProfile_ReturnsRealtimeGeneratedApplication()
     {
         var options = new NewCommandOptions(
             Name: "MyGame",
@@ -158,121 +134,12 @@ public sealed class ToolTemplateTests
 
         var source = ToolTemplates.RenderGeneratedServerApplication(options);
 
-        Assert.Contains("var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("ServerRpcServerOptions.FromConfiguration", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"ControlPlane\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Realtime\"", source, StringComparison.Ordinal);
-        Assert.Contains("runtimeOptions.ToServerRpcServerOptions(\"websocket\")", source, StringComparison.Ordinal);
-        Assert.Contains("runtimeOptions.ToServerRpcServerOptions(\"kcp\")", source, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void RenderClusterOptions_DefinesRuntimeOptionsFromCompactULinkGameSection()
-    {
-        var source = ToolTemplates.RenderClusterOptions();
-
-        Assert.Contains("ULinkGameRuntimeOptions", source);
-        Assert.Contains("ULinkGameNodeOptions", source);
-        Assert.Contains("ULinkGameEndpointOptions", source);
-        Assert.Contains("configuration.GetSection(\"ULinkGame\")", source);
-        Assert.Contains("ToClusterOptions(string transport)", source);
-        Assert.Contains("ToClusterOptions(IConfiguration configuration, string transport)", source);
-        Assert.Contains("ToServerRpcServerOptions(string transport)", source);
-        Assert.Contains("Path = ReadString(section, \"Path\", GetDefaultPath(transport))", source);
-        Assert.Contains("return string.Equals(transport, \"websocket\", StringComparison.OrdinalIgnoreCase)", source);
-        Assert.Contains("ULinkGame:Node:Id", source);
-        Assert.Contains("section.GetSection(\"Endpoints\")", source);
-        Assert.Contains("ULinkGame:Endpoints", source);
-        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Transport", source);
-        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Host", source);
-        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Port", source);
-        Assert.Contains("ULinkGame:Endpoints:{endpointIndex}:Path", source);
-        Assert.Contains("[\"cluster\"] = ClusterEndpoint", source);
-        Assert.Contains("FindEndpoint(transport).ToAdvertisedEndpoint()", source);
-        Assert.Contains("[\"client\"] = clientEndpoint", source);
-        Assert.Contains("NodeDirectoryEndpoints = new[] { ClusterEndpoint }", source);
-        Assert.Contains("new ClusterServiceOptions { Kind = \"node-directory\", Name = \"node-directory\" }", source);
-        Assert.Contains("new ClusterServiceOptions { Kind = \"route-directory\", Name = \"route-directory\" }", source);
-        Assert.Contains("new ClusterServiceOptions { Kind = \"gateway\", Name = \"gateway\" }", source);
-    }
-
-    [Fact]
-    public void RenderClusterOptions_PreservesClusterCompatibilityOverrides()
-    {
-        var source = ToolTemplates.RenderClusterOptions();
-
-        Assert.Contains("configuration.GetSection(\"Cluster\")", source);
-        Assert.Contains("NodeId = ReadString(section, \"NodeId\", defaults.NodeId)", source);
-        Assert.Contains("AdvertisedEndpoints = ReadDictionary(section.GetSection(\"AdvertisedEndpoints\"), defaults.AdvertisedEndpoints)", source);
-        Assert.Contains("Bootstrap = ClusterBootstrapOptions.FromConfiguration(section.GetSection(\"Bootstrap\"), defaults.Bootstrap)", source);
-        Assert.Contains("NodeDirectory = ClusterNodeDirectoryOptions.FromConfiguration(section.GetSection(\"NodeDirectory\"), defaults.NodeDirectory)", source);
-        Assert.Contains("Services = ReadServices(section.GetSection(\"Services\"), defaults.Services)", source);
-        Assert.Contains("RouteLeaseSeconds = ReadInt(section, \"RouteLeaseSeconds\", defaults.RouteLeaseSeconds)", source);
-        Assert.Contains("SendTimeoutMilliseconds = ReadInt(section, \"SendTimeoutMilliseconds\", defaults.SendTimeoutMilliseconds)", source);
-    }
-
-    [Fact]
-    public void GeneratedRuntimeOptions_AdvertisesClientEndpointForSelectedTransport()
-    {
-        var assembly = CompileGeneratedClusterOptions();
-        var runtime = CreateRuntimeOptions(
-            assembly,
-            CreateEndpoint(assembly, "kcp", "127.0.0.1", 20001, ""),
-            CreateEndpoint(assembly, "websocket", "127.0.0.1", 20000, "/ws"));
-
-        var clusterOptions = Invoke(runtime, "ToClusterOptions", "websocket");
-        var advertisedEndpoints = (IReadOnlyDictionary<string, string>)GetProperty(clusterOptions, "AdvertisedEndpoints");
-
-        Assert.Equal("ws://127.0.0.1:20000/ws", advertisedEndpoints["client"]);
-    }
-
-    [Fact]
-    public void GeneratedRuntimeOptions_EmptyEndpointsThrowsMissingEndpointError()
-    {
-        var assembly = CompileGeneratedClusterOptions();
-        var runtime = CreateRuntimeOptions(assembly);
-
-        var exception = Assert.ThrowsAny<Exception>(() => Invoke(runtime, "ToServerRpcServerOptions", "websocket"));
-        var message = exception.InnerException?.Message ?? exception.Message;
-
-        Assert.Contains("No ULinkGame endpoints are configured", message, StringComparison.Ordinal);
-        Assert.Contains("ULinkGame:Endpoints", message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void RenderClusterOptions_IncludesULinkGameCheckOutputLabels()
-    {
-        var source = ToolTemplates.RenderClusterOptions();
-
-        Assert.Contains("ULinkGameCheck", source);
-        Assert.Contains("cluster:", source);
-        Assert.Contains("node:", source);
-        Assert.Contains("services:", source);
-        Assert.Contains("hotfix:", source);
-        Assert.Contains("reliable-push:", source);
-        Assert.Contains("rpc:", source);
-        Assert.Contains("using System.Text.Json;", source);
-        Assert.Contains("using ULinkGame.Server.Guardrails;", source);
-        Assert.Contains("using ULinkGame.Server.Guardrails.Rules;", source);
-        Assert.Contains("ULinkGameValidationResult", source);
-        Assert.Contains("--json", source);
-        Assert.Contains("JsonSerializer.Serialize", source);
-        Assert.Contains("\"succeeded\"", source);
-        Assert.Contains("ULINK071", source);
-        Assert.Contains("public static int Run(ULinkGameRuntimeOptions runtime, ClusterOptions clusterOptions, string[] args)", source);
-        Assert.Contains("node: ok {clusterOptions.NodeId}", source);
-        Assert.Contains("clusterOptions.AdvertisedEndpoints.TryGetValue(\"client\"", source);
-        Assert.Contains("hotfix: failed local build output not found", source);
-        Assert.Contains("fix: {hotfixFailure.Repair}", source);
-        Assert.Contains("\"hotfix\"", source);
-        Assert.Contains("new HotfixSourceRule()", source);
-        Assert.Contains("new ULinkGameResolvedHotfix", source);
-        Assert.Contains("Endpoints:", source);
-        Assert.Contains("new ULinkGameResolvedFeature", source);
-        Assert.Contains("new ClusterEndpointRule()", source);
-        Assert.Contains("new ULinkGameResolvedClusterEndpoint", source);
-        Assert.DoesNotContain("Hotfix:Directory", source);
-        Assert.DoesNotContain("Hotfix:Assembly", source);
+        Assert.Contains("ULinkGameGeneratedApplication", source, StringComparison.Ordinal);
+        Assert.Contains("ULinkGameServer.RunAsync", source, StringComparison.Ordinal);
+        Assert.Contains("ServiceBindingConfigurator.Bind", source, StringComparison.Ordinal);
+        Assert.Contains("AddRpcEndpoint", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ULinkGameRuntimeOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("runtimeOptions.ToServerRpcServerOptions", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -332,14 +199,12 @@ public sealed class ToolTemplateTests
         Assert.DoesNotContain("AddULinkGameHotfix", program, StringComparison.Ordinal);
         Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
         Assert.DoesNotContain("IHotfixManager", program, StringComparison.Ordinal);
-        Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("CurrentDirectoryHotfixAssemblySource", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("IHotfixManager", generatedApplication, StringComparison.Ordinal);
+        Assert.Empty(generatedApplication);
         Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AugmentExistingStarterServerProjectWritesAdvancedGeneratedApplication()
+    public async Task AugmentExistingStarterServerProjectUsesFluentRunAsync()
     {
         var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
         try
@@ -363,15 +228,16 @@ public sealed class ToolTemplateTests
             var program = await File.ReadAllTextAsync(
                 Path.Combine(serverDirectory, "Program.cs"),
                 TestContext.Current.CancellationToken);
-            var generatedApplication = await File.ReadAllTextAsync(
-                Path.Combine(serverDirectory, "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs"),
+            var serviceBindingConfigurator = await File.ReadAllTextAsync(
+                Path.Combine(serverDirectory, "Hosting", "ServiceBindingConfigurator.cs"),
                 TestContext.Current.CancellationToken);
 
-            Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", program, StringComparison.Ordinal);
-            Assert.Contains("namespace Server.Hosting.Advanced;", generatedApplication, StringComparison.Ordinal);
-            Assert.Contains("internal static class ULinkGameGeneratedApplication", generatedApplication, StringComparison.Ordinal);
-            Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration", generatedApplication, StringComparison.Ordinal);
-            Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
+            Assert.Contains("return await ULinkGameServer.RunAsync(args", program, StringComparison.Ordinal);
+            Assert.Contains("ServiceBindingConfigurator.Bind", program, StringComparison.Ordinal);
+            Assert.DoesNotContain("ULinkGameGeneratedApplication", program, StringComparison.Ordinal);
+            Assert.Contains("class ServiceBindingConfigurator", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.Contains("AllServicesBinder.BindAll", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(serverDirectory, "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs")));
         }
         finally
         {
@@ -479,16 +345,9 @@ public sealed class ToolTemplateTests
         {
             ("Server/Server/Program.cs", ToolTemplates.RenderServerProgram(options)),
             ("Server/Server/Hosting/Advanced/ULinkGameGeneratedApplication.cs", ToolTemplates.RenderGeneratedServerApplication(options)),
-            ("Server/Server/Hosting/ServerRpcServerOptions.cs", ToolTemplates.RenderServerRpcServerOptions()),
-            ("Server/Server/Hosting/DefaultRpcServerConfigurator.cs", ToolTemplates.RenderDefaultConfigurator(options)),
-            ("Server/Server/Hosting/ClusterOptions.cs", ToolTemplates.RenderClusterOptions()),
-            ("Server/Server/Hosting/ClusterHealthCheck.cs", ToolTemplates.RenderClusterHealthCheck()),
+            ("Server/Server/Hosting/ServiceBindingConfigurator.cs", ToolTemplates.RenderServiceBindingConfigurator()),
             ("Server/Server/RealtimeProgram.cs", ToolTemplates.RenderServerProgram(realtimeOptions)),
             ("Server/Server/Hosting/Advanced/RealtimeULinkGameGeneratedApplication.cs", ToolTemplates.RenderGeneratedServerApplication(realtimeOptions)),
-            ("Server/Server/Hosting/ControlPlaneRpcServerOptions.cs", ToolTemplates.RenderNamedRpcServerOptions("ControlPlaneRpcServerOptions")),
-            ("Server/Server/Hosting/RealtimeRpcServerOptions.cs", ToolTemplates.RenderNamedRpcServerOptions("RealtimeRpcServerOptions")),
-            ("Server/Server/Hosting/DefaultControlPlaneRpcServerConfigurator.cs", ToolTemplates.RenderControlPlaneConfigurator(realtimeOptions)),
-            ("Server/Server/Hosting/DefaultRealtimeRpcServerConfigurator.cs", ToolTemplates.RenderRealtimeConfigurator(realtimeOptions))
         };
 
         AssertGeneratedSourcesParseAsCurrentCSharp(sources);
@@ -532,132 +391,6 @@ public sealed class ToolTemplateTests
         }
 
         Assert.Empty(diagnostics);
-    }
-
-    private static System.Reflection.Assembly CompileGeneratedClusterOptions()
-    {
-        var source = ToolTemplates.RenderClusterOptions();
-        var checkStart = source.IndexOf("internal static class ULinkGameCheck", StringComparison.Ordinal);
-        var clusterOptionsStart = source.IndexOf("internal sealed class ClusterOptions", StringComparison.Ordinal);
-        Assert.True(checkStart > 0);
-        Assert.True(clusterOptionsStart > checkStart);
-
-        var runtimeOnlySource = string.Concat(
-            source.AsSpan(0, checkStart),
-            source.AsSpan(clusterOptionsStart));
-        var stubs = """
-        namespace Microsoft.Extensions.Configuration
-        {
-            public interface IConfiguration
-            {
-                IConfigurationSection GetSection(string key);
-                string? this[string key] { get; set; }
-            }
-
-            public interface IConfigurationSection : IConfiguration
-            {
-                string Key { get; }
-                string? Value { get; set; }
-                System.Collections.Generic.IEnumerable<IConfigurationSection> GetChildren();
-            }
-        }
-
-        namespace ULinkGame.Server.Guardrails {}
-        namespace ULinkGame.Server.Guardrails.Rules {}
-
-        namespace Server.Hosting
-        {
-            internal sealed class ServerRpcServerOptions
-            {
-                public string Transport { get; init; } = "kcp";
-                public string Host { get; init; } = "127.0.0.1";
-                public int Port { get; init; } = 20000;
-                public string Path { get; init; } = "";
-            }
-        }
-        """;
-        var compilation = CSharpCompilation.Create(
-            "GeneratedClusterOptionsTests",
-            new[]
-            {
-                CSharpSyntaxTree.ParseText(runtimeOnlySource),
-                CSharpSyntaxTree.ParseText(stubs)
-            },
-            GetTrustedPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        var diagnostics = result.Diagnostics
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => $"{diagnostic.Id} {diagnostic.GetMessage()}")
-            .ToArray();
-        Assert.Empty(diagnostics);
-
-        stream.Position = 0;
-        return System.Reflection.Assembly.Load(stream.ToArray());
-    }
-
-    private static IReadOnlyList<MetadataReference> GetTrustedPlatformReferences()
-    {
-        return ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))!
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .ToArray();
-    }
-
-    private static object CreateEndpoint(
-        System.Reflection.Assembly assembly,
-        string transport,
-        string host,
-        int port,
-        string path)
-    {
-        var endpointType = assembly.GetType("Server.Hosting.ULinkGameEndpointOptions", throwOnError: true)!;
-        var endpoint = Activator.CreateInstance(endpointType)!;
-        SetProperty(endpoint, "Transport", transport);
-        SetProperty(endpoint, "Host", host);
-        SetProperty(endpoint, "Port", port);
-        SetProperty(endpoint, "Path", path);
-        return endpoint;
-    }
-
-    private static object CreateRuntimeOptions(System.Reflection.Assembly assembly, params object[] endpoints)
-    {
-        var runtimeType = assembly.GetType("Server.Hosting.ULinkGameRuntimeOptions", throwOnError: true)!;
-        var endpointType = assembly.GetType("Server.Hosting.ULinkGameEndpointOptions", throwOnError: true)!;
-        var endpointArray = Array.CreateInstance(endpointType, endpoints.Length);
-        for (var i = 0; i < endpoints.Length; i++)
-        {
-            endpointArray.SetValue(endpoints[i], i);
-        }
-
-        var runtime = Activator.CreateInstance(runtimeType)!;
-        SetProperty(runtime, "Endpoints", endpointArray);
-        return runtime;
-    }
-
-    private static object Invoke(object instance, string methodName, params object[] arguments)
-    {
-        var method = instance.GetType()
-            .GetMethods()
-            .Single(candidate =>
-                candidate.Name == methodName &&
-                candidate.GetParameters().Length == arguments.Length &&
-                candidate.GetParameters()
-                    .Zip(arguments)
-                    .All(pair => pair.First.ParameterType.IsInstanceOfType(pair.Second)));
-        return method.Invoke(instance, arguments)!;
-    }
-
-    private static object GetProperty(object instance, string propertyName)
-    {
-        return instance.GetType().GetProperty(propertyName)!.GetValue(instance)!;
-    }
-
-    private static void SetProperty(object instance, string propertyName, object value)
-    {
-        instance.GetType().GetProperty(propertyName)!.SetValue(instance, value);
     }
 
     [Fact]

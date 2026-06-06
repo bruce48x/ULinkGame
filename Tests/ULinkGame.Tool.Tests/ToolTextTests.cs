@@ -138,8 +138,6 @@ public sealed class ToolTextTests
         var project = ToolTemplates.RenderServerProject(options);
         var program = ToolTemplates.RenderServerProgram(options);
         var generatedApplication = ToolTemplates.RenderGeneratedServerApplication(options);
-        var clusterOptions = ToolTemplates.RenderClusterOptions();
-        var clusterHealthCheck = ToolTemplates.RenderClusterHealthCheck();
         var compose = ToolTemplates.RenderClusterCompose(options);
         var env = ToolTemplates.RenderClusterEnvExample(options);
         var operations = ToolTemplates.RenderClusterOperationsGuide();
@@ -161,20 +159,11 @@ public sealed class ToolTextTests
         Assert.Contains("ULinkGame.Cluster.ULinkRPC", project, StringComparison.Ordinal);
         Assert.Contains("<RootNamespace>Server</RootNamespace>", project, StringComparison.Ordinal);
         Assert.Contains("<ULinkRPCServerGeneratedNamespace>Server.Generated</ULinkRPCServerGeneratedNamespace>", project, StringComparison.Ordinal);
-        Assert.Contains("return await ULinkGameGeneratedApplication.RunAsync(args);", program, StringComparison.Ordinal);
+        Assert.Contains("return await ULinkGameServer.RunAsync(args", program, StringComparison.Ordinal);
+        Assert.Contains("ServiceBindingConfigurator.Bind", program, StringComparison.Ordinal);
         Assert.DoesNotContain("ULinkGameRuntimeOptions", program, StringComparison.Ordinal);
-        Assert.Contains("--health-check", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration)", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("runtimeOptions.ToClusterOptions(builder.Configuration, \"tcp\")", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("using Server.Hosting;", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("ULinkGameRuntimeOptions", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("ToClusterOptions(string transport)", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("AdvertisedEndpoints", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("[\"cluster\"] = \"tcp://127.0.0.1:21000\"", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("[\"client\"] = clientEndpoint", clusterOptions, StringComparison.Ordinal);
-        Assert.Contains("Services", clusterOptions, StringComparison.Ordinal);
-        Assert.DoesNotContain("NodeEpoch", clusterHealthCheck, StringComparison.Ordinal);
-        Assert.Contains("cluster=healthy", clusterHealthCheck, StringComparison.Ordinal);
+        Assert.Empty(generatedApplication);
+        Assert.Contains("using Server.Hosting;", program, StringComparison.Ordinal);
         Assert.Contains("healthcheck:", compose, StringComparison.Ordinal);
         Assert.Contains("dotnet Server.dll --health-check", compose, StringComparison.Ordinal);
         Assert.Contains("ULINKGAME_CLUSTER_NODE_ID", env, StringComparison.Ordinal);
@@ -192,7 +181,7 @@ public sealed class ToolTextTests
         Assert.DoesNotContain("\n              Endpoint__Path:", compose.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains("ULinkRpcClusterDependencyProbe", operations, StringComparison.Ordinal);
         Assert.Contains("Cluster__AdvertisedEndpoints__client", operations, StringComparison.Ordinal);
-        var generatedText = string.Concat(appSettings, project, program, generatedApplication, clusterOptions, clusterHealthCheck, compose, env, operations);
+        var generatedText = string.Concat(appSettings, project, program, generatedApplication, compose, env, operations);
         Assert.DoesNotContain("NodeEpoch", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("InternalEndpoint", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain("RouteDirectoryEndpoint", generatedText, StringComparison.Ordinal);
@@ -262,9 +251,7 @@ public sealed class ToolTextTests
         Assert.DoesNotContain("AddULinkGameHotfix", program, StringComparison.Ordinal);
         Assert.DoesNotContain("CurrentDirectoryHotfixAssemblySource", program, StringComparison.Ordinal);
         Assert.DoesNotContain("IHotfixManager", program, StringComparison.Ordinal);
-        Assert.Contains("AddULinkGameHotfix", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("CurrentDirectoryHotfixAssemblySource", generatedApplication, StringComparison.Ordinal);
-        Assert.Contains("IHotfixManager", generatedApplication, StringComparison.Ordinal);
+        Assert.Empty(generatedApplication);
         Assert.DoesNotContain("Agar.Sample.Hotfix", generatedText, StringComparison.Ordinal);
     }
 
