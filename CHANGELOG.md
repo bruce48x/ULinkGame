@@ -10,9 +10,11 @@
 - `ULinkGame.Tool` `0.5.1`
 - `ULinkGame.Tool` `0.6.0`
 - `ULinkGame.Tool` `0.6.1`
+- `ULinkGame.Tool` `0.6.2`
 
 ### Changed
 
+- `ULinkGame.Tool` `0.6.2`: also remove the server-side `PingService.cs` implementation when cleaning up starter Ping samples, so the generated server project compiles cleanly after Ping contracts are removed.
 - `ULinkGame.Tool` `0.6.1`: removed starter Ping sample files from generated ULinkGame projects. Moved generated Chat contracts to `Shared/Contracts/Chat/` with namespace `Shared.Contracts.Chat`. Replaced inline Chat RPC IDs with named constants in `Shared.Contracts.RpcContractIds`. Updated generated server, hotfix, Unity client, and Godot client code to use the new namespace and contract ID layout.
 - Added the canonical `ULinkGame` runtime configuration model with `ULinkGame:Node:Id`, `ULinkGame:Endpoints[]`, compact `ULinkGame:Feature`, and minimal `ULinkGame:Cluster` binding.
 - Added Feature Catalog startup APIs with ordered `ULinkGameFeature` registration, feature dependencies, transport requirements, and fail-fast validation.
