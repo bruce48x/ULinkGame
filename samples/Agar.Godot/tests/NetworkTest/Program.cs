@@ -25,7 +25,7 @@ finally
 
 static async Task<Process> StartGatewayAsync()
 {
-    var psi = new ProcessStartInfo("dotnet", "run --project samples/Agar.Godot/Server/Gateway/Gateway.csproj")
+    var psi = new ProcessStartInfo("dotnet", "run --project samples/Agar.Godot/Server/Gateway/Gateway.csproj --no-build --no-restore")
     {
         RedirectStandardOutput = true,
         RedirectStandardError = true,

@@ -13,9 +13,15 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddFeatures(builder.Configuration, features =>
+builder.Services.AddULinkGame(builder.Configuration, features =>
 {
-    features.FromAssembly(typeof(GatewayRole).Assembly);
+    features.Feature<GatewayCoreFeature>("gateway-core");
+    features
+        .Feature<GatewayBusinessFeature>("gateway-business")
+        .After("gateway-core")
+        .RequiresFeature("gateway-core")
+        .RequiresTransport("websocket")
+        .RequiresTransport("kcp");
 });
 
 var host = builder.Build();

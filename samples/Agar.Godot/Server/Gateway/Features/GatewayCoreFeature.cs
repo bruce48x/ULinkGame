@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ULinkGame.Server;
 using ULinkGame.Server.Actors;
@@ -10,10 +9,12 @@ using ULinkGame.Server.Sessions;
 
 namespace Gateway.Features;
 
-public sealed class GatewayCoreFeature : IFeature
+public sealed class GatewayCoreFeature : ULinkGameFeature
 {
-    public void Configure(IServiceCollection services, IConfiguration config)
+    public override void ConfigureServices(ULinkGameFeatureContext context)
     {
+        var services = context.Services;
+
         services.AddULinkGameServerActors(options =>
         {
             options.MailboxCapacity = 4096;

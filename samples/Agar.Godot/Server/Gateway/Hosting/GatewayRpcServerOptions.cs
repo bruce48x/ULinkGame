@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+using ULinkGame.Server.Configuration;
 
 namespace Gateway.Hosting;
 
@@ -9,36 +9,25 @@ internal sealed class GatewayRpcServerOptions
     public int Port { get; init; } = 20000;
     public string Path { get; init; } = "";
 
-    public static GatewayRpcServerOptions FromConfiguration(
-        IConfiguration configuration,
-        string sectionName,
-        GatewayRpcServerOptions defaults)
+    public static GatewayRpcServerOptions FromEndpoint(ULinkGameEndpointOptions endpoint)
     {
-        var section = configuration.GetSection(sectionName);
-        var transport = NormalizeTransport(section["Transport"], defaults.Transport);
-        var host = section["Host"];
-        var path = section["Path"];
+        ArgumentNullException.ThrowIfNull(endpoint);
 
         return new GatewayRpcServerOptions
         {
-            Transport = transport,
-            Host = string.IsNullOrWhiteSpace(host) ? defaults.Host : host,
-            Port = ParsePort(section["Port"], defaults.Port),
-            Path = string.IsNullOrWhiteSpace(path) ? defaults.Path : path
+            Transport = NormalizeTransport(endpoint.Transport),
+            Host = string.IsNullOrWhiteSpace(endpoint.AdvertisedHost)
+                ? (string.IsNullOrWhiteSpace(endpoint.Host) ? "127.0.0.1" : endpoint.Host)
+                : endpoint.AdvertisedHost,
+            Port = endpoint.Port,
+            Path = endpoint.Path
         };
     }
 
-    private static string NormalizeTransport(string? rawValue, string fallback)
+    private static string NormalizeTransport(string? rawValue)
     {
         return string.IsNullOrWhiteSpace(rawValue)
-            ? fallback
+            ? ""
             : rawValue.Trim().ToLowerInvariant();
-    }
-
-    private static int ParsePort(string? rawValue, int fallback)
-    {
-        return int.TryParse(rawValue, out var port) && port > 0
-            ? port
-            : fallback;
     }
 }
