@@ -5,8 +5,10 @@
 ### Released
 
 - `ULinkGame.Server` `0.2.0`
+- `ULinkGame.Server` `0.3.0`
 - `ULinkGame.Tool` `0.5.0`
 - `ULinkGame.Tool` `0.5.1`
+- `ULinkGame.Tool` `0.6.0`
 
 ### Changed
 
@@ -15,6 +17,8 @@
 - Updated guardrails, generated project templates, and Agar Unity Gateway sample to use `ULinkGame:Endpoints[]` and Feature Catalog startup instead of singular endpoint or role-shaped configuration.
 - Updated configuration/startup documentation and package READMEs to make the new schema the current guidance.
 - `ULinkGame.Tool` `0.5.1`: relaxed `ulinkrpc-starter` version check from exact match to `>=` minimum; auto-update now installs latest available version instead of pinning to a specific version.
+- `ULinkGame.Server` `0.3.0`: moved `ClusterOptions`, `ServerRpcServerOptions`, and `ULinkGameRuntimeOptions` configuration types from Tool-generated layer into the framework package. Added `ULinkGameServer.RunAsync()` unified hosting entry point with `ULinkGameServerBuilder` for delegate-based RPC wiring (`UseSerializer`, `UseAcceptor`, `BindServices`, `ConfigureFeatures`, `AddRpcEndpoint`). Added layered health probes: `ULinkGameLivenessProbe` (`--health-check`, profile-aware cluster/standalone) and `ULinkGameReadinessProbe` (`--readiness-check`, with Guardrails integration and `--json` output). Added automatic feature discovery from entry assembly, referenced assemblies, and hotfix directory when `ConfigureFeatures` is not called.
+- `ULinkGame.Tool` `0.6.0`: replaced generated `ClusterHealthCheck.cs`, `ClusterOptions.cs`, `ServerRpcServerOptions.cs`, `DefaultRpcServerConfigurator.cs`, and `ULinkGameGeneratedApplication.cs` with thin `Program.cs` wiring (`ULinkGameServer.RunAsync`) and `ServiceBindingConfigurator.cs` (`AllServicesBinder.BindAll`). Generated projects now consume hosting lifecycle, health checks, and configuration from the `ULinkGame.Server` `0.3.0` framework package instead of owning generated copies.
 
 ## 2026-06-05
 
