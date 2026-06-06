@@ -1,13 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
-using Shared.Gameplay;
 using ULinkGame.Server;
 using ULinkGame.Server.Actors;
 using ULinkGame.Server.Diagnostics;
 using ULinkGame.Server.Features;
 using ULinkGame.Server.Guardrails;
 using ULinkGame.Server.Hosting;
-using ULinkGame.Server.Hotfix;
-using ULinkGame.Server.Hotfix.Loading;
 using ULinkGame.Server.Sessions;
 
 namespace Gateway.Features;
@@ -32,12 +29,6 @@ public sealed class GatewayCoreFeature : ULinkGameFeature
         });
         services.AddMessageRecording();
         services.AddULinkGameRuntimeValidation();
-
-        var hotfixDirectory = Path.Combine(AppContext.BaseDirectory, "hotfix");
-        services.AddULinkGameHotfix(
-            new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, "Agar.Sample.Hotfix.dll"),
-            sharedAssemblyNames: [typeof(ArenaSimulation).Assembly.GetName().Name!]);
-
         services.AddULinkGameServerGateway();
     }
 }

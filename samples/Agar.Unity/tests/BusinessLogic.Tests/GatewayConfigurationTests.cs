@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Gateway.Hosting;
 using ULinkGame.Server.Configuration;
 using Xunit;
 
@@ -49,20 +48,25 @@ public sealed class GatewayConfigurationTests
     }
 
     [Fact]
-    public void GatewayOptionsUseAdvertisedHostFromCanonicalEndpoint()
+    public void ToServerRpcServerOptionsCreatesFromEndpoint()
     {
-        var endpoint = new ULinkGameEndpointOptions
+        var runtimeOptions = new ULinkGameRuntimeOptions
         {
-            Transport = "kcp",
-            Host = "0.0.0.0",
-            AdvertisedHost = "game.example.com",
-            Port = 20001
+            Endpoints =
+            [
+                new ULinkGameEndpointOptions
+                {
+                    Transport = "kcp",
+                    Host = "0.0.0.0",
+                    Port = 20001
+                }
+            ]
         };
 
-        var options = GatewayRpcServerOptions.FromEndpoint(endpoint);
+        var options = runtimeOptions.ToServerRpcServerOptions("kcp");
 
         Assert.Equal("kcp", options.Transport);
-        Assert.Equal("game.example.com", options.Host);
+        Assert.Equal("0.0.0.0", options.Host);
         Assert.Equal(20001, options.Port);
         Assert.Equal("", options.Path);
     }
