@@ -9,6 +9,7 @@ internal sealed class ProjectScaffolder
     public async Task AugmentProjectWithULinkGameAsync(string projectRoot, NewCommandOptions options)
     {
         EnsureStarterServerProjectDirectory(projectRoot);
+        await RemoveStarterPingSampleContractsAsync(projectRoot).ConfigureAwait(false);
         await WriteClientPackageReferenceAsync(projectRoot, options).ConfigureAwait(false);
         await WriteClientChatFilesAsync(projectRoot, options).ConfigureAwait(false);
         await WriteSharedHotfixReferencesAsync(projectRoot).ConfigureAwait(false);
@@ -58,6 +59,60 @@ internal sealed class ProjectScaffolder
         EnsurePackageReference(project, "ULinkGame.Client", ToolPackageVersions.ULinkGameClient);
 
         await File.WriteAllTextAsync(path, document.ToString() + Environment.NewLine).ConfigureAwait(false);
+    }
+
+    private static async Task RemoveStarterPingSampleContractsAsync(string projectRoot)
+    {
+        var interfacesDirectory = Path.Combine(projectRoot, "Shared", "Interfaces");
+        await DeleteIfStarterPingSampleAsync(Path.Combine(interfacesDirectory, "IPingService.cs")).ConfigureAwait(false);
+        await DeleteIfStarterPingSampleAsync(Path.Combine(interfacesDirectory, "SharedDtos.cs")).ConfigureAwait(false);
+        await DeleteIfStarterPingSampleAsync(Path.Combine(interfacesDirectory, "RpcContractIds.cs")).ConfigureAwait(false);
+
+        DeleteIfExists(Path.Combine(interfacesDirectory, "IPingService.cs.meta"));
+        DeleteIfExists(Path.Combine(interfacesDirectory, "SharedDtos.cs.meta"));
+        DeleteIfExists(Path.Combine(interfacesDirectory, "RpcContractIds.cs.meta"));
+    }
+
+    private static async Task DeleteIfStarterPingSampleAsync(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var source = await File.ReadAllTextAsync(path).ConfigureAwait(false);
+        if (!LooksLikeStarterPingSample(path, source))
+        {
+            return;
+        }
+
+        File.Delete(path);
+    }
+
+    private static bool LooksLikeStarterPingSample(string path, string source)
+    {
+        var fileName = Path.GetFileName(path);
+        return fileName switch
+        {
+            "IPingService.cs" => source.Contains("interface IPingService", StringComparison.Ordinal)
+                && source.Contains("RpcContractIds.Services.Ping", StringComparison.Ordinal)
+                && source.Contains("PingAsync(PingRequest request)", StringComparison.Ordinal),
+            "SharedDtos.cs" => source.Contains("class PingRequest", StringComparison.Ordinal)
+                && source.Contains("class PingReply", StringComparison.Ordinal)
+                && source.Contains("namespace Shared.Interfaces", StringComparison.Ordinal),
+            "RpcContractIds.cs" => source.Contains("class RpcContractIds", StringComparison.Ordinal)
+                && source.Contains("public const int Ping = 1;", StringComparison.Ordinal)
+                && source.Contains("public const int PingAsync = 1;", StringComparison.Ordinal),
+            _ => false
+        };
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
     private static Task WriteSharedHotfixBoundaryFilesAsync(string projectRoot, NewCommandOptions options)

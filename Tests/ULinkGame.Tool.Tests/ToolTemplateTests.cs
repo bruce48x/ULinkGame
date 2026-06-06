@@ -545,4 +545,96 @@ public sealed class ToolTemplateTests
 
         Assert.Equal("@import url(\"unity-theme://default\");", source.Trim());
     }
+
+    [Fact]
+    public async Task AugmentExistingStarterServerProjectRemovesStarterPingSampleContracts()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var serverDirectory = Path.Combine(projectRoot, "Server", "Server");
+            var interfacesDirectory = Path.Combine(projectRoot, "Shared", "Interfaces");
+            Directory.CreateDirectory(serverDirectory);
+            Directory.CreateDirectory(interfacesDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(serverDirectory, "Server.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(interfacesDirectory, "IPingService.cs"),
+                """
+                using System.Threading.Tasks;
+                using ULinkRPC.Core;
+
+                namespace Shared.Interfaces
+                {
+                    [RpcService(RpcContractIds.Services.Ping)]
+                    public interface IPingService
+                    {
+                        [RpcMethod(RpcContractIds.PingServiceMethods.PingAsync)]
+                        ValueTask<PingReply> PingAsync(PingRequest request);
+                    }
+                }
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(interfacesDirectory, "SharedDtos.cs"),
+                """
+                namespace Shared.Interfaces
+                {
+                    public sealed class PingRequest
+                    {
+                        public string Message { get; set; } = "";
+                    }
+
+                    public sealed class PingReply
+                    {
+                        public string Message { get; set; } = "";
+                    }
+                }
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(interfacesDirectory, "RpcContractIds.cs"),
+                """
+                namespace Shared.Interfaces
+                {
+                    public static class RpcContractIds
+                    {
+                        public static class Services
+                        {
+                            public const int Ping = 1;
+                        }
+
+                        public static class PingServiceMethods
+                        {
+                            public const int PingAsync = 1;
+                        }
+                    }
+                }
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(interfacesDirectory, "IPingService.cs.meta"), "fileFormatVersion: 2", TestContext.Current.CancellationToken);
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            Assert.False(File.Exists(Path.Combine(interfacesDirectory, "IPingService.cs")));
+            Assert.False(File.Exists(Path.Combine(interfacesDirectory, "SharedDtos.cs")));
+            Assert.False(File.Exists(Path.Combine(interfacesDirectory, "RpcContractIds.cs")));
+            Assert.False(File.Exists(Path.Combine(interfacesDirectory, "IPingService.cs.meta")));
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
 }
