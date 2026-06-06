@@ -246,7 +246,10 @@ public sealed class ToolTemplateTests
             Assert.Contains("ServiceBindingConfigurator.Bind", program, StringComparison.Ordinal);
             Assert.DoesNotContain("ULinkGameGeneratedApplication", program, StringComparison.Ordinal);
             Assert.Contains("class ServiceBindingConfigurator", serviceBindingConfigurator, StringComparison.Ordinal);
-            Assert.Contains("AllServicesBinder.BindAll", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.Contains("IServiceProvider services", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.Contains("ActivatorUtilities.CreateInstance<ChatServiceImpl>(services, callback)", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.Contains("ChatServiceBinder.Bind", serviceBindingConfigurator, StringComparison.Ordinal);
+            Assert.DoesNotContain("AllServicesBinder.BindAll", serviceBindingConfigurator, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(serverDirectory, "Hosting", "Advanced", "ULinkGameGeneratedApplication.cs")));
         }
         finally
@@ -466,6 +469,20 @@ public sealed class ToolTemplateTests
         Assert.Contains("_actors.AskAsync<ChatRoomActor", source, StringComparison.Ordinal);
         Assert.DoesNotContain("static readonly ChatRoom", source, StringComparison.Ordinal);
         Assert.DoesNotContain("new ChatRoom", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderServiceBindingConfigurator_UsesDependencyInjectionForNotificationServices()
+    {
+        var source = ToolTemplates.RenderServiceBindingConfigurator();
+
+        Assert.Contains("using Microsoft.Extensions.DependencyInjection;", source, StringComparison.Ordinal);
+        Assert.Contains("using Server.Chat;", source, StringComparison.Ordinal);
+        Assert.Contains("using Server.Generated;", source, StringComparison.Ordinal);
+        Assert.Contains("public static void Bind(RpcServiceRegistry registry, IServiceProvider services)", source, StringComparison.Ordinal);
+        Assert.Contains("ChatServiceBinder.Bind", source, StringComparison.Ordinal);
+        Assert.Contains("ActivatorUtilities.CreateInstance<ChatServiceImpl>(services, callback)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AllServicesBinder.BindAll", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -814,6 +831,7 @@ public sealed class ToolTemplateTests
             await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
 
             var service = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatServiceImpl.cs"), TestContext.Current.CancellationToken);
+            var binding = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Hosting", "ServiceBindingConfigurator.cs"), TestContext.Current.CancellationToken);
             var actor = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRoomActor.cs"), TestContext.Current.CancellationToken);
             var rules = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRules.cs"), TestContext.Current.CancellationToken);
             var hotfix = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Hotfix", "Chat", "ChatRulesSystem.cs"), TestContext.Current.CancellationToken);
@@ -824,6 +842,8 @@ public sealed class ToolTemplateTests
             Assert.Contains("FilterMessage", actor, StringComparison.Ordinal);
             Assert.Contains("HotfixDispatch.Invoke", rules, StringComparison.Ordinal);
             Assert.Contains("[HotfixSystemOf(typeof(ChatRuleState))]", hotfix, StringComparison.Ordinal);
+            Assert.Contains("ActivatorUtilities.CreateInstance<ChatServiceImpl>(services, callback)", binding, StringComparison.Ordinal);
+            Assert.DoesNotContain("AllServicesBinder.BindAll", binding, StringComparison.Ordinal);
             Assert.DoesNotContain("static readonly ChatRoom", service + actor, StringComparison.Ordinal);
             Assert.DoesNotContain("ConcurrentDictionary", actor, StringComparison.Ordinal);
         }

@@ -9,13 +9,13 @@ internal sealed class ULinkGameRpcConfigurator : IULinkRpcServerConfigurator
     private readonly ServerRpcServerOptions _options;
     private readonly Func<IRpcSerializer> _serializerFactory;
     private readonly Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>> _acceptorFactory;
-    private readonly Action<RpcServiceRegistry>? _bindServices;
+    private readonly Action<RpcServiceRegistry, IServiceProvider>? _bindServices;
 
     public ULinkGameRpcConfigurator(
         ServerRpcServerOptions options,
         Func<IRpcSerializer> serializerFactory,
         Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>> acceptorFactory,
-        Action<RpcServiceRegistry>? bindServices)
+        Action<RpcServiceRegistry, IServiceProvider>? bindServices)
     {
         _options = options;
         _serializerFactory = serializerFactory;
@@ -30,6 +30,6 @@ internal sealed class ULinkGameRpcConfigurator : IULinkRpcServerConfigurator
         var builder = context.Builder;
         builder.UseSerializer(_serializerFactory());
         builder.UseAcceptor(async ct => await _acceptorFactory(_options));
-        _bindServices?.Invoke(builder.ServiceRegistry);
+        _bindServices?.Invoke(builder.ServiceRegistry, context.Services);
     }
 }

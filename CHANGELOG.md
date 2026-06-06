@@ -7,6 +7,7 @@
 - `ULinkGame.Server` `0.2.0`
 - `ULinkGame.Server` `0.3.0`
 - `ULinkGame.Server` `0.3.1`
+- `ULinkGame.Server` `0.3.2`
 - `ULinkGame.Tool` `0.5.0`
 - `ULinkGame.Tool` `0.5.1`
 - `ULinkGame.Tool` `0.6.0`
@@ -14,9 +15,12 @@
 - `ULinkGame.Tool` `0.6.2`
 - `ULinkGame.Tool` `0.6.4`
 - `ULinkGame.Tool` `0.6.3`
+- `ULinkGame.Tool` `0.6.5`
 
 ### Changed
 
+- `ULinkGame.Tool` `0.6.5`: fixed generated Chat server startup failure where ULinkRPC notification service binding could not construct `ChatServiceImpl(IChatCallback, IActorRuntime)`. Generated `ServiceBindingConfigurator` now binds `ChatServiceImpl` through `ChatServiceBinder` and `ActivatorUtilities` so the callback still comes from ULinkRPC while `IActorRuntime` comes from DI.
+- `ULinkGame.Server` `0.3.2`: added `IServiceProvider`-aware `BindServices` and `AddRpcEndpoint` overloads so generated service binders can create RPC services through DI.
 - `ULinkGame.Tool` `0.6.4`: fixed `CS0267` build error where `ChatRuleState` template used `partial sealed class` but the Hotfix source generator produced a conflicting `partial class` declaration without `sealed`.
 - `ULinkGame.Tool` `0.6.3`: replaced generated static mutable Chat room with `ChatRoomActor` through `IActorRuntime`. Added stable `ChatRules` Hotfix wrapper and valid `[HotfixSystemOf]` `ChatRulesSystem`. Generated Chat send path now filters messages through Hotfix before broadcasting.
 - `ULinkGame.Server` `0.3.1`: failed initial Hotfix load now throws and fails server startup instead of logging a warning and continuing.

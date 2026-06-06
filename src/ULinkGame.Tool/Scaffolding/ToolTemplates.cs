@@ -1722,15 +1722,21 @@ internal static class ToolTemplates
 
     public static string RenderServiceBindingConfigurator()
     {
-        return @"using Server.Generated;
+        return @"using Microsoft.Extensions.DependencyInjection;
+using Server.Chat;
+using Server.Generated;
 using ULinkRPC.Server;
 
 namespace Server.Hosting;
 
 internal static class ServiceBindingConfigurator
 {
-    public static void Bind(RpcServiceRegistry registry)
-        => AllServicesBinder.BindAll(registry);
+    public static void Bind(RpcServiceRegistry registry, IServiceProvider services)
+    {
+        ChatServiceBinder.Bind(
+            registry,
+            callback => ActivatorUtilities.CreateInstance<ChatServiceImpl>(services, callback));
+    }
 }";
     }
 

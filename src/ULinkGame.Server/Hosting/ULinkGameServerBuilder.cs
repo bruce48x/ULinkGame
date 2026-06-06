@@ -12,7 +12,7 @@ public sealed class ULinkGameServerBuilder
 {
     private Func<IRpcSerializer>? _serializerFactory;
     private Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>>? _acceptorFactory;
-    private Action<RpcServiceRegistry>? _serviceBinder;
+    private Action<RpcServiceRegistry, IServiceProvider>? _serviceBinder;
     private string _transport = "websocket";
     private Action<ULinkGameFeatureCatalogBuilder>? _configureFeatures;
     private readonly List<Action<IServiceCollection>> _serviceRegistrations = new();
@@ -68,6 +68,13 @@ public sealed class ULinkGameServerBuilder
 
     public ULinkGameServerBuilder BindServices(Action<RpcServiceRegistry> bind)
     {
+        ArgumentNullException.ThrowIfNull(bind);
+        _serviceBinder = (registry, _) => bind(registry);
+        return this;
+    }
+
+    public ULinkGameServerBuilder BindServices(Action<RpcServiceRegistry, IServiceProvider> bind)
+    {
         _serviceBinder = bind ?? throw new ArgumentNullException(nameof(bind));
         return this;
     }
@@ -78,6 +85,27 @@ public sealed class ULinkGameServerBuilder
         Func<IRpcSerializer> serializerFactory,
         Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>> acceptorFactory,
         Action<RpcServiceRegistry>? serviceBinder = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(transport);
+        ArgumentNullException.ThrowIfNull(serializerFactory);
+        ArgumentNullException.ThrowIfNull(acceptorFactory);
+
+        _additionalEndpoints.Add(new RpcEndpointRegistration(
+            name,
+            transport,
+            serializerFactory,
+            acceptorFactory,
+            serviceBinder is null ? null : (registry, _) => serviceBinder(registry)));
+        return this;
+    }
+
+    public ULinkGameServerBuilder AddRpcEndpoint(
+        string name,
+        string transport,
+        Func<IRpcSerializer> serializerFactory,
+        Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>> acceptorFactory,
+        Action<RpcServiceRegistry, IServiceProvider>? serviceBinder)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(transport);
@@ -109,7 +137,7 @@ public sealed class ULinkGameServerBuilder
             "Acceptor factory is required. Call UseAcceptor() before RunAsync().");
     }
 
-    internal Action<RpcServiceRegistry>? GetServiceBinder() => _serviceBinder;
+    internal Action<RpcServiceRegistry, IServiceProvider>? GetServiceBinder() => _serviceBinder;
 
     internal string GetTransport() => _transport;
 
@@ -122,5 +150,5 @@ public sealed class ULinkGameServerBuilder
         string Transport,
         Func<IRpcSerializer> SerializerFactory,
         Func<ServerRpcServerOptions, Task<IRpcConnectionAcceptor>> AcceptorFactory,
-        Action<RpcServiceRegistry>? ServiceBinder);
+        Action<RpcServiceRegistry, IServiceProvider>? ServiceBinder);
 }
