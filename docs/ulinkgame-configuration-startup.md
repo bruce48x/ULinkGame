@@ -206,7 +206,7 @@ The singular key `Feature` is intentional because it names the framework concept
 Rules:
 
 - If `Cluster` is absent, the process does not participate in cluster routing.
-- If `Cluster` is present, `Endpoint` is required.
+- If `Cluster` is present, `Cluster.Endpoint` is required.
 - If `Seeds` is omitted or empty, it defaults to the local `Cluster.Endpoint`.
 - `Cluster.Endpoint` must not conflict with business endpoint ports in the same process.
 
@@ -279,8 +279,6 @@ The context exposes resolved configuration:
 - `Services`: the DI service collection.
 - `Configuration`: raw configuration for business-specific settings, not Feature selection.
 - `Endpoints`: framework-resolved endpoint catalog.
-- `Cluster`: framework-resolved cluster settings, if present.
-- `Feature`: resolved active Feature metadata.
 
 ## Framework Responsibilities
 

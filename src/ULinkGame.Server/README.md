@@ -253,31 +253,48 @@ public sealed class PlayerLoginService
 
 Projects can register `IGameSessionTokenValidator` and `IAuthoritativeSessionStateProbe` to decide whether a reconnect is accepted, requires a snapshot refresh, or must start a new session. ULinkGame does not define account models, token formats, room snapshots, or gameplay DTOs.
 
-## Feature/Role Assembly
+## Feature Catalog Assembly
 
-Compose servers from declarative features and deploy with role-based filtering. Develop with everything in one process, split into multiple processes in production — without code changes.
+Compose servers from ordered `ULinkGameFeature` startup units. Develop with every registered Feature in one process, or select a compact Feature set per process with `ULinkGame:Feature`.
 
 ```csharp
-// Define a role
-public sealed class GatewayRole : INodeRole
+public sealed class AuthFeature : ULinkGameFeature
 {
-    public string Name => "gateway";
-    public IFeature[] Features => [new ClusterFeature(), new AuthFeature()];
+    public override void ConfigureServices(ULinkGameFeatureContext context)
+    {
+        context.Services.AddSingleton<AuthService>();
+    }
 }
 
-// Configure in Program.cs
-builder.Services.AddFeatures(builder.Configuration, features =>
+builder.Services.AddULinkGame(builder.Configuration, game =>
 {
-    features.FromAssembly(typeof(GatewayRole).Assembly);
+    game.Feature<ClusterFeature>("cluster");
+    game.Feature<AuthFeature>("auth")
+        .After("cluster")
+        .RequiresFeature("cluster")
+        .RequiresTransport("websocket");
 });
 ```
 
-```bash
-dotnet run                                     # all roles
-dotnet run --ULinkGame:Features:Roles=gateway   # gateway only
+```json
+{
+  "ULinkGame": {
+    "Feature": ["cluster", "auth"],
+    "Endpoints": [
+      {
+        "Transport": "websocket",
+        "Host": "0.0.0.0",
+        "Port": 20000,
+        "Path": "/ws"
+      }
+    ]
+  }
+}
 ```
 
-See `docs/feature-role.md` for details.
+`RequiresTransport(...)` validates against the framework-resolved endpoint catalog. Endpoint transport hosting remains framework-owned.
+
+See `../../docs/feature-role.md` and `../../docs/ulinkgame-configuration-startup.md` for details.
 
 ## Remote Actor Messaging
 

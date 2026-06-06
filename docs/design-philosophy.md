@@ -158,7 +158,7 @@ The tradeoff is that hotfix assemblies cannot modify state layout — only behav
 
 ### Phase 2: Developer experience (complete)
 
-- [x] Feature/Role component-based assembly (`IFeature` / `INodeRole`, single-process dev / multi-process prod)
+- [x] Feature Catalog startup (`ULinkGameFeature`, `AddULinkGame`, compact `ULinkGame:Feature`, transport requirements)
 - [x] Managed distributed actor messaging (typed `Get(id)` / `Local(id)` / `Remote(nodeId, id)` refs + typed actor call exceptions)
 - [x] Gate/Watchdog/Agent pattern documented (see `docs/gate-watchdog-agent.md`)
 

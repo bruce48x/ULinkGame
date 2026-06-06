@@ -48,7 +48,7 @@ Currently implemented:
 - Session resume and token validation
 - Reliable push outbox/inbox
 - Hotfix assembly loading and dispatch table swap
-- Component-based server assembly (`IFeature` / `INodeRole`)
+- Feature Catalog server assembly (`ULinkGameFeature`, `AddULinkGame`, compact `ULinkGame:Feature`)
 - Remote actor messaging (typed `Local(id)` / `Remote(nodeId, id)` refs over lower-level `AskRemoteAsync` / `TellRemoteAsync` plumbing)
 - Message recording storage and replay (`IMessageLogStore`)
 - Game-specific ActorId scheme (string with generation)
