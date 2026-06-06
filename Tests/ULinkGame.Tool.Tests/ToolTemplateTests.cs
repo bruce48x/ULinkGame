@@ -782,4 +782,48 @@ public sealed class ToolTemplateTests
             }
         }
     }
+
+    [Fact]
+    public async Task GeneratedProjectChatFlowUsesActorAndHotfix()
+    {
+        var projectRoot = Path.Combine(Path.GetTempPath(), "ulinkgame-tool-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Server", "Server"));
+            Directory.CreateDirectory(Path.Combine(projectRoot, "Shared"));
+            await File.WriteAllTextAsync(
+                Path.Combine(projectRoot, "Server", "Server", "Server.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+
+            await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
+
+            var service = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatServiceImpl.cs"), TestContext.Current.CancellationToken);
+            var actor = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRoomActor.cs"), TestContext.Current.CancellationToken);
+            var rules = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRules.cs"), TestContext.Current.CancellationToken);
+            var hotfix = await File.ReadAllTextAsync(Path.Combine(projectRoot, "Server", "Hotfix", "Chat", "ChatRulesSystem.cs"), TestContext.Current.CancellationToken);
+
+            Assert.Contains("IActorRuntime", service, StringComparison.Ordinal);
+            Assert.Contains("AskAsync<ChatRoomActor", service, StringComparison.Ordinal);
+            Assert.Contains("class ChatRoomActor : Actor", actor, StringComparison.Ordinal);
+            Assert.Contains("FilterMessage", actor, StringComparison.Ordinal);
+            Assert.Contains("HotfixDispatch.Invoke", rules, StringComparison.Ordinal);
+            Assert.Contains("[HotfixSystemOf(typeof(ChatRuleState))]", hotfix, StringComparison.Ordinal);
+            Assert.DoesNotContain("static readonly ChatRoom", service + actor, StringComparison.Ordinal);
+            Assert.DoesNotContain("ConcurrentDictionary", actor, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(projectRoot))
+            {
+                Directory.Delete(projectRoot, recursive: true);
+            }
+        }
+    }
 }
