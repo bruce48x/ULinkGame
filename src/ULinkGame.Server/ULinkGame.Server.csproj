@@ -26,4 +26,8 @@
   <ItemGroup>
     <None Update="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ULinkGame.Server.Tests" />
+  </ItemGroup>
 </Project>

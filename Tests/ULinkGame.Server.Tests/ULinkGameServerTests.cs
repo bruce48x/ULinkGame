@@ -1,5 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ULinkGame.Abstractions;
+using ULinkGame.Server.Hosting;
+using ULinkGame.Server.Hotfix;
+using ULinkGame.Server.Hotfix.Abstractions;
 using ULinkGame.Server.ReliablePush;
 using ULinkGame.Server.Sessions;
 using Xunit;
@@ -8,6 +13,22 @@ namespace ULinkGame.Server.Tests;
 
 public sealed class ULinkGameServerTests
 {
+    [Fact]
+    public async Task InitialHotfixLoad_Throws_WhenReloadFails()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IHotfixManager>(new FailingHotfixManager());
+        await using var provider = services.BuildServiceProvider();
+
+        var hotfix = provider.GetRequiredService<IHotfixManager>();
+        var result = await hotfix.ReloadAsync();
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(HotfixReloadStatus.Failed, result.Status);
+        Assert.Contains("Server.Hotfix.dll", result.RequestedPath, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task MainEntryStartsSessionBindsEndpointAndReturnsCallback()
     {
@@ -260,6 +281,32 @@ public sealed class ULinkGameServerTests
         {
             Closed.Add((endpoint, connectionId, notice));
             return ValueTask.CompletedTask;
+        }
+    }
+
+    internal sealed class FailingHotfixManager : IHotfixManager
+    {
+        public HotfixSnapshot Current => new(
+            Version: null,
+            SourceKind: null,
+            SourcePath: "",
+            LoadedAtUtc: null,
+            DispatchTableVersion: 0,
+            Methods: [],
+            LastReloadStatus: HotfixReloadStatus.Failed,
+            LastFailureMessage: null,
+            LastFailureExceptionType: null);
+
+        public ValueTask<HotfixReloadResult> ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            var result = new HotfixReloadResult(
+                Status: HotfixReloadStatus.Failed,
+                Current: Current,
+                RequestedVersion: "1",
+                RequestedPath: @"C:\app\hotfix\Server.Hotfix.dll",
+                Diagnostics: ["missing assembly"],
+                ErrorMessage: "Reload failed");
+            return ValueTask.FromResult(result);
         }
     }
 }

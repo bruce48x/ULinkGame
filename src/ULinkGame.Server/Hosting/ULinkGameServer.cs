@@ -134,7 +134,7 @@ public static class ULinkGameServer
         }
     }
 
-    private static async Task LoadInitialHotfixAsync(IHost host)
+    public static async Task LoadInitialHotfixAsync(IHost host)
     {
         using var scope = host.Services.CreateScope();
         var hotfix = scope.ServiceProvider.GetRequiredService<IHotfixManager>();
@@ -152,14 +152,12 @@ public static class ULinkGameServer
             return;
         }
 
-        logger.LogWarning(
-            "Initial hotfix load failed for {HotfixPath}: {ErrorMessage}",
-            result.RequestedPath,
-            result.ErrorMessage);
-        foreach (var diagnostic in result.Diagnostics)
-        {
-            logger.LogWarning("Hotfix diagnostic: {Diagnostic}", diagnostic);
-        }
+        var diagnostics = result.Diagnostics.Count == 0
+            ? ""
+            : " Diagnostics: " + string.Join("; ", result.Diagnostics);
+        var message = $"Initial hotfix load failed for '{result.RequestedPath}': {result.ErrorMessage}{diagnostics}";
+        logger.LogError("{Message}", message);
+        throw new InvalidOperationException(message);
     }
 
     private static void DiscoverAndRegisterFeatures(
