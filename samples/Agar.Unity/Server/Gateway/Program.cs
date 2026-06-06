@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Gateway.Features;
 using ULinkGame.Server.Features;
 using ULinkGame.Server.Hotfix;
+using ULinkGame.Server.Hotfix.Loading;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration
@@ -22,6 +23,11 @@ builder.Services.AddULinkGame(builder.Configuration, features =>
         .RequiresTransport("websocket")
         .RequiresTransport("kcp");
 });
+
+var hotfixDirectory = Path.Combine(AppContext.BaseDirectory, "hotfix");
+builder.Services.AddULinkGameHotfix(
+    new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, "Agar.Sample.Hotfix.dll"),
+    sharedAssemblyNames: ["Agar.Sample.Hotfix"]);
 
 var host = builder.Build();
 
