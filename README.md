@@ -156,16 +156,24 @@ await rooms.Remote(nodeId, roomId).JoinAsync(request, ct); // Pinned to node
 
 Source generators produce `RoomActors` with `Get`, `Local`, and `Remote` selectors. No reflection, no string-based dispatch.
 
-## Feature / Role System
+## Feature Catalog Startup
 
-Assemble server capabilities from composable features. One role in development, many roles in production.
+Assemble server capabilities from ordered Features. Run all registered Features in one development process, or select a compact Feature set per production process with `ULinkGame:Feature`.
 
 ```csharp
-builder.Services.AddFeatures(builder.Configuration, features =>
+builder.Services.AddULinkGame(builder.Configuration, game =>
 {
-    features.AddRole<GatewayRole>();
-    features.AddRole<MatchmakingRole>();
-    features.AddRole<RoomRole>();
+    game.Feature<GatewayFeature>("gateway")
+        .RequiresTransport("websocket");
+
+    game.Feature<MatchmakingFeature>("matchmaking")
+        .After("gateway")
+        .RequiresFeature("gateway");
+
+    game.Feature<RoomFeature>("room")
+        .After("matchmaking")
+        .RequiresFeature("matchmaking")
+        .RequiresTransport("kcp");
 });
 ```
 
@@ -226,6 +234,6 @@ Full multiplayer game samples (agar.io-style):
 
 - [Getting Started](https://bruce48x.github.io/ULinkGame/posts/ulinkgame-getting-started/)
 - [Design Philosophy](docs/design-philosophy.md)
-- [Feature / Role System](docs/feature-role.md)
+- [Feature Catalog Startup](docs/feature-role.md)
 - [Runtime Guardrails](docs/ulinkgame-runtime-guardrails.md)
 - [ULinkRPC](https://github.com/bruce48x/ulinkrpc)
