@@ -1,5 +1,7 @@
 # Server Default Entrypoint Design
 
+> **Historical note:** This design predates the current configuration/startup model. For canonical guidance, use [ULinkGame Configuration And Startup Model](../../ulinkgame-configuration-startup.md), which replaces singular `ULinkGame:Endpoint` guidance with `ULinkGame:Endpoints[]` and Feature Catalog startup.
+
 ## Purpose
 
 Generated ULinkGame server projects should teach the user's game shape first and the framework assembly mechanics later. The current generated `Program.cs` runs, but it exposes too much internal setup: runtime option derivation, RPC server options, cluster defaults, hotfix loading, check output, and service registration all compete for attention in the first file a new user opens.
@@ -79,7 +81,7 @@ Eventually, `Hosting/Advanced/ULinkGameGeneratedApplication.cs` should disappear
 `ULinkGame.Server` should provide a default application model that derives the same runtime state currently generated into projects:
 
 - local single-node cluster topology
-- gateway endpoint from `ULinkGame:Endpoint`
+- gateway endpoints from `ULinkGame:Endpoints[]`
 - node identity from `ULinkGame:Node:Id`
 - node-directory and route-directory services
 - reliable push defaults
@@ -96,11 +98,13 @@ The generated project config should remain small:
     "Node": {
       "Id": "dev-1"
     },
-    "Endpoint": {
-      "Transport": "kcp",
-      "Host": "127.0.0.1",
-      "Port": 20000
-    }
+    "Endpoints": [
+      {
+        "Transport": "kcp",
+        "Host": "127.0.0.1",
+        "Port": 20000
+      }
+    ]
   }
 }
 ```
@@ -172,7 +176,7 @@ Functional tests should scaffold a project, build it, run `--ulinkgame-check`, a
 Framework API tests should validate that the application model derives the same runtime state as the current template:
 
 - node id
-- endpoint
+- endpoints from `ULinkGame:Endpoints[]`
 - advertised client endpoint
 - local cluster services
 - hotfix assembly path

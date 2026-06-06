@@ -1,100 +1,83 @@
-# Feature & Role — Component-Based Server Assembly
+# Feature Catalog Startup
 
-`IFeature` and `INodeRole` implement the "N→1, 1→N" pattern: develop with every service in a single process, deploy with services split across processes — without changing a line of code.
+ULinkGame startup is assembled through the Feature Catalog. The canonical configuration and startup model is documented in [ULinkGame Configuration And Startup Model](ulinkgame-configuration-startup.md).
+
+Features are ordered startup units. They register game services, declare ordering and feature dependencies, and state which endpoint transports they require. Endpoint transport hosting remains framework-owned and is resolved from `ULinkGame:Endpoints[]`.
 
 ## Concepts
 
 | Concept | Responsibility |
 |---------|---------------|
-| `IFeature` | A pure capability unit. It has one method: `Configure(IServiceCollection, IConfiguration)`. It does not know about deployment, roles, or dependencies. |
-| `INodeRole` | A deployment unit. It has a `Name` and an ordered list of `IFeature[]`. The array order determines `Configure()` invocation order (natural topological sort). |
-| `FeatureBuilder` | Collects roles (manually or via assembly scanning), applies a `FeatureFilter`, and resolves the final deduplicated feature list. |
-| `FeatureFilter` | Selects which roles to activate. `Roles = ["gateway"]` means only the gateway role's features are configured. |
+| `ULinkGameFeature` | A startup unit that registers services through `ConfigureServices(ULinkGameFeatureContext)`. |
+| Feature Catalog | The `Program.cs` declaration of known project features, their order, dependencies, and transport requirements. |
+| `ULinkGame:Feature` | Optional compact configuration selection for which catalog features run in this process. If omitted, all registered features run. |
 
-## Design
+The previous role/filter startup model is superseded. Do not use role-shaped configuration for new ULinkGame startup code.
 
-Features are deduplicated by **type**. If `GatewayRole` and `RoomRole` both reference `ClusterFeature`, it's configured only once. This is correct: the same service registration should not happen twice.
-
-Feature `Configure()` order follows the role's array. No declarative `DependsOn` — the array is the dependency order.
-
-## Usage
-
-### Define a Feature
+## Define Features
 
 ```csharp
-public sealed class KcpRealtimeFeature : IFeature
+public sealed class RealtimeFeature : ULinkGameFeature
 {
-    public void Configure(IServiceCollection services, IConfiguration config)
+    public override void ConfigureServices(ULinkGameFeatureContext context)
     {
-        services.AddULinkRpcServer<KcpRealtimeConfigurator>();
+        context.Services.AddSingleton<RoomRuntime>();
     }
 }
 ```
 
-### Define a Role
-
 ```csharp
-public sealed class RoomRole : INodeRole
+public sealed class MatchmakingFeature : ULinkGameFeature
 {
-    public string Name => "room";
-
-    public IFeature[] Features => [
-        new ClusterFeature(),       // 1. cluster routing must come first
-        new ActorRuntimeFeature(),  // 2. actor runtime
-        new KcpRealtimeFeature(),   // 3. KCP transport
-        new RoomFeature(),          // 4. room-specific services
-    ];
+    public override void ConfigureServices(ULinkGameFeatureContext context)
+    {
+        context.Services.AddSingleton<MatchmakingService>();
+    }
 }
 ```
 
-### Wire in Program.cs
+## Wire Program.cs
 
 ```csharp
-// Manual registration
-builder.Services.AddFeatures(builder.Configuration, features =>
+builder.Services.AddULinkGame(builder.Configuration, game =>
 {
-    features.AddRole<GatewayRole>();
-    features.AddRole<RoomRole>();
-});
+    game.Feature<ClusterFeature>("cluster");
 
-// Assembly scanning
-builder.Services.AddFeatures(builder.Configuration, features =>
-{
-    features.FromAssembly(typeof(GatewayRole).Assembly);
+    game.Feature<MatchmakingFeature>("matchmaking")
+        .After("cluster")
+        .RequiresFeature("cluster")
+        .RequiresTransport("websocket");
+
+    game.Feature<RealtimeFeature>("realtime")
+        .After("matchmaking")
+        .RequiresFeature("matchmaking")
+        .RequiresTransport("kcp");
 });
 ```
 
-### Run
+`After(...)` controls startup order. `RequiresFeature(...)` fails fast when a selected feature is missing a dependency. `RequiresTransport(...)` fails fast when `ULinkGame:Endpoints[]` does not provide the required transport.
 
-```bash
-# Development — all roles in one process
-dotnet run
+## Select Features
 
-# Production — one role per process
-dotnet run --ULinkGame:Features:Roles=gateway
-dotnet run --ULinkGame:Features:Roles=room
-```
-
-### Filter from appsettings.json
+Local development can omit `ULinkGame:Feature` and run every registered feature. Split processes can select a compact feature set:
 
 ```json
 {
   "ULinkGame": {
-    "Features": {
-      "Roles": ["gateway"]
-    }
+    "Node": {
+      "Id": "gateway-1"
+    },
+    "Feature": ["cluster", "matchmaking"],
+    "Endpoints": [
+      {
+        "Transport": "websocket",
+        "Host": "0.0.0.0",
+        "Port": 20000,
+        "Path": "/ws"
+      }
+    ]
   }
 }
 ```
 
-## Integration with existing APIs
-
-`AddFeatures()` is additive. It coexists with `AddULinkGameServerActors()`, `AddULinkGameServerSessions()`, and all other DI extension methods. Features can call these internally or be used alongside them.
-
-## Assembly scanning
-
-`FromAssembly()` discovers all concrete `INodeRole` implementations in the given assembly. Roles must have parameterless constructors. Types without one are silently skipped.
-
-## Error handling
-
-If a requested role is not found, `ResolveFeatures()` throws `InvalidOperationException` listing both the missing roles and the available ones. This surfaces configuration errors at startup, not at runtime.
+Business concepts such as `matchmaking` or `realtime` are feature names, not endpoint names. Endpoint routing is selected by transport requirements and the resolved endpoint catalog.
