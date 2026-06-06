@@ -71,6 +71,9 @@ internal sealed class ProjectScaffolder
         DeleteIfExists(Path.Combine(interfacesDirectory, "IPingService.cs.meta"));
         DeleteIfExists(Path.Combine(interfacesDirectory, "SharedDtos.cs.meta"));
         DeleteIfExists(Path.Combine(interfacesDirectory, "RpcContractIds.cs.meta"));
+
+        var serverStarterDirectory = Path.Combine(projectRoot, ToNativePath(ProjectConventions.StarterServerProjectPath));
+        await DeleteIfStarterPingSampleAsync(Path.Combine(serverStarterDirectory, "Services", "PingService.cs")).ConfigureAwait(false);
     }
 
     private static async Task DeleteIfStarterPingSampleAsync(string path)
@@ -103,6 +106,8 @@ internal sealed class ProjectScaffolder
             "RpcContractIds.cs" => source.Contains("class RpcContractIds", StringComparison.Ordinal)
                 && source.Contains("public const int Ping = 1;", StringComparison.Ordinal)
                 && source.Contains("public const int PingAsync = 1;", StringComparison.Ordinal),
+            "PingService.cs" => source.Contains("using Shared.Interfaces;", StringComparison.Ordinal)
+                && source.Contains("class PingService : IPingService", StringComparison.Ordinal),
             _ => false
         };
     }

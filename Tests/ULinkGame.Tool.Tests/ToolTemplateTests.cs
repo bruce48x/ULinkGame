@@ -668,6 +668,28 @@ public sealed class ToolTemplateTests
                 """,
                 TestContext.Current.CancellationToken);
             await File.WriteAllTextAsync(Path.Combine(interfacesDirectory, "IPingService.cs.meta"), "fileFormatVersion: 2", TestContext.Current.CancellationToken);
+            Directory.CreateDirectory(Path.Combine(serverDirectory, "Services"));
+            await File.WriteAllTextAsync(
+                Path.Combine(serverDirectory, "Services", "PingService.cs"),
+                """
+                using Shared.Interfaces;
+
+                namespace Server.Services
+                {
+                    public sealed class PingService : IPingService
+                    {
+                        public ValueTask<PingReply> PingAsync(PingRequest request)
+                        {
+                            return ValueTask.FromResult(new PingReply
+                            {
+                                Message = string.IsNullOrWhiteSpace(request.Message) ? "pong" : "pong: " + request.Message,
+                                ServerTimeUtc = DateTime.UtcNow.ToString("O")
+                            });
+                        }
+                    }
+                }
+                """,
+                TestContext.Current.CancellationToken);
 
             await new ProjectScaffolder().AugmentProjectWithULinkGameAsync(projectRoot, CliParser.ParseNewOptions([]));
 
@@ -675,6 +697,7 @@ public sealed class ToolTemplateTests
             Assert.False(File.Exists(Path.Combine(interfacesDirectory, "SharedDtos.cs")));
             Assert.False(File.Exists(Path.Combine(interfacesDirectory, "RpcContractIds.cs")));
             Assert.False(File.Exists(Path.Combine(interfacesDirectory, "IPingService.cs.meta")));
+            Assert.False(File.Exists(Path.Combine(serverDirectory, "Services", "PingService.cs")));
         }
         finally
         {
