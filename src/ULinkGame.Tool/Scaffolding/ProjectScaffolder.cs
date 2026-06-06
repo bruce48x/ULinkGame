@@ -390,8 +390,11 @@ internal sealed class ProjectScaffolder
     {
         return Task.WhenAll(
             WriteIfMissingAsync(
-                Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRoom.cs"),
-                ToolTemplates.RenderServerChatRoom()),
+                Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRoomActor.cs"),
+                ToolTemplates.RenderServerChatRoomActor()),
+            WriteIfMissingAsync(
+                Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatRules.cs"),
+                ToolTemplates.RenderServerChatRules()),
             WriteIfMissingAsync(
                 Path.Combine(projectRoot, "Server", "Server", "Chat", "ChatServiceImpl.cs"),
                 ToolTemplates.RenderServerChatServiceImpl()));
@@ -513,7 +516,7 @@ internal sealed class ProjectScaffolder
     private static Task WriteHotfixBoundaryFilesAsync(string projectRoot)
     {
         return WriteIfMissingAsync(
-            Path.Combine(projectRoot, "Server", "Hotfix", "Chat", "ChatSystem.cs"),
+            Path.Combine(projectRoot, "Server", "Hotfix", "Chat", "ChatRulesSystem.cs"),
             ToolTemplates.RenderHotfixChatSystem());
     }
 

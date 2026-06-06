@@ -349,77 +349,72 @@ internal static class ToolTemplates
         """;
     }
 
-    public static string RenderServerChatRoom()
+    public static string RenderServerChatRoomActor()
     {
         return """
         using System;
-        using System.Collections.Concurrent;
         using System.Collections.Generic;
         using System.Linq;
         using Shared.Contracts.Chat;
+        using ULinkGame.Server.Actors;
 
         namespace Server.Chat
         {
-            internal sealed class ChatRoom
+            internal sealed class ChatRoomActor : Actor
             {
                 private const int MaxRecentMessages = 100;
-                private readonly ConcurrentDictionary<string, (string Name, IChatCallback Callback)> _members = new();
-                private readonly ConcurrentQueue<ChatMessage> _recentMessages = new();
-                private readonly object _lock = new();
+                private readonly Dictionary<string, (string Name, IChatCallback Callback)> _members = new();
+                private readonly Queue<ChatMessage> _recentMessages = new();
+                private readonly ChatRules _rules = new();
 
-                public ChatJoinReply Join(string connectionId, string playerName, IChatCallback callback)
+                public ValueTask<ChatJoinReply> JoinAsync(string connectionId, string playerName, IChatCallback callback)
                 {
                     var member = new ChatMember { Name = playerName };
                     _members[connectionId] = (playerName, callback);
 
                     Broadcast(cb => cb.OnUserJoined(member), excludeConnectionId: null);
 
-                    return new ChatJoinReply
+                    return new ValueTask<ChatJoinReply>(new ChatJoinReply
                     {
                         Members = _members.Values.Select(v => new ChatMember { Name = v.Name }).ToList(),
                         RecentMessages = _recentMessages.ToList()
-                    };
+                    });
                 }
 
-                public void Send(string connectionId, string text)
+                public ValueTask SendAsync(string connectionId, string text)
                 {
                     if (!_members.TryGetValue(connectionId, out var entry))
                     {
-                        return;
+                        return ValueTask.CompletedTask;
                     }
 
+                    var filteredText = _rules.FilterMessage(text);
                     var msg = new ChatMessage
                     {
                         SenderName = entry.Name,
-                        Text = text,
+                        Text = filteredText,
                         Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                     };
 
                     _recentMessages.Enqueue(msg);
-                    lock (_lock)
+                    while (_recentMessages.Count > MaxRecentMessages)
                     {
-                        while (_recentMessages.Count > MaxRecentMessages)
-                        {
-                            _recentMessages.TryDequeue(out _);
-                        }
+                        _recentMessages.Dequeue();
                     }
 
                     Broadcast(cb => cb.OnMessageReceived(msg), excludeConnectionId: null);
+                    return ValueTask.CompletedTask;
                 }
 
-                public void Leave(string connectionId)
+                public ValueTask LeaveAsync(string connectionId)
                 {
-                    if (!_members.TryRemove(connectionId, out var entry))
+                    if (!_members.Remove(connectionId, out var entry))
                     {
-                        return;
+                        return ValueTask.CompletedTask;
                     }
 
                     Broadcast(cb => cb.OnUserLeft(new ChatUserLeft { Name = entry.Name }), excludeConnectionId: null);
-                }
-
-                public void Disconnect(string connectionId)
-                {
-                    Leave(connectionId);
+                    return ValueTask.CompletedTask;
                 }
 
                 private void Broadcast(Action<IChatCallback> action, string? excludeConnectionId)
@@ -445,44 +440,86 @@ internal static class ToolTemplates
         """;
     }
 
+    public static string RenderServerChatRules()
+    {
+        return """
+        using ULinkGame.Server.Hotfix.Abstractions;
+        using ULinkGame.Server.Hotfix.Dispatch;
+
+        namespace Server.Chat
+        {
+            [HotfixState]
+            public partial sealed class ChatRuleState
+            {
+            }
+
+            internal sealed class ChatRules
+            {
+                private readonly ChatRuleState _state = new();
+
+                public string FilterMessage(string text)
+                {
+                    return HotfixDispatch.Invoke<ChatRuleState, string, string>(
+                        "FilterMessage",
+                        _state,
+                        text);
+                }
+            }
+        }
+        """;
+    }
+
     public static string RenderServerChatServiceImpl()
     {
         return """
         using System;
         using Shared.Contracts.Chat;
+        using ULinkGame.Server.Actors;
 
         namespace Server.Chat
         {
             internal sealed class ChatServiceImpl : IChatService
             {
-                private static readonly ChatRoom SharedRoom = new();
+                private static readonly ActorId RoomId = ActorId.From("chat:global");
 
                 private readonly IChatCallback _callback;
-                private readonly ChatRoom _room;
+                private readonly IActorRuntime _actors;
                 private readonly string _connectionId;
 
-                public ChatServiceImpl(IChatCallback callback)
+                public ChatServiceImpl(IChatCallback callback, IActorRuntime actors)
                 {
                     _callback = callback;
-                    _room = SharedRoom;
+                    _actors = actors;
                     _connectionId = Guid.NewGuid().ToString("N");
                 }
 
                 public ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req)
                 {
-                    return new ValueTask<ChatJoinReply>(_room.Join(_connectionId, req.PlayerName, _callback));
+                    return _actors.AskAsync<ChatRoomActor, ChatJoinReply>(
+                        RoomId,
+                        (room, ct) => room.JoinAsync(_connectionId, req.PlayerName, _callback));
                 }
 
-                public ValueTask SendAsync(ChatSendRequest req)
+                public async ValueTask SendAsync(ChatSendRequest req)
                 {
-                    _room.Send(_connectionId, req.Text);
-                    return ValueTask.CompletedTask;
+                    await _actors.AskAsync<ChatRoomActor, bool>(
+                        RoomId,
+                        async (room, ct) =>
+                        {
+                            await room.SendAsync(_connectionId, req.Text);
+                            return true;
+                        });
                 }
 
-                public ValueTask LeaveAsync(ChatLeaveRequest req)
+                public async ValueTask LeaveAsync(ChatLeaveRequest req)
                 {
-                    _room.Leave(_connectionId);
-                    return ValueTask.CompletedTask;
+                    await _actors.AskAsync<ChatRoomActor, bool>(
+                        RoomId,
+                        async (room, ct) =>
+                        {
+                            await room.LeaveAsync(_connectionId);
+                            return true;
+                        });
                 }
             }
         }
@@ -492,24 +529,26 @@ internal static class ToolTemplates
     public static string RenderHotfixChatSystem()
     {
         return """
-        using Shared.Contracts.Chat;
+        using Server.Chat;
+        using ULinkGame.Server.Hotfix.Abstractions;
 
         namespace Server.Hotfix.Chat
         {
-            public static class ChatSystem
+            [FriendOf(typeof(ChatRuleState))]
+            [HotfixSystemOf(typeof(ChatRuleState))]
+            public static class ChatRulesSystem
             {
-                public static ChatMessage SanitizeMessage(this ChatMessage message)
+                public static string FilterMessage(this ChatRuleState self, string text)
                 {
-                    if (string.IsNullOrWhiteSpace(message.Text))
+                    if (string.IsNullOrWhiteSpace(text))
                     {
-                        message.Text = "<empty>";
-                    }
-                    else if (message.Text.Length > 500)
-                    {
-                        message.Text = message.Text[..500];
+                        return "<empty>";
                     }
 
-                    return message;
+                    var filtered = text.Length > 500 ? text[..500] : text;
+                    filtered = filtered.Replace("badword", "***", StringComparison.OrdinalIgnoreCase);
+                    filtered = filtered.Replace("脏话", "**", StringComparison.OrdinalIgnoreCase);
+                    return filtered;
                 }
             }
         }
