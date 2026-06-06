@@ -262,24 +262,25 @@ internal static class ToolTemplates
     {
         return """
         using System.Threading.Tasks;
+        using Shared.Contracts;
         using ULinkRPC.Core;
 
         namespace Shared.Contracts.Chat
         {
-            [RpcService(2, NotificationContract = typeof(IChatCallback))]
+            [RpcService(RpcContractIds.Services.Chat, NotificationContract = typeof(IChatCallback))]
             public interface IChatService
             {
-                [RpcMethod(1)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
-                [RpcMethod(2)] ValueTask SendAsync(ChatSendRequest req);
-                [RpcMethod(3)] ValueTask LeaveAsync(ChatLeaveRequest req);
+                [RpcMethod(RpcContractIds.ChatServiceMethods.JoinAsync)] ValueTask<ChatJoinReply> JoinAsync(ChatJoinRequest req);
+                [RpcMethod(RpcContractIds.ChatServiceMethods.SendAsync)] ValueTask SendAsync(ChatSendRequest req);
+                [RpcMethod(RpcContractIds.ChatServiceMethods.LeaveAsync)] ValueTask LeaveAsync(ChatLeaveRequest req);
             }
 
             [RpcNotificationContract(typeof(IChatService))]
             public interface IChatCallback
             {
-                [RpcNotification(1)] void OnMessageReceived(ChatMessage msg);
-                [RpcNotification(2)] void OnUserJoined(ChatMember member);
-                [RpcNotification(3)] void OnUserLeft(ChatUserLeft evt);
+                [RpcNotification(RpcContractIds.ChatNotifications.MessageReceived)] void OnMessageReceived(ChatMessage msg);
+                [RpcNotification(RpcContractIds.ChatNotifications.UserJoined)] void OnUserJoined(ChatMember member);
+                [RpcNotification(RpcContractIds.ChatNotifications.UserLeft)] void OnUserLeft(ChatUserLeft evt);
             }
         }
         """;

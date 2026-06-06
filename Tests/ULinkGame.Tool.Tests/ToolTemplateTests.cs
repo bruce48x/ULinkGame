@@ -151,6 +151,7 @@ public sealed class ToolTemplateTests
         var project = ToolTemplates.RenderServerProject(options);
         var sharedProject = ToolTemplates.RenderSharedProjectHotfixItemGroup();
         var sharedAssemblyInfo = ToolTemplates.RenderSharedHotfixAssemblyInfo();
+        var sharedContractIds = ToolTemplates.RenderSharedRpcContractIds();
         var sharedProtocols = ToolTemplates.RenderSharedChatProtocols();
         var sharedMessages = ToolTemplates.RenderSharedChatMessages();
         var hotfixProject = ToolTemplates.RenderHotfixProject();
@@ -165,6 +166,7 @@ public sealed class ToolTemplateTests
             project,
             sharedProject,
             sharedAssemblyInfo,
+            sharedContractIds,
             sharedProtocols,
             sharedMessages,
             hotfixProject,
@@ -183,7 +185,9 @@ public sealed class ToolTemplateTests
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
-        Assert.Contains("[RpcService(2, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("public const int Chat = 2;", sharedContractIds, StringComparison.Ordinal);
+        Assert.Contains("public const int MessageReceived = 1;", sharedContractIds, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(RpcContractIds.Services.Chat, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);
@@ -288,19 +292,38 @@ public sealed class ToolTemplateTests
     }
 
     [Fact]
-    public void RenderSharedChatProtocols_DefinesRpcServiceAndCallback()
+    public void RenderSharedChatProtocols_DefinesRpcServiceAndCallbackWithNamedContractIds()
     {
         var source = ToolTemplates.RenderSharedChatProtocols();
 
-        Assert.Contains("[RpcService(2", source, StringComparison.Ordinal);
-        Assert.Contains("typeof(IChatCallback)", source, StringComparison.Ordinal);
-        Assert.Contains("[RpcMethod(1)]", source, StringComparison.Ordinal);
-        Assert.Contains("[RpcMethod(2)]", source, StringComparison.Ordinal);
-        Assert.Contains("[RpcMethod(3)]", source, StringComparison.Ordinal);
-        Assert.Contains("[RpcNotification(1)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(RpcContractIds.Services.Chat, NotificationContract = typeof(IChatCallback))]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(RpcContractIds.ChatServiceMethods.JoinAsync)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(RpcContractIds.ChatServiceMethods.SendAsync)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcMethod(RpcContractIds.ChatServiceMethods.LeaveAsync)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcNotification(RpcContractIds.ChatNotifications.MessageReceived)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcNotification(RpcContractIds.ChatNotifications.UserJoined)]", source, StringComparison.Ordinal);
+        Assert.Contains("[RpcNotification(RpcContractIds.ChatNotifications.UserLeft)]", source, StringComparison.Ordinal);
         Assert.Contains("OnMessageReceived", source, StringComparison.Ordinal);
         Assert.Contains("OnUserJoined", source, StringComparison.Ordinal);
         Assert.Contains("OnUserLeft", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[RpcService(2", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[RpcMethod(1)]", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[RpcNotification(1)]", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenderSharedRpcContractIds_DefinesChatIds()
+    {
+        var source = ToolTemplates.RenderSharedRpcContractIds();
+
+        Assert.Contains("namespace Shared.Contracts", source, StringComparison.Ordinal);
+        Assert.Contains("public const int Chat = 2;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int JoinAsync = 1;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int SendAsync = 2;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int LeaveAsync = 3;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int MessageReceived = 1;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int UserJoined = 2;", source, StringComparison.Ordinal);
+        Assert.Contains("public const int UserLeft = 3;", source, StringComparison.Ordinal);
     }
 
     [Fact]

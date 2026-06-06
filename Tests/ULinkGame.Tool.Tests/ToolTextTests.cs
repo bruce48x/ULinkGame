@@ -203,6 +203,7 @@ public sealed class ToolTextTests
         var project = ToolTemplates.RenderServerProject(options);
         var sharedProject = ToolTemplates.RenderSharedProjectHotfixItemGroup();
         var sharedAssemblyInfo = ToolTemplates.RenderSharedHotfixAssemblyInfo();
+        var sharedContractIds = ToolTemplates.RenderSharedRpcContractIds();
         var sharedProtocols = ToolTemplates.RenderSharedChatProtocols();
         var sharedMessages = ToolTemplates.RenderSharedChatMessages();
         var hotfixProject = ToolTemplates.RenderHotfixProject();
@@ -217,6 +218,7 @@ public sealed class ToolTextTests
             project,
             sharedProject,
             sharedAssemblyInfo,
+            sharedContractIds,
             sharedProtocols,
             sharedMessages,
             hotfixProject,
@@ -235,7 +237,9 @@ public sealed class ToolTextTests
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Abstractions""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"PackageReference Include=""ULinkGame.Server.Hotfix.Generators""", sharedProject, StringComparison.Ordinal);
         Assert.Contains(@"InternalsVisibleTo(""Server.Hotfix"")", sharedAssemblyInfo, StringComparison.Ordinal);
-        Assert.Contains("[RpcService(2, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
+        Assert.Contains("public const int Chat = 2;", sharedContractIds, StringComparison.Ordinal);
+        Assert.Contains("public const int MessageReceived = 1;", sharedContractIds, StringComparison.Ordinal);
+        Assert.Contains("[RpcService(RpcContractIds.Services.Chat, NotificationContract = typeof(IChatCallback))]", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatService", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("interface IChatCallback", sharedProtocols, StringComparison.Ordinal);
         Assert.Contains("ChatJoinRequest", sharedMessages, StringComparison.Ordinal);
