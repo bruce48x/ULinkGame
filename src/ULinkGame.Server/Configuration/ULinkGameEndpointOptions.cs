@@ -23,4 +23,14 @@ public sealed class ULinkGameEndpointOptions
             ? $"{scheme}://{host}:{Port}"
             : $"{scheme}://{host}:{Port}{Path}";
     }
+
+    public string GetDefaultPath()
+    {
+        var normalizedTransport = Transport.ToLowerInvariant();
+        return normalizedTransport switch
+        {
+            "websocket" => "/ws",
+            _ => ""
+        };
+    }
 }
