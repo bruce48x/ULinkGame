@@ -1,7 +1,0 @@
-<Solution>
-  <Project Path="../Shared/Shared.csproj" />
-  <Project Path="../../../src/ULinkGame.Server/ULinkGame.Server.csproj" />
-  <Project Path="Gateway/Gateway.csproj" />
-  <Project Path="State.Contracts/State.Contracts.csproj" />
-  <Project Path="State/State.csproj" />
-</Solution>
