@@ -336,7 +336,6 @@ Default generated configuration should remain compact:
     },
     "Endpoints": [
       {
-        "Name": "game",
         "Transport": "kcp",
         "Host": "127.0.0.1",
         "Port": 20000
@@ -351,7 +350,7 @@ Advanced configuration should express source values, not derived internals.
 Acceptable advanced values:
 
 - node id
-- endpoint names, transports, hosts, ports, paths, and advertised addresses
+- endpoint transports, hosts, ports, paths, and advertised addresses
 - compact `ULinkGame:Feature` selection for process-local startup composition
 - topology or operational profile selected outside the framework schema
 - persistent storage provider and connection string names
@@ -367,7 +366,6 @@ Advanced configuration should still use user-facing ULinkGame concepts:
     "Feature": ["login", "battle"],
     "Endpoints": [
       {
-        "Name": "control",
         "Transport": "websocket",
         "Host": "0.0.0.0",
         "Port": 20000,
@@ -375,7 +373,6 @@ Advanced configuration should still use user-facing ULinkGame concepts:
         "AdvertisedHost": "game.example.com"
       },
       {
-        "Name": "gameplay",
         "Transport": "kcp",
         "Host": "0.0.0.0",
         "Port": 20001,

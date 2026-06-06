@@ -50,7 +50,6 @@ The default configuration should be:
     },
     "Endpoints": [
       {
-        "Name": "game",
         "Transport": "kcp",
         "Host": "127.0.0.1",
         "Port": 20000
@@ -70,7 +69,6 @@ For WebSocket transport, the generated endpoint includes the path:
     },
     "Endpoints": [
       {
-        "Name": "game",
         "Transport": "websocket",
         "Host": "127.0.0.1",
         "Port": 20000,
