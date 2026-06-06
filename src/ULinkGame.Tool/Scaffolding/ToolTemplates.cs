@@ -357,7 +357,7 @@ internal static class ToolTemplates
         namespace Shared.Contracts.Chat
         {
             [HotfixState]
-            public partial sealed class ChatRuleState
+            public partial class ChatRuleState
             {
             }
         }

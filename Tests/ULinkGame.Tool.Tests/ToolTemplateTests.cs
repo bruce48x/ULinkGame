@@ -485,7 +485,7 @@ public sealed class ToolTemplateTests
         var source = ToolTemplates.RenderSharedChatRuleState();
 
         Assert.Contains("[HotfixState]", source, StringComparison.Ordinal);
-        Assert.Contains("partial sealed class ChatRuleState", source, StringComparison.Ordinal);
+        Assert.Contains("partial class ChatRuleState", source, StringComparison.Ordinal);
         Assert.Contains("namespace Shared.Contracts.Chat", source, StringComparison.Ordinal);
     }
 

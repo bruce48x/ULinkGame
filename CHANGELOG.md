@@ -12,10 +12,12 @@
 - `ULinkGame.Tool` `0.6.0`
 - `ULinkGame.Tool` `0.6.1`
 - `ULinkGame.Tool` `0.6.2`
+- `ULinkGame.Tool` `0.6.4`
 - `ULinkGame.Tool` `0.6.3`
 
 ### Changed
 
+- `ULinkGame.Tool` `0.6.4`: fixed `CS0267` build error where `ChatRuleState` template used `partial sealed class` but the Hotfix source generator produced a conflicting `partial class` declaration without `sealed`.
 - `ULinkGame.Tool` `0.6.3`: replaced generated static mutable Chat room with `ChatRoomActor` through `IActorRuntime`. Added stable `ChatRules` Hotfix wrapper and valid `[HotfixSystemOf]` `ChatRulesSystem`. Generated Chat send path now filters messages through Hotfix before broadcasting.
 - `ULinkGame.Server` `0.3.1`: failed initial Hotfix load now throws and fails server startup instead of logging a warning and continuing.
 - `ULinkGame.Tool` `0.6.2`: also remove the server-side `PingService.cs` implementation when cleaning up starter Ping samples, so the generated server project compiles cleanly after Ping contracts are removed.
