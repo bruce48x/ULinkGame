@@ -30,7 +30,7 @@ public sealed class ToolTextTests
     [Fact]
     public void PinsCurrentStarterPackageVersion()
     {
-        Assert.Equal("0.4.1", ToolPackageVersions.ULinkRpcStarter);
+        Assert.Equal("0.4.2", ToolPackageVersions.ULinkRpcStarter);
     }
 
     [Fact]

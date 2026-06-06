@@ -6,6 +6,7 @@
 
 - `ULinkGame.Server` `0.2.0`
 - `ULinkGame.Tool` `0.5.0`
+- `ULinkGame.Tool` `0.5.1`
 
 ### Changed
 
@@ -13,6 +14,7 @@
 - Added Feature Catalog startup APIs with ordered `ULinkGameFeature` registration, feature dependencies, transport requirements, and fail-fast validation.
 - Updated guardrails, generated project templates, and Agar Unity Gateway sample to use `ULinkGame:Endpoints[]` and Feature Catalog startup instead of singular endpoint or role-shaped configuration.
 - Updated configuration/startup documentation and package READMEs to make the new schema the current guidance.
+- `ULinkGame.Tool` `0.5.1`: relaxed `ulinkrpc-starter` version check from exact match to `>=` minimum; auto-update now installs latest available version instead of pinning to a specific version.
 
 ## 2026-06-05
 
