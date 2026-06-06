@@ -312,7 +312,7 @@ var remoteReply = await rooms
 
 The lower-level `AskRemoteAsync` and `TellRemoteAsync` helpers remain available for custom cluster actor envelope plumbing.
 
-See `docs/remote-actor-messaging.md` for details.
+See `../../docs/remote-actor-messaging.md` for details.
 
 ## Message Recording
 
