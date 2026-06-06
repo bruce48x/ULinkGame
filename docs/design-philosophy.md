@@ -79,7 +79,7 @@ These belong to game projects. The framework provides infrastructure; the game p
 |---------|--------|--------|-----------|
 | Actor mailbox + diagnostics | skynet | Done (ULinkActor) | Core concurrency model |
 | Reliable push (at-least-once) | skynet (message log concept) | Done (ULinkGame) | Business-level delivery guarantee |
-| Hot-reloadable business logic | skynet (Lua hotswap) | Done (ULinkGame.Hotfix) | Zero-downtime logic updates |
+| Hot-reloadable business logic | skynet (Lua hotswap) | Done (`ULinkGame.Server.Hotfix`) | Zero-downtime logic updates |
 | Explicit cluster routing | skynet (harbor) | Done (ULinkGame.Cluster) | Cross-node messaging with visible boundaries |
 | Session lifecycle + reconnect | skynet (gate/watchdog/agent) | Done (ULinkGame.Server) | Connection management |
 | Component-based assembly (N→1, 1→N) | ET | Planned | Single-process dev, multi-process prod |

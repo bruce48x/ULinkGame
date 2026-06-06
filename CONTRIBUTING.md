@@ -4,14 +4,13 @@ This document is for people working on the ULinkGame repository itself. User-fac
 
 ## Design Documentation
 
-Before contributing, read the design philosophy and architectural boundary documents:
+Before contributing, read the design philosophy and architectural boundary documents. This list names the stable documentation entry points; implementation plans are historical once their work lands.
 
 - **[Design Philosophy](docs/design-philosophy.md)** — The design principles (influenced by skynet), analysis of four reference frameworks (skynet, ET, Fantasy, GeekServer), what we absorb and reject, and the development roadmap.
 - **[ULinkActor Boundary](docs/ulinkactor-boundary.md)** — The responsibility split between ULinkActor (process-local actor runtime) and ULinkGame (distributed game server), the facade pattern, and configuration flow.
 - **[ULinkGame.Tool Default Experience](docs/ulinkgame-tool-default-experience.md)** — The generated project experience, reduced default configuration surface, derived runtime state, and check-command direction for `ulinkgame-tool new`.
 - **[ULinkGame Configuration And Startup Model](docs/ulinkgame-configuration-startup.md)** — The canonical `ULinkGame` configuration schema, Feature Catalog startup model, endpoint rules, and local validation boundary.
 - **[ULinkGame Runtime Guardrails](docs/ulinkgame-runtime-guardrails.md)** — The framework-level validation model for preventing invalid Cluster, Hotfix, Reliable Push, endpoint, and production-profile states.
-- **[ULinkGame Runtime Guardrails Implementation Plan](docs/ulinkgame-runtime-guardrails-implementation-plan.md)** — The task-by-task plan for implementing the first shared runtime validation loop and generated check integration.
 
 The core principle: **skynet compatibility is the litmus test.** Features from ET, Fantasy, or GeekServer are adopted only when they do not conflict with skynet's philosophy of explicit boundaries, fail-fast behavior, and bounded resources.
 
@@ -22,7 +21,7 @@ src/
   ULinkGame.Abstractions/  Cross-side framework-owned session and reliable push primitives
     Sessions/              Session identity, endpoint names, and resume decisions
     ReliablePush/          Reliable push sequence and acknowledgement primitives
-  ULinkGame.Server/       Server-side RPC hosting, session lifecycle, reliable push outbox, and ULinkActor-based execution
+  ULinkGame.Server/       Server-side RPC hosting, session lifecycle, reliable push outbox, guardrails, health checks, and ULinkActor-based execution
   ULinkGame.Client/       Engine-neutral client helpers, currently reliable push tracking
   ULinkGame.Cluster/      Optional explicit cluster route contracts and in-memory routing primitives
     Actors/                Cluster actor route keys and envelopes
@@ -37,6 +36,7 @@ src/
     Protocol/              ULinkRPC cluster service and method identifiers
     Routes/                ULinkRPC route-directory client, binder, and DTO conversion
     Transports/            ULinkRPC transport endpoint and factory abstractions
+  ULinkGame.Server.*      Hotfix, generator, and other server-adjacent packages
   ULinkGame.Tool/         Project management tool entry point
     Cli/                   CLI entry point, parser, application flow, and localized text
     Infrastructure/        Process execution helpers
@@ -53,8 +53,7 @@ Tests/
   tests.slnx              Framework test entry point
   ULinkGame.Client.Tests/ Client package unit tests
   ULinkGame.Cluster.Tests/ Cluster package unit tests
-  ULinkGame.Cluster.ULinkRPC.Tests/ ULinkRPC cluster adapter unit and TCP smoke tests
-  ULinkGame.Server.Tests/ Server package unit tests
+  *.Tests/                Package and sample test projects included by tests.slnx
 
 blog/
   Hugo blog and user-facing article source
@@ -64,7 +63,7 @@ User-facing articles live in the Hugo site under root `blog/`. Do not put intern
 
 ### Samples
 
-The repository currently contains one cluster infrastructure sample and two game client samples:
+The repository currently contains one cluster infrastructure sample and two game samples:
 
 ```txt
 
@@ -77,7 +76,9 @@ samples/Agar.Unity/
   Client/  Unity client
 
 samples/Agar.Godot/
-  Godot .NET client playground that consumes ULinkGame.Client from NuGet and references Agar.Unity/Shared
+  Shared/  MemoryPack contracts and shared gameplay kernel
+  Server/  .NET Gateway server with ULinkActor-based state runtime, WebSocket control plane, KCP realtime plane
+  Client/  Godot .NET client
 ```
 
 `samples/Cluster.TwoNode` starts a directory process and worker process, then verifies ULinkRPC-based node registration, route registration, local dispatch, remote dispatch, route not found, expired message rejection, timeout, handler unavailable, backpressure, stale registration rejection, clear-by-node-epoch, and node restart with a new directory-assigned epoch.
@@ -97,7 +98,7 @@ dotnet run --project samples/Cluster.TwoNode/Cluster.TwoNode.csproj -- --mode dr
 - business-level reliable push for server notifications
 - an agar-style arena built on a shared simulation kernel
 
-`samples/Agar.Godot` is intentionally smaller. It is an offline Godot .NET client playground that reuses the shared agar gameplay kernel and `ULinkGame.Client` reliable push helpers.
+`samples/Agar.Godot` follows the same high-level shape as the Unity sample with its own shared contracts, server projects, and Godot client. It is intentionally smaller than the Unity sample, but it is an online client/server sample, not an offline playground.
 
 Sample-specific documentation and local infrastructure live with the sample:
 
@@ -116,7 +117,7 @@ dotnet run --project samples/Agar.Unity/Server/Gateway/Gateway.csproj
 
 Open `samples/Agar.Unity/Client` in Unity for the client.
 
-Open `samples/Agar.Godot` in Godot 4 .NET for the Godot client playground.
+Open `samples/Agar.Godot/Client` in Godot 4 .NET for the Godot client.
 
 ## Contributor Workflow
 
@@ -129,24 +130,16 @@ Run this checklist before every commit:
 3. If the changed package version is consumed by `ULinkGame.Tool` scaffolding or samples, update the generated template constants, package-version readers, sample package references, or changelog entries in the same commit so newly scaffolded projects consume the intended package version.
 4. Do not bump package versions for test-only or docs-only changes unless those changes alter files packed into a package or otherwise need to ship in a NuGet artifact.
 5. Run the relevant local tests before committing.
+6. Delete `docs/superpowers/` before finishing a development branch. Superpowers specs and plans are temporary working notes. Move durable decisions into the stable docs under `docs/` first, then remove the temporary directory.
 
 Package version bumps are a commit-time rule. The publish workflow pushes with `--skip-duplicate`; if a changed package keeps an already-published version, the CI run can still succeed while nuget.org silently skips that package. Downstream consumers then keep receiving the stale package.
 
 ### Build And Test
 
-Build framework projects:
+Use the solution file instead of maintaining package-by-package command lists in this document:
 
 ```powershell
-dotnet build src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj
-dotnet build src/ULinkGame.Server/ULinkGame.Server.csproj
-dotnet build src/ULinkGame.Client/ULinkGame.Client.csproj
-dotnet build src/ULinkGame.Cluster/ULinkGame.Cluster.csproj
-dotnet build src/ULinkGame.Tool/ULinkGame.Tool.csproj
-```
-
-Build and run unit tests:
-
-```powershell
+dotnet build Tests/tests.slnx
 dotnet test Tests/tests.slnx
 ```
 
@@ -172,13 +165,7 @@ Useful local checks:
 
 ```powershell
 dotnet test Tests/tests.slnx
-dotnet pack src/ULinkGame.Abstractions/ULinkGame.Abstractions.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Client/ULinkGame.Client.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Server/ULinkGame.Server.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Cluster/ULinkGame.Cluster.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Cluster.Sql/ULinkGame.Cluster.Sql.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Cluster.ULinkRPC/ULinkGame.Cluster.ULinkRPC.csproj -c Release -o artifacts/nuget
-dotnet pack src/ULinkGame.Tool/ULinkGame.Tool.csproj -c Release -o artifacts/nuget
+Get-ChildItem src -Filter *.csproj -Recurse | ForEach-Object { dotnet pack $_.FullName -c Release -o artifacts/nuget }
 ```
 
 ## Package Boundaries

@@ -326,7 +326,7 @@ var store = provider.GetRequiredService<IMessageLogStore>();
 var log = await store.GetLogAsync(ActorId.From("player/alice"));
 ```
 
-See `docs/message-recording.md` for details.
+See `../../docs/message-recording.md` for details.
 
 ## Actor Runtime Configuration
 

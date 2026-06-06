@@ -14,7 +14,7 @@ Tooling and runtime validation have different responsibilities:
 
 - `ULinkGame.Tool` hides unnecessary choices and generates safe defaults.
 - ULinkGame runtime packages enforce invariants that must hold for a server to run correctly.
-- `--ulinkgame-check` explains the final derived state and repair steps in user-facing language.
+- `--health-check`, `--readiness-check`, and the compatibility `--ulinkgame-check` explain runtime state at the right operational boundary.
 
 Do not make Cluster, Hotfix, or Reliable Push ordinary optional modules in generated projects. They are part of the ULinkGame application model. Users may change their source, storage, topology, or deployment profile, but generated projects should not teach users to disable the core model.
 
@@ -282,9 +282,17 @@ Startup exceptions should preserve diagnostic codes so tests and tools can asser
 
 ## Check Command Behavior
 
-Generated `--ulinkgame-check` should call the same runtime validation pipeline used by startup.
+Generated readiness checks should call the same runtime validation pipeline used by startup. `--ulinkgame-check` remains available for compatibility and local inspection, but new deployment automation should use the more explicit probes:
 
-The check command should format diagnostics for humans:
+- `--health-check`: liveness only. It is fast, does not perform network calls, and answers whether the process is alive and minimally configured.
+- `--readiness-check`: liveness plus applicable guardrails. It answers whether the node is ready to receive traffic. It supports `--json`.
+- `--ulinkgame-check`: local/developer compatibility surface for the readiness output.
+
+Liveness failure must imply readiness failure. Readiness failure does not necessarily imply liveness failure; for example, a missing hotfix assembly means the process is alive but not ready.
+
+Cluster profile liveness validates node id, advertised endpoints, configured cluster services, and non-empty endpoint keys/values. Standalone liveness validates node id and configured business endpoints, and skips cluster service graph requirements.
+
+Readiness output should format diagnostics for humans:
 
 ```txt
 cluster: ok single-node

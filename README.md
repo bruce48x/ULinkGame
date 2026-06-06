@@ -204,13 +204,16 @@ ULinkGame is infrastructure, not a full game business framework. It does not cho
 
 ## Packages
 
-| Package | Description |
-|---|---|
-| `ULinkGame.Abstractions` | Shared types: sessions, endpoints, reliable push primitives |
-| `ULinkGame.Client` | Client helpers: reconnect state, push inbox, session tracking |
-| `ULinkGame.Server` | Server runtime: actor execution, sessions, reliable push outbox |
-| `ULinkGame.Cluster` | Cluster routing contracts and directory primitives |
-| `ULinkGame.Tool` | CLI scaffolding tool (`ulinkgame-tool new`) |
+The repository publishes several small packages under `src/`. The stable entry points are:
+
+- `ULinkGame.Tool` for `ulinkgame-tool new`
+- `ULinkGame.Server` for server hosting, actors, sessions, reliable push, health checks, and guardrails
+- `ULinkGame.Client` for engine-neutral client helpers
+- `ULinkGame.Abstractions` for shared framework primitives
+- `ULinkGame.Cluster`, `ULinkGame.Cluster.ULinkRPC`, and `ULinkGame.Cluster.Sql` for optional cluster routing and persistence adapters
+- `ULinkGame.Server.Hotfix.*` and `ULinkGame.Server.Generators` for hotfix and generated actor APIs
+
+Use the package README under each `src/<PackageName>/` directory for package-specific usage. The exact package list is intentionally kept in `src/` and `CHANGELOG.md` so this overview does not drift every time a package is split.
 
 ## Platform Support
 

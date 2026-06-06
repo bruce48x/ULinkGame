@@ -4,7 +4,7 @@
 
 ULinkGame needs one long-term configuration and startup contract for generated projects, repository samples, and user applications.
 
-The current project is still early, so this design intentionally optimizes for the future contract instead of preserving older sample or tool template shapes. Incorrect configuration should fail at startup or in `--ulinkgame-check`; it should not be accepted through compatibility branches that make the model harder to explain.
+The current project is still early, so this design intentionally optimizes for the long-term contract while documenting current implementation escape hatches where they exist. Incorrect configuration should fail at startup or in readiness checks; it should not be accepted through compatibility branches that make the model harder to explain.
 
 ## Design Goals
 
@@ -19,12 +19,14 @@ The current project is still early, so this design intentionally optimizes for t
 
 All application configuration lives under `ULinkGame`.
 
-Supported top-level keys:
+Supported top-level keys under `ULinkGame`:
 
 - `Node`: required node identity.
 - `Endpoints`: optional array of business-facing RPC endpoints.
 - `Feature`: optional array of project Feature names enabled in the current process.
-- `Cluster`: optional minimal cluster participation settings.
+- `Cluster`: optional compact cluster participation settings.
+
+Generated Docker Compose scaffolds also accepts a top-level `Cluster` section for cluster operational settings such as advertised endpoints, node-directory bootstrap endpoints, node-directory storage mode, service descriptors, route lease duration, and send timeout. That section is the current framework-owned operational shape used by `ClusterOptions`; it should stay out of the default `appsettings.json` unless the project is explicitly configuring cluster deployment behavior.
 
 The schema does not include:
 
@@ -34,7 +36,7 @@ The schema does not include:
 - `Services.Enabled`
 - `Endpoint` as a single object
 - top-level business endpoint sections such as `ControlPlane` or `Realtime`
-- `Cluster.Directory` or storage settings that are not supported yet
+- duplicate cluster configuration sections that represent the same setting in two places
 
 ### Single-Process Development
 
@@ -192,7 +194,7 @@ The singular key `Feature` is intentional because it names the framework concept
 
 ### Cluster
 
-`ULinkGame:Cluster` is optional. The first supported shape is deliberately small:
+`ULinkGame:Cluster` is optional. The long-term source configuration shape is deliberately small:
 
 ```json
 {
@@ -210,7 +212,18 @@ Rules:
 - If `Seeds` is omitted or empty, it defaults to the local `Cluster.Endpoint`.
 - `Cluster.Endpoint` must not conflict with business endpoint ports in the same process.
 
-`Cluster.Directory` and durable directory storage are out of scope until the framework has implemented and tested them.
+The current generated Compose and health-check path uses the framework `ClusterOptions` family for operational overrides. Those settings are expressed under top-level `Cluster` environment variables:
+
+- `Cluster:NodeId`
+- `Cluster:AdvertisedEndpoints`
+- `Cluster:Bootstrap:NodeDirectoryEndpoints`
+- `Cluster:NodeDirectory:Enabled`
+- `Cluster:NodeDirectory:Storage:Mode`
+- `Cluster:Services`
+- `Cluster:RouteLeaseSeconds`
+- `Cluster:SendTimeoutMilliseconds`
+
+Default local `appsettings.json` should still stay compact. Put the operational `Cluster` section in deployment-specific files or environment variables, not in the first-run config.
 
 ## Program.cs Startup Model
 
@@ -342,12 +355,12 @@ Out-of-scope validation:
 
 - Whole-deployment validation across multiple config files.
 - Production profile checks.
-- Durable node-directory or route-directory storage validation.
+- Provider-specific durable node-directory behavior beyond validating selected local options.
 - Multi-instance same-transport endpoints.
 
 ## Check Command
 
-`--ulinkgame-check` should call the same resolver and validator used by startup.
+Readiness checks should call the same resolver and validator used by startup. `--ulinkgame-check` remains a compatibility alias for local project inspection; new generated deployment checks should prefer `--readiness-check`, and Docker liveness should use `--health-check`.
 
 Suggested text output:
 
@@ -376,6 +389,7 @@ The tool should generate:
 - `ULinkGame:Endpoints`
 - optional `ULinkGame:Feature` only when the generated project is intentionally split
 - optional `ULinkGame:Cluster` only when the selected template participates in cluster routing
+- top-level operational `Cluster` environment variables only for deployment scaffolds such as Docker Compose
 
 `samples/Agar.Unity` should move its control WebSocket and realtime KCP listeners into `ULinkGame:Endpoints`. `control` and `realtime` remain business concepts in Agar code, not endpoint names in the framework schema. Agar Features can declare transport requirements, for example battle requiring `kcp` and login/control requiring `websocket`.
 
