@@ -1,0 +1,219 @@
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using ULinkGame.Server.Configuration;
+using ULinkGame.Server.Features;
+using ULinkGame.Server.Health;
+using ULinkGame.Server.Hotfix;
+using ULinkGame.Server.Hotfix.Loading;
+
+namespace ULinkGame.Server.Hosting;
+
+public static class ULinkGameServer
+{
+    public static Task<int> RunAsync(string[] args)
+    {
+        return RunAsync(args, _ => { });
+    }
+
+    public static async Task<int> RunAsync(string[] args, Action<ULinkGameServerBuilder> configure)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
+        builder.Configuration
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables();
+
+        var serverBuilder = new ULinkGameServerBuilder(builder);
+        configure(serverBuilder);
+        serverBuilder.ApplyToHostBuilder();
+
+        var runtimeOptions = ULinkGameRuntimeOptions.FromConfiguration(builder.Configuration);
+
+        // Health check commands (exit before full startup)
+        if (args.Contains("--ulinkgame-check", StringComparer.Ordinal))
+        {
+            var clusterOptions = runtimeOptions.ToClusterOptions(builder.Configuration, serverBuilder.GetTransport());
+            return ULinkGameReadinessProbe.Run(runtimeOptions, clusterOptions, args);
+        }
+
+        if (args.Contains("--health-check", StringComparer.Ordinal))
+        {
+            var clusterOptions = TryBuildClusterOptions(runtimeOptions, builder.Configuration, serverBuilder.GetTransport());
+            return ULinkGameLivenessProbe.Run(clusterOptions, runtimeOptions);
+        }
+
+        if (args.Contains("--readiness-check", StringComparer.Ordinal))
+        {
+            var clusterOptions = TryBuildClusterOptions(runtimeOptions, builder.Configuration, serverBuilder.GetTransport());
+            return ULinkGameReadinessProbe.Run(runtimeOptions, clusterOptions, args);
+        }
+
+        // Full startup
+        builder.Services.AddULinkGameServer();
+        builder.Services.AddSingleton(runtimeOptions);
+        builder.Services.AddSingleton(_ => runtimeOptions.ToServerRpcServerOptions(serverBuilder.GetTransport()));
+
+        // Register primary RPC configurator
+        builder.Services.AddSingleton<IULinkRpcServerConfigurator>(sp =>
+            new ULinkGameRpcConfigurator(
+                runtimeOptions.ToServerRpcServerOptions(serverBuilder.GetTransport()),
+                serverBuilder.GetSerializerFactory(),
+                serverBuilder.GetAcceptorFactory(),
+                serverBuilder.GetServiceBinder())
+            { Name = "default" });
+
+        // Register additional RPC endpoints
+        foreach (var endpoint in serverBuilder.GetAdditionalEndpoints())
+        {
+            builder.Services.AddSingleton<IULinkRpcServerConfigurator>(sp =>
+                new ULinkGameRpcConfigurator(
+                    runtimeOptions.ToServerRpcServerOptions(endpoint.Transport),
+                    endpoint.SerializerFactory,
+                    endpoint.AcceptorFactory,
+                    endpoint.ServiceBinder)
+                { Name = endpoint.Name });
+        }
+
+        // Cluster options (may throw for standalone — wrap gracefully)
+        try
+        {
+            builder.Services.AddSingleton(
+                runtimeOptions.ToClusterOptions(builder.Configuration, serverBuilder.GetTransport()));
+        }
+        catch (InvalidOperationException)
+        {
+            // Standalone — no cluster config; services that need ClusterOptions handle null
+        }
+
+        // Feature registration
+        var featureConfig = serverBuilder.GetFeatureConfiguration();
+        if (featureConfig is not null)
+        {
+            var catalogBuilder = new ULinkGameFeatureCatalogBuilder();
+            featureConfig(catalogBuilder);
+            var catalog = catalogBuilder.Build(runtimeOptions);
+            builder.Services.AddSingleton(catalog);
+        }
+        else
+        {
+            DiscoverAndRegisterFeatures(builder.Services, builder.Configuration);
+        }
+
+        // Hotfix
+        var hotfixDirectory = Path.Combine(AppContext.BaseDirectory, "hotfix");
+        builder.Services.AddULinkGameHotfix(
+            new CurrentDirectoryHotfixAssemblySource(hotfixDirectory, "Server.Hotfix.dll"),
+            sharedAssemblyNames: new[] { "Shared" });
+
+        // Gateway (registers ULinkRpcServersHostedService)
+        builder.Services.AddULinkGameServerGateway();
+
+        var host = builder.Build();
+        await LoadInitialHotfixAsync(host);
+        await host.RunAsync();
+        return 0;
+    }
+
+    private static ClusterOptions? TryBuildClusterOptions(
+        ULinkGameRuntimeOptions runtimeOptions,
+        IConfiguration configuration,
+        string transport)
+    {
+        try
+        {
+            return runtimeOptions.ToClusterOptions(configuration, transport);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task LoadInitialHotfixAsync(IHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var hotfix = scope.ServiceProvider.GetRequiredService<IHotfixManager>();
+        var logger = scope.ServiceProvider
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Server.Hotfix");
+        var result = await hotfix.ReloadAsync();
+
+        if (result.Succeeded)
+        {
+            logger.LogInformation(
+                "Initial hotfix load succeeded from {HotfixPath} with {MethodCount} method(s).",
+                result.Current.SourcePath,
+                result.Current.Methods.Count);
+            return;
+        }
+
+        logger.LogWarning(
+            "Initial hotfix load failed for {HotfixPath}: {ErrorMessage}",
+            result.RequestedPath,
+            result.ErrorMessage);
+        foreach (var diagnostic in result.Diagnostics)
+        {
+            logger.LogWarning("Hotfix diagnostic: {Diagnostic}", diagnostic);
+        }
+    }
+
+    private static void DiscoverAndRegisterFeatures(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var featureBuilder = new FeatureBuilder();
+
+        var entryAssembly = Assembly.GetEntryAssembly();
+        if (entryAssembly is not null)
+        {
+            featureBuilder.FromAssembly(entryAssembly);
+        }
+
+        // Referenced assemblies with project prefix
+        var entryName = entryAssembly?.GetName().Name ?? "";
+        foreach (var referencedAssembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var name = referencedAssembly.GetName().Name;
+            if (name is not null
+                && name.StartsWith(entryName, StringComparison.OrdinalIgnoreCase)
+                && name != entryName) // don't double-scan entry assembly
+            {
+                featureBuilder.FromAssembly(referencedAssembly);
+            }
+        }
+
+        // Hotfix assemblies
+        var hotfixDir = Path.Combine(AppContext.BaseDirectory, "hotfix");
+        if (Directory.Exists(hotfixDir))
+        {
+            foreach (var dll in Directory.GetFiles(hotfixDir, "*.dll"))
+            {
+                try
+                {
+                    var hotfixAssembly = Assembly.LoadFrom(dll);
+                    featureBuilder.FromAssembly(hotfixAssembly);
+                }
+                catch
+                {
+                    // Skip unloadable assemblies
+                }
+            }
+        }
+
+        var features = featureBuilder.ResolveFeatures()
+            .OrderBy(f => f.GetType().Assembly.GetName().Name)
+            .ThenBy(f => f.GetType().FullName)
+            .ToArray();
+
+        foreach (var feature in features)
+        {
+            feature.Configure(services, configuration);
+            services.AddSingleton(feature.GetType(), feature);
+        }
+    }
+}

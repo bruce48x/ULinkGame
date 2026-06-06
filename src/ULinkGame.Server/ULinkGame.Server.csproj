@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="ULinkRPC.Server" Version="0.12.1" />
     <PackageReference Include="ULinkActor" Version="0.5.16" />
@@ -19,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ULinkGame.Abstractions\ULinkGame.Abstractions.csproj" />
     <ProjectReference Include="..\ULinkGame.Cluster\ULinkGame.Cluster.csproj" />
+    <ProjectReference Include="..\ULinkGame.Server.Hotfix\ULinkGame.Server.Hotfix.csproj" />
   </ItemGroup>
 
   <ItemGroup>
